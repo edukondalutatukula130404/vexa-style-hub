@@ -122,6 +122,7 @@ function Dashboard() {
                     src={p.image}
                     alt={p.name}
                     loading="lazy"
+                    decoding="async"
                     width={900}
                     height={1100}
                     className="size-16 rounded-sm object-cover transition-transform duration-500 group-hover:scale-105"

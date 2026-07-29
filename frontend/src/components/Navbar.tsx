@@ -31,13 +31,22 @@ export function Navbar() {
       }`}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5">
-        <Link to="/" className="group flex flex-col leading-none">
-          <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
-            VEXA
-          </span>
-          <span className="mt-1 text-[9px] tracking-[0.34em] text-muted-foreground">
-            WEAR CONFIDENCE
-          </span>
+        <Link to="/" className="group flex items-center gap-3 leading-none">
+          <img
+            src="/favicon.svg"
+            alt="VEXA Logo"
+            loading="lazy"
+            decoding="async"
+            className="size-8 rounded-md transition-transform duration-300 group-hover:scale-105"
+          />
+          <div className="flex flex-col">
+            <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
+              VEXA
+            </span>
+            <span className="mt-1 text-[9px] tracking-[0.34em] text-muted-foreground">
+              WEAR CONFIDENCE
+            </span>
+          </div>
         </Link>
 
         <ul className="hidden items-center gap-8 lg:flex">

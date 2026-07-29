@@ -57,9 +57,11 @@ function Home() {
           <img
             src={heroImg}
             alt="VEXA premium oversized t-shirts on black marble pedestals"
+            loading="lazy"
+            decoding="async"
             width={1600}
             height={1104}
-            className="h-full w-full object-cover opacity-45"
+            className="h-full w-full object-cover opacity-45 transition-opacity duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/60 to-background" />
         </div>

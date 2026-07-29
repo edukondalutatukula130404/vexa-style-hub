@@ -42,9 +42,10 @@ function About() {
           src={heroImg}
           alt="VEXA studio display of premium t-shirts"
           loading="lazy"
+          decoding="async"
           width={1600}
           height={1104}
-          className="absolute inset-0 h-full w-full object-cover opacity-25"
+          className="absolute inset-0 h-full w-full object-cover opacity-25 transition-opacity duration-700"
         />
         <div className="relative mx-auto max-w-4xl px-5 py-24 text-center">
           <Reveal>

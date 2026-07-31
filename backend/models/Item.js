@@ -20,6 +20,14 @@ const itemSchema = new mongoose.Schema(
       type: String,
       default: 'General'
     },
+    collectionType: {
+      type: String,
+      default: 'Explore Collections'
+    },
+    image: {
+      type: String,
+      default: ''
+    },
     inStock: {
       type: Boolean,
       default: true

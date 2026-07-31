@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState, useMemo, useEffect } from "react";
 import {
   Shirt,
   Wind,
@@ -8,11 +9,17 @@ import {
   BadgeIndianRupee,
   MessageCircle,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import heroImg from "@/assets/hero.jpg";
-import { products, SIZES } from "@/lib/products";
+import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
+import promoBanner1 from "@/assets/promo_banner_1.png";
+import promoBanner2 from "@/assets/promo_banner_2.png";
+import { products as defaultProducts, SIZES, useProducts } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,7 +55,172 @@ const services = [
   { icon: ShieldCheck, title: "Quality Guarantee", text: "30-day easy returns" },
 ];
 
+const heroBanners = [
+  {
+    tag: "Elevate your everyday style",
+    title: "Premium T-Shirt Collection",
+    highlight: "Collection",
+    description: "Engineered in 240 GSM heavyweight cotton, finished by hand, and cut for the modern oversized silhouette. This is VEXA — wear confidence, wear style.",
+    ctaText: "Shop the drop",
+    ctaLink: "/products",
+    secondaryText: "Our story",
+    secondaryLink: "/about",
+    image: heroLuxuryImg,
+    badgeText: "Signature Drop",
+    discount: "30% Off",
+  },
+  {
+    tag: "New Streetwear Edition",
+    title: "Heavyweight Oversized Fit",
+    highlight: "Oversized Fit",
+    description: "Bio-washed combed cotton with double-stitched collar reinforcement. Sculpted drape designed for lasting luxury and everyday comfort.",
+    ctaText: "Explore Catalog",
+    ctaLink: "/products",
+    secondaryText: "Learn More",
+    secondaryLink: "/about",
+    image: heroLuxuryImg,
+    badgeText: "240 GSM Heavy",
+    discount: "Free Ship",
+  },
+  {
+    tag: "Bespoke Branding & Concierge",
+    title: "Custom Tee Booking",
+    highlight: "Booking",
+    description: "Order personalized colorways, custom logo embroidery, and bulk tee reservations directly from your user dashboard.",
+    ctaText: "Book Custom Tee",
+    ctaLink: "/dashboard?tab=booking",
+    secondaryText: "Customer Support",
+    secondaryLink: "/dashboard?tab=support",
+    image: heroLuxuryImg,
+    badgeText: "Custom Service",
+    discount: "Express",
+  },
+];
+
+const promoCarouselBanners = [
+  {
+    tag: "LIMITED EDITION DROP",
+    title: "URBAN SILHOUETTE COLLECTION",
+    subtitle: "FLAT 30% OFF STOREWIDE",
+    text: "Sculpted from 240 GSM bio-washed heavy cotton with double-stitched collar reinforcement. Engineered for superior drape and longevity.",
+    ctaText: "EXPLORE COLLECTION",
+    ctaLink: "/products",
+    image: promoBanner1,
+  },
+  {
+    tag: "BESPOKE CUSTOMISATION",
+    title: "BOOK YOUR CUSTOM TEE",
+    subtitle: "PERSONALIZED EMBROIDERY & BULK ORDERS",
+    text: "Personalize colorways, custom embroidery & bulk orders directly from your user dashboard with live tracking and concierge support.",
+    ctaText: "BOOK CUSTOM TEE",
+    ctaLink: "/dashboard",
+    image: promoBanner2,
+  },
+  {
+    tag: "VEXA SIGNATURE ESSENTIALS",
+    title: "240 GSM HEAVYWEIGHT FIT",
+    subtitle: "COMFORT MEETS LUXURY STREETWEAR",
+    text: "Engineered for lasting quality, zero color bleeding, and pre-shrunk combed long-staple luxury cotton.",
+    ctaText: "SHOP CATALOG",
+    ctaLink: "/products",
+    image: heroLuxuryImg,
+  },
+];
+
 function Home() {
+  const { products } = useProducts();
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [featureIndex, setFeatureIndex] = useState(0);
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [bannerIndex, setBannerIndex] = useState(0);
+
+  // Dynamic Media State managed by Admin Portal
+  const [heroImgState, setHeroImgState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("vexa_home_hero_img") || heroLuxuryImg;
+    }
+    return heroLuxuryImg;
+  });
+  const [banner1ImgState, setBanner1ImgState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("vexa_home_banner1_img") || promoBanner1;
+    }
+    return promoBanner1;
+  });
+  const [banner2ImgState, setBanner2ImgState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("vexa_home_banner2_img") || promoBanner2;
+    }
+    return promoBanner2;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateMedia = () => {
+      setHeroImgState(localStorage.getItem("vexa_home_hero_img") || heroLuxuryImg);
+      setBanner1ImgState(localStorage.getItem("vexa_home_banner1_img") || promoBanner1);
+      setBanner2ImgState(localStorage.getItem("vexa_home_banner2_img") || promoBanner2);
+    };
+    window.addEventListener("vexa_media_updated", updateMedia);
+    return () => window.removeEventListener("vexa_media_updated", updateMedia);
+  }, []);
+
+  const activePromoBanners = useMemo(() => [
+    {
+      tag: "LIMITED EDITION DROP",
+      title: "URBAN SILHOUETTE COLLECTION",
+      subtitle: "FLAT 30% OFF STOREWIDE",
+      text: "Sculpted from 240 GSM bio-washed heavy cotton with double-stitched collar reinforcement. Engineered for superior drape and longevity.",
+      ctaText: "EXPLORE COLLECTION",
+      ctaLink: "/products",
+      image: banner1ImgState,
+    },
+    {
+      tag: "BESPOKE CUSTOMISATION",
+      title: "BOOK YOUR CUSTOM TEE",
+      subtitle: "PERSONALIZED EMBROIDERY & BULK ORDERS",
+      text: "Personalize colorways, custom embroidery & bulk orders directly from your user dashboard with live tracking and concierge support.",
+      ctaText: "BOOK CUSTOM TEE",
+      ctaLink: "/dashboard",
+      image: banner2ImgState,
+    },
+    {
+      tag: "VEXA SIGNATURE ESSENTIALS",
+      title: "240 GSM HEAVYWEIGHT FIT",
+      subtitle: "COMFORT MEETS LUXURY STREETWEAR",
+      text: "Engineered for lasting quality, zero color bleeding, and pre-shrunk combed long-staple luxury cotton.",
+      ctaText: "SHOP CATALOG",
+      ctaLink: "/products",
+      image: heroImgState,
+    },
+  ], [banner1ImgState, banner2ImgState, heroImgState]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFeatureIndex((prev) => (prev + 1) % features.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const bannerTimer = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % activePromoBanners.length);
+    }, 4500);
+    return () => clearInterval(bannerTimer);
+  }, [activePromoBanners.length]);
+
+  useEffect(() => {
+    const heroTimer = setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % heroBanners.length);
+    }, 5000);
+    return () => clearInterval(heroTimer);
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    if (selectedCategory === "All") return products;
+    return products.filter((p) => p.category === selectedCategory);
+  }, [products, selectedCategory]);
+
   return (
     <>
       {/* HERO */}
@@ -56,79 +228,87 @@ function Home() {
         <div className="pointer-events-none absolute inset-0">
           <img
             src={heroImg}
-            alt="VEXA premium oversized t-shirts on black marble pedestals"
+            alt="VEXA premium oversized t-shirts on pedestals"
             loading="lazy"
             decoding="async"
             width={1600}
             height={1104}
-            className="h-full w-full object-cover opacity-45 transition-opacity duration-700"
+            className="h-full w-full object-cover opacity-25 mix-blend-multiply transition-opacity duration-700"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/60 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/70 to-background" />
         </div>
 
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-24 lg:grid-cols-2 lg:py-32">
-          <div className="animate-fade-up">
-            <span className="inline-block rounded-full border border-gold/50 px-4 py-1.5 text-[10px] uppercase tracking-[0.3em] text-gold">
-              Elevate your everyday style
-            </span>
-            <h1 className="mt-7 font-display text-5xl leading-[1.05] sm:text-6xl lg:text-7xl">
-              Premium
-              <br />
-              <span className="text-gold-gradient">T-Shirt</span>
-              <br />
-              Collection
-            </h1>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-              Engineered in heavyweight cotton, finished by hand, and cut for the
-              modern oversized silhouette. This is VEXA — wear confidence, wear
-              style.
-            </p>
-
-            <div className="mt-9 flex flex-wrap gap-4">
-              <Link
-                to="/products"
-                className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-sm px-8 py-4 text-xs"
-              >
-                Shop the drop <ArrowRight className="size-4" />
-              </Link>
-              <Link
-                to="/about"
-                className="btn-outline-gold inline-flex items-center rounded-sm px-8 py-4 text-xs hover:bg-gold hover:text-primary-foreground"
-              >
-                Our story
-              </Link>
-            </div>
-
-            <div className="mt-12">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                Available sizes
+        <div className="relative mx-auto max-w-7xl px-5 py-16 lg:py-24">
+          <div className="grid gap-10 lg:grid-cols-2 items-center">
+            <div className="animate-fade-up">
+              <span className="inline-block rounded-full border border-gold/50 bg-gold/10 px-4 py-1.5 text-[10px] uppercase tracking-[0.3em] text-gold font-bold shadow-sm">
+                ELEVATE YOUR EVERYDAY STYLE
+              </span>
+              <h1 className="mt-7 font-display text-5xl leading-[1.05] sm:text-6xl lg:text-7xl font-bold text-foreground">
+                PREMIUM T-SHIRT
+                <br />
+                <span className="text-gold-gradient">COLLECTION</span>
+              </h1>
+              <p className="mt-6 max-w-md text-sm sm:text-base leading-relaxed text-muted-foreground">
+                Engineered in 240 GSM heavyweight cotton, finished by hand, and cut for the modern oversized silhouette. This is VEXA — wear confidence, wear style.
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {SIZES.map((s) => (
-                  <span
-                    key={s}
-                    className="flex size-11 items-center justify-center rounded-sm border border-gold/40 text-xs tracking-widest text-gold transition-all duration-300 hover:-translate-y-1 hover:bg-gold hover:text-primary-foreground"
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          <div className="relative flex items-center justify-center">
-            <div className="animate-float relative flex size-56 items-center justify-center rounded-full border-2 border-gold/70 shadow-goldy lg:size-72">
-              <div className="absolute inset-3 rounded-full border border-gold/30" />
-              <div className="text-center">
-                <p className="font-display text-6xl text-gold-gradient lg:text-7xl">30%</p>
-                <p className="text-sm uppercase tracking-[0.4em] text-gold">Off</p>
+              <div className="mt-9 flex flex-wrap gap-4">
+                <Link
+                  to="/products"
+                  className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-sm px-8 py-4 text-xs font-bold uppercase tracking-wider shadow-sm"
+                >
+                  SHOP THE DROP <ArrowRight className="size-4" />
+                </Link>
+                <Link
+                  to="/about"
+                  className="btn-outline-gold inline-flex items-center rounded-sm px-8 py-4 text-xs font-bold uppercase tracking-wider hover:bg-gold hover:text-primary-foreground shadow-sm"
+                >
+                  OUR STORY
+                </Link>
+              </div>
+            </div>
+
+            <div className="relative flex items-center justify-center">
+              <div className="group relative w-full max-w-lg overflow-hidden rounded-3xl border border-gold/50 bg-card p-3 shadow-goldy transition-all duration-700 hover:border-gold hover:shadow-2xl">
+                <div className="relative w-full overflow-hidden rounded-2xl">
+                  <img
+                    src={heroImgState}
+                    alt="VEXA Premium Luxury Oversized T-Shirt"
+                    loading="eager"
+                    decoding="async"
+                    width={1200}
+                    height={1400}
+                    className="h-[480px] sm:h-[580px] w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/30 via-transparent to-transparent pointer-events-none" />
+
+                  <span className="absolute left-5 top-5 rounded-full border border-gold/50 bg-background/85 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-gold backdrop-blur-md shadow-sm">
+                    {heroBanners[heroIndex]?.badgeText || "Signature Drop"}
+                  </span>
+
+                  <div className="animate-float absolute right-5 top-5 flex size-18 items-center justify-center rounded-full border-2 border-gold/70 bg-background/90 shadow-goldy backdrop-blur-md">
+                    <div className="text-center">
+                      <p className="font-display text-base sm:text-lg font-bold text-gold-gradient leading-tight">
+                        {heroBanners[heroIndex]?.discount || "30% Off"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* PROMO ANNOUNCEMENT BANNER */}
+        <div className="bg-gradient-to-r from-gold/30 via-gold to-gold/30 py-2.5 px-4 text-center border-y border-gold/40 shadow-sm">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground">
+            ✨ SPECIAL OFFER: FLAT 30% OFF ON ALL OVERSIZED TEES | FREE EXPRESS SHIPPING NATIONWIDE ✨
+          </p>
         </div>
 
         {/* marquee */}
-        <div className="relative overflow-hidden border-y border-border py-4">
+        <div className="relative overflow-hidden border-b border-border py-4">
           <div className="animate-marquee flex w-max gap-12 whitespace-nowrap">
             {Array.from({ length: 2 }).map((_, r) => (
               <div key={r} className="flex gap-12">
@@ -153,48 +333,156 @@ function Home() {
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section className="mx-auto max-w-7xl px-5 py-24">
+      {/* SIMPLE FEATURES CAROUSEL */}
+      <section className="mx-auto max-w-7xl px-5 py-16">
         <Reveal className="text-center">
-          <h2 className="font-display text-3xl sm:text-4xl">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold">Engineered Excellence</p>
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl">
             Crafted to the <span className="text-gold-gradient">last stitch</span>
           </h2>
-          <div className="hairline mx-auto mt-6 w-48" />
+          <div className="hairline mx-auto mt-4 w-48" />
         </Reveal>
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map((f, i) => (
-            <Reveal key={f.title} delay={i * 110}>
-              <div className="group h-full rounded-sm border border-border bg-card p-8 transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy">
-                <f.icon className="size-8 text-gold transition-transform duration-500 group-hover:scale-110" />
-                <h3 className="mt-6 font-display text-lg">{f.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  {f.text}
-                </p>
-              </div>
-            </Reveal>
-          ))}
+        {/* 2x2 Grid Features Section (2 in line 1, 2 in line 2) */}
+        <div className="mt-10 grid grid-cols-2 gap-3.5 sm:gap-6 lg:grid-cols-4">
+          {features.map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <Reveal key={f.title} delay={i * 90}>
+                <div className="group h-full rounded-2xl border border-gold/40 bg-card p-5 sm:p-8 text-center shadow-goldy transition-all duration-300 hover:-translate-y-1 hover:border-gold">
+                  <div className="mx-auto flex size-12 sm:size-14 items-center justify-center rounded-2xl border border-gold/50 bg-gold/15 text-gold shadow-sm transition-transform group-hover:scale-110">
+                    <Icon className="size-6 sm:size-7 text-gold" />
+                  </div>
+                  <h3 className="mt-4 sm:mt-6 font-display text-xs sm:text-lg font-bold text-foreground uppercase tracking-wider">
+                    {f.title}
+                  </h3>
+                  <p className="mt-2 text-[11px] sm:text-sm text-muted-foreground leading-relaxed">
+                    {f.text}
+                  </p>
+                </div>
+              </Reveal>
+            );
+          })}
         </div>
       </section>
 
-      {/* BESTSELLERS */}
+      {/* LUXURY PROMO BANNER CAROUSEL SLIDER */}
+      <section className="mx-auto max-w-7xl px-5 pb-16 pt-8">
+        <Reveal className="mb-6 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">Featured Highlights</p>
+          <h2 className="mt-1 font-display text-2xl sm:text-3xl font-bold">
+            Promotional <span className="text-gold-gradient">Showcase</span>
+          </h2>
+        </Reveal>
+
+        <div className="relative overflow-hidden rounded-3xl border border-gold/50 bg-card shadow-goldy transition-all hover:border-gold">
+          {/* Active Banner Image Slide */}
+          <div className="relative min-h-[360px] sm:min-h-[420px] lg:min-h-[460px] w-full overflow-hidden">
+            <img
+              src={activePromoBanners[bannerIndex].image}
+              alt={activePromoBanners[bannerIndex].title}
+              className="absolute inset-0 h-full w-full object-cover object-center transition-all duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-transparent" />
+
+            {/* Banner Text Overlay */}
+            <div className="relative z-10 flex h-full min-h-[360px] sm:min-h-[420px] lg:min-h-[460px] max-w-2xl flex-col justify-center p-6 sm:p-12 lg:p-16">
+              <span className="inline-block w-fit rounded-full border border-gold/50 bg-gold/15 px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-gold shadow-sm">
+                {activePromoBanners[bannerIndex].tag}
+              </span>
+
+              <h3 className="mt-4 font-display text-2xl sm:text-4xl lg:text-5xl font-bold leading-tight text-foreground">
+                {activePromoBanners[bannerIndex].title}
+              </h3>
+
+              <p className="mt-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-gold">
+                ✨ {activePromoBanners[bannerIndex].subtitle} ✨
+              </p>
+
+              <p className="mt-3 text-xs sm:text-sm leading-relaxed text-muted-foreground">
+                {activePromoBanners[bannerIndex].text}
+              </p>
+
+              <div className="mt-6">
+                <Link
+                  to={activePromoBanners[bannerIndex].ctaLink}
+                  className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-sm px-8 py-3.5 text-xs font-bold uppercase tracking-wider shadow-sm"
+                >
+                  {activePromoBanners[bannerIndex].ctaText} <ArrowRight className="size-4" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Banner Slider Arrow Controls & Indicator Dots */}
+            <div className="absolute bottom-5 right-5 z-20 flex items-center gap-3 rounded-full border border-gold/40 bg-background/80 px-4 py-2 backdrop-blur-md shadow-sm">
+              <button
+                onClick={() => setBannerIndex((prev) => (prev - 1 + activePromoBanners.length) % activePromoBanners.length)}
+                className="flex size-7 items-center justify-center rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-primary-foreground transition-all"
+                aria-label="Previous banner slide"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                {activePromoBanners.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setBannerIndex(idx)}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      bannerIndex === idx ? "w-6 bg-gold" : "w-2 bg-muted-foreground/40 hover:bg-gold/60"
+                    }`}
+                    aria-label={`Banner slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={() => setBannerIndex((prev) => (prev + 1) % activePromoBanners.length)}
+                className="flex size-7 items-center justify-center rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-primary-foreground transition-all"
+                aria-label="Next banner slide"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* COLLECTION */}
       <section className="mx-auto max-w-7xl px-5 pb-24">
         <Reveal className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-gold">The collection</p>
-            <h2 className="mt-3 font-display text-3xl sm:text-4xl">Bestsellers</h2>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-gold">Explore the catalog</p>
+            <h2 className="mt-3 font-display text-3xl sm:text-4xl">Featured Collection</h2>
           </div>
           <Link
             to="/products"
             className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gold transition-transform hover:translate-x-1"
           >
-            View all <ArrowRight className="size-4" />
+            View all products ({products.length}) <ArrowRight className="size-4" />
           </Link>
         </Reveal>
 
-        <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {products.slice(0, 3).map((p, i) => (
-            <Reveal key={p.id} delay={i * 120}>
+        {/* Category Tabs (Non-scrolling 4-column grid on mobile) */}
+        <div className="mt-8 grid grid-cols-4 gap-1.5 sm:flex sm:w-auto sm:items-center sm:gap-2">
+          {["All", "Oversized", "Classic", "Limited"].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`w-full rounded-full py-2 px-1 text-[9px] sm:px-5 sm:text-[10px] font-semibold uppercase tracking-wider sm:tracking-[0.2em] transition-all duration-300 text-center ${
+                selectedCategory === cat
+                  ? "bg-gold text-primary-foreground shadow-goldy font-bold"
+                  : "border border-border bg-card text-muted-foreground hover:border-gold hover:text-gold"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredProducts.map((p, i) => (
+            <Reveal key={p.id} delay={(i % 4) * 90}>
               <ProductCard product={p} />
             </Reveal>
           ))}

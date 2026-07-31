@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import heroImg from "@/assets/hero.jpg";
 import { Reveal } from "@/components/Reveal";
+import { ShieldCheck, Award, Leaf, Feather, Star } from "lucide-react";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About VEXA | Our Craft & Story" },
+      { title: "About VEXA | Our Craft, Mill & Story" },
       {
         name: "description",
         content:
-          "VEXA was built on one idea: a t-shirt should feel like an heirloom. Meet the craft, the mill and the makers.",
+          "Discover the story of VEXA: 240 GSM combed cotton, custom mill engineering, bio-washed finishing, and timeless modern streetwear design.",
       },
       { property: "og:title", content: "About VEXA | Our Craft & Story" },
       {
@@ -22,21 +23,57 @@ export const Route = createFileRoute("/about")({
 });
 
 const stats = [
-  { k: "240", l: "GSM cotton" },
-  { k: "68k+", l: "Tees shipped" },
-  { k: "4.9", l: "Average rating" },
-  { k: "30d", l: "Easy returns" },
+  { k: "240 GSM", l: "Heavyweight combed cotton" },
+  { k: "68,000+", l: "Tees crafted & delivered" },
+  { k: "4.95 / 5", l: "Customer satisfaction rating" },
+  { k: "30 Days", l: "No-questions return guarantee" },
 ];
 
-const steps = [
-  { n: "01", t: "Sourcing", d: "Long-staple cotton from certified Indian mills, spun to a consistent 240 GSM." },
-  { n: "02", t: "Cutting", d: "Drop-shoulder patterns graded across six sizes for a true oversized drape." },
-  { n: "03", t: "Finishing", d: "Bio-wash, reinforced collar tape and twin-needle hems, inspected by hand." },
+const pillars = [
+  {
+    icon: Feather,
+    t: "Long-Staple Combed Cotton",
+    d: "Sourced directly from certified Indian textile mills. The long cotton fibers provide exceptional softness, zero pilling, and enduring fabric integrity.",
+  },
+  {
+    icon: Award,
+    t: "Drop-Shoulder Silhouette",
+    d: "Patterns sculpted specifically for an effortless modern drape. Boxy, structural, and perfectly proportioned across six calibrated sizes.",
+  },
+  {
+    icon: Leaf,
+    t: "Zero-Shrinkage Bio-Wash",
+    d: "Pre-treated with organic enzyme washes to neutralize shrinkage and ensure color richness wash after wash, year after year.",
+  },
+  {
+    icon: ShieldCheck,
+    t: "Twin-Needle Collar Lock",
+    d: "Ribbed collar reinforced with internal herringbone neck tape so your neckband never sags or bacon-ribs.",
+  },
 ];
 
-function About() {
+const reviews = [
+  {
+    author: "Kabir Mehta",
+    role: "Verified Purchaser",
+    quote: "The weight and drape on the Gold-Embroidered Tee are unreal. Easily competes with luxury designer brands at 4x the price.",
+  },
+  {
+    author: "Rohan Kapoor",
+    role: "Fashion Editor, TrendReport",
+    quote: "VEXA has mastered the balance between structured heavyweight cotton and breathable comfort. The collar tension is perfect.",
+  },
+  {
+    author: "Ananya Desai",
+    role: "Verified Purchaser",
+    quote: "I’ve washed my Obsidian Black tee 15 times and it still looks and feels brand new. No fading, no misshaping.",
+  },
+];
+
+export function About() {
   return (
     <>
+      {/* HERO SECTION */}
       <section className="relative overflow-hidden border-b border-border">
         <img
           src={heroImg}
@@ -45,30 +82,31 @@ function About() {
           decoding="async"
           width={1600}
           height={1104}
-          className="absolute inset-0 h-full w-full object-cover opacity-25 transition-opacity duration-700"
+          className="absolute inset-0 h-full w-full object-cover opacity-20 transition-opacity duration-700"
         />
         <div className="relative mx-auto max-w-4xl px-5 py-24 text-center">
           <Reveal>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-gold">Est. 2024</p>
+            <p className="text-[10px] uppercase tracking-[0.35em] text-gold font-semibold">Est. 2024 • Bengaluru, India</p>
             <h1 className="mt-5 font-display text-4xl sm:text-6xl">
-              We build the <span className="text-gold-gradient">perfect tee</span>
+              We build the <span className="text-gold-gradient">definitive tee</span>
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl leading-relaxed text-muted-foreground">
-              VEXA started with a frustration — every "premium" t-shirt lost its shape
-              after five washes. So we spent two years with a single mill perfecting
-              weight, drape and collar tension until the shirt outlived the trend.
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
+              VEXA was born out of frustration with flimsy t-shirts that lose shape after three washes.
+              We spent two years collaborating with master weavers to engineer a heavyweight cotton fabric
+              that delivers timeless structure, plush comfort, and unwavering durability.
             </p>
           </Reveal>
         </div>
       </section>
 
+      {/* STATS HIGHLIGHT */}
       <section className="mx-auto max-w-7xl px-5 py-20">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((s, i) => (
             <Reveal key={s.l} delay={i * 100}>
-              <div className="rounded-sm border border-border bg-card p-8 text-center transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy">
-                <p className="font-display text-4xl text-gold-gradient">{s.k}</p>
-                <p className="mt-3 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              <div className="rounded-xl border border-border bg-card p-8 text-center transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy">
+                <p className="font-display text-3xl font-bold text-gold-gradient">{s.k}</p>
+                <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground font-medium">
                   {s.l}
                 </p>
               </div>
@@ -77,26 +115,56 @@ function About() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-5 pb-24">
+      {/* CRAFT PILLARS */}
+      <section className="mx-auto max-w-7xl px-5 pb-24">
         <Reveal className="text-center">
-          <h2 className="font-display text-3xl sm:text-4xl">How it's made</h2>
-          <div className="hairline mx-auto mt-6 w-40" />
+          <p className="text-[10px] uppercase tracking-[0.3em] text-gold">Obsessive Craftsmanship</p>
+          <h2 className="mt-3 font-display text-3xl sm:text-4xl">Built to Outlast Trends</h2>
+          <div className="hairline mx-auto mt-6 w-44" />
         </Reveal>
 
-        <div className="mt-14 space-y-6">
-          {steps.map((s, i) => (
-            <Reveal key={s.n} delay={i * 120}>
-              <div className="group flex flex-col gap-5 rounded-sm border border-border bg-card p-8 transition-all duration-500 hover:border-gold sm:flex-row sm:items-center">
-                <span className="font-display text-4xl text-gold/50 transition-colors duration-500 group-hover:text-gold">
-                  {s.n}
-                </span>
-                <div>
-                  <h3 className="font-display text-xl">{s.t}</h3>
-                  <p className="mt-2 leading-relaxed text-muted-foreground">{s.d}</p>
+        <div className="mt-14 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          {pillars.map((p, i) => (
+            <Reveal key={p.t} delay={i * 100}>
+              <div className="group h-full rounded-xl border border-border bg-card p-8 transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy">
+                <div className="flex size-12 items-center justify-center rounded-full border border-gold/40 text-gold transition-transform duration-500 group-hover:scale-110">
+                  <p.icon className="size-6" />
                 </div>
+                <h3 className="mt-6 font-display text-lg font-semibold text-foreground">{p.t}</h3>
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{p.d}</p>
               </div>
             </Reveal>
           ))}
+        </div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section className="border-t border-border bg-surface/40 py-24">
+        <div className="mx-auto max-w-7xl px-5">
+          <Reveal className="text-center">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-gold">Community Voices</p>
+            <h2 className="mt-3 font-display text-3xl sm:text-4xl">Trusted by Collectors</h2>
+            <div className="hairline mx-auto mt-6 w-40" />
+          </Reveal>
+
+          <div className="mt-14 grid gap-8 md:grid-cols-3">
+            {reviews.map((r, i) => (
+              <Reveal key={r.author} delay={i * 120}>
+                <div className="h-full rounded-xl border border-border bg-card p-8 shadow-sm transition-all duration-500 hover:border-gold">
+                  <div className="flex gap-1 text-gold">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <Star key={idx} className="size-4 fill-current" />
+                    ))}
+                  </div>
+                  <p className="mt-6 text-sm leading-relaxed text-muted-foreground italic">"{r.quote}"</p>
+                  <div className="mt-8 border-t border-border/60 pt-4">
+                    <p className="font-display text-sm font-semibold text-foreground">{r.author}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gold">{r.role}</p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
     </>

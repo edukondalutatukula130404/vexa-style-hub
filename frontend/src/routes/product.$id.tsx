@@ -338,7 +338,7 @@ export function ProductDetailPage() {
       )}
 
 
-      {/* Mobile & Desktop Back Button */}
+      {/* Back to Products Navigation Button (Mobile & Desktop) */}
       <div className="mb-6 flex items-center justify-between">
         <Link
           to="/products"

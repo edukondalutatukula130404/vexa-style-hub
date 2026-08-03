@@ -376,8 +376,15 @@ export function UserDashboard() {
     <div className="min-h-screen bg-background pt-24 sm:pt-28 pb-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* PAGE HEADER BANNER */}
-        <div className="mb-6 border-b border-border/60 pb-5">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-5">
           <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">MY ACCOUNT</h1>
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
+          >
+            <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
+            <span>Back to Products</span>
+          </Link>
         </div>
 
         <div className="grid gap-6 lg:gap-8 lg:grid-cols-[280px_1fr]">
@@ -743,12 +750,6 @@ export function UserDashboard() {
                   <>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
                       <div className="flex items-center gap-3">
-                        <Link
-                          to="/products"
-                          className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm"
-                        >
-                          <ArrowLeft className="size-3.5" /> Back to Products
-                        </Link>
                         <h2 className="font-display text-2xl font-bold text-foreground">My Cart</h2>
                       </div>
                       {cartItems.length > 0 && (

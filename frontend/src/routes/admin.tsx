@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import {
   IndianRupee,
@@ -33,20 +33,6 @@ import promoBanner2 from "@/assets/promo_banner_2.png";
 import { products, type Product, useProducts } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL } from "@/lib/auth";
-
-export const Route = createFileRoute("/admin")({
-  head: () => ({
-    meta: [
-      { title: "Admin Portal & Collections | VEXA" },
-      {
-        name: "description",
-        content:
-          "VEXA admin dashboard: manage customer bookings, update shipment statuses, add new collection items, and review user accounts.",
-      },
-    ],
-  }),
-  component: Admin,
-});
 
 type OrderItem = {
   _id: string;
@@ -300,7 +286,7 @@ export function Admin() {
 
   useEffect(() => {
     if (!isLoggedIn) {
-      navigate({ to: "/login" });
+      navigate("/login");
     }
   }, [isLoggedIn, navigate]);
 

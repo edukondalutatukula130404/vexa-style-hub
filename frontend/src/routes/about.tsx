@@ -1,26 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
 import heroImg from "@/assets/hero.jpg";
 import { Reveal } from "@/components/Reveal";
 import { ShieldCheck, Award, Leaf, Feather, Star } from "lucide-react";
-
-export const Route = createFileRoute("/about")({
-  head: () => ({
-    meta: [
-      { title: "About VEXA | Our Craft, Mill & Story" },
-      {
-        name: "description",
-        content:
-          "Discover the story of VEXA: 240 GSM combed cotton, custom mill engineering, bio-washed finishing, and timeless modern streetwear design.",
-      },
-      { property: "og:title", content: "About VEXA | Our Craft & Story" },
-      {
-        property: "og:description",
-        content: "The mill, the makers and the standard behind every VEXA tee.",
-      },
-    ],
-  }),
-  component: About,
-});
 
 const stats = [
   { k: "240 GSM", l: "Heavyweight combed cotton" },

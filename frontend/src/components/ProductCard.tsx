@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Star, ShoppingBag, Eye, X, Check, ArrowRight, Minus, Plus } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router-dom";
 import { SIZES, type Product } from "@/lib/products";
 import { useAuth } from "@/lib/auth";
 import { addToCart } from "@/lib/cart";

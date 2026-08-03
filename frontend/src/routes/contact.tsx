@@ -1,20 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Mail, Phone, MapPin, Send, CheckCircle2, MessageCircle, Clock } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
-
-export const Route = createFileRoute("/contact")({
-  head: () => ({
-    meta: [
-      { title: "Contact Us | VEXA" },
-      {
-        name: "description",
-        content: "Get in touch with VEXA customer support. We are here to help you with your orders and sizing queries.",
-      },
-    ],
-  }),
-  component: Contact,
-});
 
 export function Contact() {
   const [sent, setSent] = useState(false);

@@ -1,30 +1,14 @@
-import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Lock, AlertCircle, Eye, EyeOff, CheckCircle2, ShieldCheck, KeyRound } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
 import { setLoggedIn, resetPasswordApi } from "@/lib/auth";
 
-export const Route = createFileRoute("/reset-password")({
-  head: () => ({
-    meta: [
-      { title: "Reset Password | VEXA" },
-      { name: "description", content: "Create a new password for your VEXA account." },
-    ],
-  }),
-  validateSearch: (search: Record<string, unknown>) => {
-    return {
-      token: (search.token as string) || "",
-      email: (search.email as string) || "",
-    };
-  },
-  component: ResetPassword,
-});
-
-function ResetPassword() {
+export function ResetPassword() {
   const navigate = useNavigate();
-  const search = useSearch({ from: "/reset-password" });
-  const token = search.token;
-  const userEmail = search.email;
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
+  const userEmail = searchParams.get("email") || "";
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -62,9 +46,9 @@ function ResetPassword() {
 
       setTimeout(() => {
         if (res.user.role === "admin") {
-          navigate({ to: "/admin" });
+          navigate("/admin");
         } else {
-          navigate({ to: "/" });
+          navigate("/");
         }
       }, 2000);
     } catch (err: any) {

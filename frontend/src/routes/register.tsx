@@ -1,29 +1,10 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Lock, Mail, User, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
 import { setLoggedIn, registerApi, type AuthUser } from "@/lib/auth";
 
-export const Route = createFileRoute("/register")({
-  head: () => ({
-    meta: [
-      { title: "Create Account | VEXA" },
-      {
-        name: "description",
-        content:
-          "Register for a VEXA account and unlock member pricing, early drop access and free express shipping.",
-      },
-      { property: "og:title", content: "Create Account | VEXA" },
-      {
-        property: "og:description",
-        content: "Member pricing, early drops and free express shipping.",
-      },
-    ],
-  }),
-  component: Register,
-});
-
-function Register() {
+export function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
@@ -61,7 +42,7 @@ function Register() {
       if (redirectTarget) {
         window.location.href = redirectTarget;
       } else {
-        navigate({ to: "/" });
+        navigate("/");
       }
     } catch (err: any) {
       console.warn("Registration API error:", err.message);
@@ -80,7 +61,7 @@ function Register() {
       if (redirectTarget) {
         window.location.href = redirectTarget;
       } else {
-        navigate({ to: "/dashboard" });
+        navigate("/dashboard");
       }
     } finally {
       setLoading(false);

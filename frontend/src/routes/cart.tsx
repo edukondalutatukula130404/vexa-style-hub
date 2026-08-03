@@ -1,21 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
-export const Route = createFileRoute("/cart")({
-  head: () => ({
-    meta: [
-      { title: "Shopping Cart | VEXA" },
-      { name: "description", content: "View your selected VEXA oversized t-shirts and proceed to order checkout." },
-    ],
-  }),
-  component: CartRedirect,
-});
-
-function CartRedirect() {
+export function CartRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate({ to: "/dashboard", search: { tab: "cart" } });
+    navigate("/dashboard?tab=cart");
   }, [navigate]);
 
   return (

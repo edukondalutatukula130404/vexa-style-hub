@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import {
   User as UserIcon,
@@ -31,28 +31,6 @@ import { products, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL } from "@/lib/auth";
 import { useCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
-
-type DashboardSearch = {
-  tab?: string;
-};
-
-export const Route = createFileRoute("/dashboard")({
-  validateSearch: (search: Record<string, unknown>): DashboardSearch => {
-    return {
-      tab: typeof search.tab === "string" ? search.tab : undefined,
-    };
-  },
-  head: () => ({
-    meta: [
-      { title: "My Account | VEXA" },
-      {
-        name: "description",
-        content: "Manage your profile, orders, addresses, cart, password settings and support enquiries.",
-      },
-    ],
-  }),
-  component: UserDashboard,
-});
 
 type OrderItem = {
   _id: string;
@@ -103,7 +81,7 @@ export function UserDashboard() {
 
   useEffect(() => {
     if (!isLoggedIn) {
-      navigate({ to: "/login" });
+      navigate("/login");
     }
   }, [isLoggedIn, navigate]);
 

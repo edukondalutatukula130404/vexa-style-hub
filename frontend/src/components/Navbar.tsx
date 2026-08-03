@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Menu, X, ShoppingCart, User, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";

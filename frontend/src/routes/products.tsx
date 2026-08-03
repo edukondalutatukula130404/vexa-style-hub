@@ -1,28 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useProducts } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
-
-export const Route = createFileRoute("/products")({
-  head: () => ({
-    meta: [
-      { title: "Shop Premium T-Shirts | VEXA" },
-      {
-        name: "description",
-        content:
-          "Browse VEXA oversized, classic and limited-edition premium cotton t-shirts in multiple colourways with 240 GSM heavy cotton construction.",
-      },
-      { property: "og:title", content: "Shop Premium T-Shirts | VEXA" },
-      {
-        property: "og:description",
-        content: "Oversized, classic and limited-edition premium cotton tees by VEXA.",
-      },
-    ],
-  }),
-  component: Products,
-});
 
 const filters = ["All", "Oversized", "Classic", "Limited"] as const;
 

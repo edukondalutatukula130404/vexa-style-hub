@@ -1,26 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { Plus, Search, HelpCircle, MessageCircle, Truck, RefreshCw, ShieldCheck } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
-
-export const Route = createFileRoute("/faq")({
-  head: () => ({
-    meta: [
-      { title: "FAQ | Sizing, Shipping & Returns — VEXA" },
-      {
-        name: "description",
-        content:
-          "Search VEXA FAQs for details on 240 GSM cotton care, oversized fit sizing, 24-hour dispatch, Cash on Delivery, and our 30-day hassle-free return policy.",
-      },
-      { property: "og:title", content: "VEXA FAQ" },
-      {
-        property: "og:description",
-        content: "Sizing, shipping, payment and returns — everything about ordering from VEXA.",
-      },
-    ],
-  }),
-  component: Faq,
-});
 
 type FAQItem = {
   category: "Sizing & Fit" | "Orders & Shipping" | "Payments & COD" | "Returns & Exchanges" | "Care & Quality";

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import {
   Shirt,
@@ -20,26 +20,6 @@ import { products as defaultProducts, SIZES, useProducts } from "@/lib/products"
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { useAuth } from "@/lib/auth";
-
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "VEXA | Premium Oversized T-Shirt Collection" },
-      {
-        name: "description",
-        content:
-          "Shop the VEXA premium t-shirt collection — oversized modern fit, soft breathable cotton, wrinkle resistant. Up to 30% off.",
-      },
-      { property: "og:title", content: "VEXA | Premium T-Shirt Collection" },
-      {
-        property: "og:description",
-        content:
-          "Premium cotton oversized t-shirts crafted for everyday confidence. Up to 30% off.",
-      },
-    ],
-  }),
-  component: Home,
-});
 
 const features = [
   { icon: Shirt, title: "Premium Cotton Fabric", text: "240 GSM combed long-staple cotton." },
@@ -127,7 +107,7 @@ const promoCarouselBanners = [
   },
 ];
 
-function Home() {
+export function Home() {
   const { products } = useProducts();
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [featureIndex, setFeatureIndex] = useState(0);

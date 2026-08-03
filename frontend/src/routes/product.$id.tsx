@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import {
   Star,
@@ -33,20 +33,6 @@ import charcoal from "@/assets/tee-charcoal.jpg";
 import olive from "@/assets/tee-olive.jpg";
 import luxuryGold from "@/assets/hero_luxury_tshirt.png";
 import rust from "@/assets/tee-rust.png";
-
-export const Route = createFileRoute("/product/$id")({
-  head: () => ({
-    meta: [
-      { title: "Product Detail | VEXA Account" },
-      {
-        name: "description",
-        content:
-          "Explore VEXA 240 GSM luxury heavyweight combed cotton oversized t-shirt details, customer reviews, and related products.",
-      },
-    ],
-  }),
-  component: ProductDetailPage,
-});
 
 export type ColorOption = {
   name: string;
@@ -127,8 +113,8 @@ const defaultReviewsMap: Record<string, Review[]> = {
   ],
 };
 
-function ProductDetailPage() {
-  const { id } = Route.useParams();
+export function ProductDetailPage() {
+  const { id } = useParams();
   const navigate = useNavigate();
   const { products, loading } = useProducts();
   const { isLoggedIn } = useAuth();

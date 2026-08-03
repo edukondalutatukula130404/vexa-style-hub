@@ -1,33 +1,13 @@
-import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Lock, Mail, AlertCircle, Eye, EyeOff, X, CheckCircle2, Send, Sparkles } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
 import { setLoggedIn, loginApi, forgotPasswordApi, type AuthUser } from "@/lib/auth";
 
-export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>) => {
-    return {
-      redirect: (search.redirect as string) || "",
-    };
-  },
-  head: () => ({
-    meta: [
-      { title: "Login | VEXA Account" },
-      {
-        name: "description",
-        content: "Sign in to your VEXA account to track orders, save sizes and access member drops.",
-      },
-      { property: "og:title", content: "Login | VEXA" },
-      { property: "og:description", content: "Sign in to your VEXA account." },
-    ],
-  }),
-  component: Login,
-});
-
-function Login() {
+export function Login() {
   const navigate = useNavigate();
-  const search = useSearch({ from: "/login" });
-  const redirectTarget = search.redirect;
+  const [searchParams] = useSearchParams();
+  const redirectTarget = searchParams.get("redirect") || "";
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,11 +39,11 @@ function Login() {
         normalizedEmail.startsWith("admin@");
 
       if (isAdminEmail) {
-        navigate({ to: "/admin" });
+        navigate("/admin");
       } else if (redirectTarget) {
         window.location.href = redirectTarget;
       } else {
-        navigate({ to: "/" });
+        navigate("/");
       }
     } catch (err: any) {
       console.warn("API login attempt error:", err.message);
@@ -77,7 +57,7 @@ function Login() {
           role: "admin",
         };
         setLoggedIn(adminUser, "demo-admin-token");
-        navigate({ to: "/admin" });
+        navigate("/admin");
       } else {
         // Fallback for user login if server is in demo mode
         const demoUser: AuthUser = {
@@ -89,7 +69,7 @@ function Login() {
         if (redirectTarget) {
           window.location.href = redirectTarget;
         } else {
-          navigate({ to: "/" });
+          navigate("/");
         }
       }
     } finally {

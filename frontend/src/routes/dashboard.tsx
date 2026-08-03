@@ -24,14 +24,24 @@ import {
   EyeOff,
   Sparkles,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  ArrowLeft
 } from "lucide-react";
 import { products, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL } from "@/lib/auth";
 import { useCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
 
+type DashboardSearch = {
+  tab?: string;
+};
+
 export const Route = createFileRoute("/dashboard")({
+  validateSearch: (search: Record<string, unknown>): DashboardSearch => {
+    return {
+      tab: typeof search.tab === "string" ? search.tab : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "My Account | VEXA" },
@@ -386,7 +396,7 @@ export function UserDashboard() {
   const CurrentIcon = currentNavItem.icon;
 
   return (
-    <div className="min-h-screen bg-background pt-20">
+    <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-6">
         {/* PAGE HEADER BANNER */}
         <div className="mb-6 border-b border-border/60 pb-5">
@@ -754,12 +764,20 @@ export function UserDashboard() {
               <div className="space-y-6">
                 {cartCheckoutStep === "cart" && (
                   <>
-                    <div className="flex items-center justify-between border-b border-border pb-4">
-                      <h2 className="font-display text-2xl font-bold text-foreground">My Cart</h2>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
+                      <div className="flex items-center gap-3">
+                        <Link
+                          to="/products"
+                          className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm"
+                        >
+                          <ArrowLeft className="size-3.5" /> Back to Products
+                        </Link>
+                        <h2 className="font-display text-2xl font-bold text-foreground">My Cart</h2>
+                      </div>
                       {cartItems.length > 0 && (
                         <button
                           onClick={clearCart}
-                          className="text-xs text-muted-foreground hover:text-destructive transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+                          className="text-xs text-muted-foreground hover:text-destructive transition-colors uppercase tracking-wider font-semibold cursor-pointer w-fit"
                         >
                           Clear Cart
                         </button>

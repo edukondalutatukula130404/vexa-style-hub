@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Menu, X, ShoppingBag, User, LogOut } from "lucide-react";
+import { Menu, X, ShoppingCart, User, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart";
 
 const baseLinks = [
   { to: "/", label: "Home" },
@@ -14,12 +15,32 @@ const baseLinks = [
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [visible, setVisible] = useState(true);
   const { isLoggedIn, isAdmin, logout } = useAuth();
+  const { cartItems } = useCart();
+  const totalCartCount = (cartItems || []).reduce((acc, item) => acc + (item?.quantity || 1), 0);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    onScroll();
-    window.addEventListener("scroll", onScroll);
+    let lastScrollY = window.scrollY;
+
+    const onScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrolled(currentScrollY > 20);
+
+      // Automatically close mobile menu options drawer on scroll up/down
+      setOpen(false);
+
+      if (currentScrollY > lastScrollY && currentScrollY > 80) {
+        // Scrolling down -> hide navbar
+        setVisible(false);
+      } else {
+        // Scrolling up -> show navbar
+        setVisible(true);
+      }
+      lastScrollY = currentScrollY;
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -32,9 +53,11 @@ export function Navbar() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${
+      className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 transform ${
+        visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
+      } ${
         scrolled
-          ? "border-b border-border bg-background/85 backdrop-blur-xl py-3"
+          ? "border-b border-border bg-background/85 backdrop-blur-xl py-3 shadow-sm"
           : "py-5"
       }`}
     >
@@ -76,6 +99,21 @@ export function Navbar() {
 
         {/* Right Section Controls */}
         <div className="flex items-center gap-3 sm:gap-4">
+          {/* Cart Button (Desktop only, hidden on mobile screens) */}
+          <Link
+            to="/dashboard"
+            search={{ tab: "cart" }}
+            className="btn-gold hover:btn-gold-hover hidden sm:flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] cursor-pointer shadow-goldy"
+          >
+            <ShoppingCart className="size-4" />
+            <span>Cart</span>
+            {totalCartCount > 0 && (
+              <span className="ml-1 flex size-5 items-center justify-center rounded-full bg-background text-[10px] font-extrabold text-gold shadow border border-gold/50 font-mono">
+                {totalCartCount}
+              </span>
+            )}
+          </Link>
+
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               <Link
@@ -89,7 +127,7 @@ export function Navbar() {
               <button
                 aria-label="Toggle menu"
                 onClick={() => setOpen((o) => !o)}
-                className="text-gold lg:hidden p-1"
+                className="text-gold lg:hidden p-1 cursor-pointer"
               >
                 {open ? <X className="size-6" /> : <Menu className="size-6" />}
               </button>
@@ -98,21 +136,14 @@ export function Navbar() {
             <>
               <Link
                 to="/login"
-                className="hidden text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-gold sm:block"
+                className="hidden text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-gold sm:block"
               >
                 Login
-              </Link>
-              <Link
-                to="/products"
-                className="btn-gold hover:btn-gold-hover hidden sm:flex items-center gap-2 rounded-sm px-5 py-2.5 text-[10px]"
-              >
-                <ShoppingBag className="size-3.5" />
-                Shop
               </Link>
               <button
                 aria-label="Toggle menu"
                 onClick={() => setOpen((o) => !o)}
-                className="text-gold lg:hidden p-1"
+                className="text-gold lg:hidden p-1 cursor-pointer"
               >
                 {open ? <X className="size-6" /> : <Menu className="size-6" />}
               </button>
@@ -139,6 +170,16 @@ export function Navbar() {
               </Link>
             </li>
           ))}
+          <li>
+            <Link
+              to="/dashboard"
+              search={{ tab: "cart" }}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 py-2.5 text-sm font-bold uppercase tracking-[0.2em] text-gold"
+            >
+              <ShoppingCart className="size-4" /> My Cart ({totalCartCount})
+            </Link>
+          </li>
           {isLoggedIn ? (
             <>
               <li>

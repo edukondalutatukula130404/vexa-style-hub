@@ -1,24 +1,34 @@
-# Vexa Style Hub
+# VEXA Style Hub — E-Commerce T-Shirt Platform
 
-i need a website with the technologies of mern stack,need to be professional and attractive the comapany name should be vexa take referrence of the above image ned to be same and add the nav bar pages oh home,products ,about us contact us and faq and asloo need add the 2 dashboard alsoo addd the animatiaons it should beee perfect website for the t shirt website its a e commerse website alsooa dd a login and regisyter page
+VEXA is a luxury oversized t-shirt e-commerce web application featuring modern MERN stack integration, TanStack Start SSR, interactive product quick-views, customer bookings, address management, and a comprehensive Admin Control Panel.
 
-This project was built with [Lovable](https://lovable.dev).
+## Features
 
-## Build with Lovable
+- **Storefront & Catalog**: Browse luxury oversized tees, filter collections, and view quick product details.
+- **Shopping Cart & Checkout**: Page-level 3-step checkout (Cart -> Shipping Address -> Payment).
+- **Customer Dashboard**: Track orders, manage saved shipping addresses, update user profile, and send enquiry messages.
+- **Admin Control Panel**: Real-time sales metrics, inventory management, category manager, order status updates, and home page media management.
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/16357613-b636-4a8f-abd8-4492283f2f6b).
+## Getting Started
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+### Prerequisites
+Node.js (v18+) and npm.
 
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+### Installation & Local Development
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+# Install dependencies
+npm install
+
+# Start backend server (Port 5000)
+npm run dev:backend
+
+# Start frontend dev server (Port 8080)
+npm run dev:frontend
+```
+
+### Production Build
+
+```sh
+npm run build:frontend
 ```

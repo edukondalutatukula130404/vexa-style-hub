@@ -16,10 +16,7 @@ export function ProductCard({ product }: { product: Product }) {
   const off = Math.round((1 - product.price / product.oldPrice) * 100);
 
   const handleCardClick = () => {
-    navigate({
-      to: "/product/$id",
-      params: { id: product.id },
-    });
+    navigate(`/product/${product.id}`);
   };
 
   const handleAddToCart = (e?: React.MouseEvent) => {
@@ -29,13 +26,10 @@ export function ProductCard({ product }: { product: Product }) {
     setTimeout(() => setAddedMsg(""), 3000);
 
     if (isLoggedIn) {
-      navigate({
-        to: "/dashboard",
-        search: { tab: "cart" },
-      });
+      navigate("/dashboard?tab=cart");
     } else {
       localStorage.setItem("vexa_redirect_after_login", "/dashboard?tab=cart");
-      navigate({ to: "/login" });
+      navigate("/login");
     }
   };
 
@@ -61,10 +55,10 @@ export function ProductCard({ product }: { product: Product }) {
           <span className="btn-gold absolute right-4 top-4 rounded-full px-3 py-1 text-[10px]">
             {off}% Off
           </span>
-          <div className="absolute inset-x-0 bottom-0 translate-y-full bg-background/90 p-3.5 backdrop-blur transition-transform duration-500 group-hover:translate-y-0 flex gap-2">
+          <div className="absolute inset-x-0 bottom-0 z-20 flex gap-2 bg-gradient-to-t from-background/95 via-background/90 to-transparent p-3.5 backdrop-blur-md transition-all duration-300 opacity-100 translate-y-0 lg:opacity-0 lg:translate-y-full lg:group-hover:opacity-100 lg:group-hover:translate-y-0">
             <button
               onClick={handleAddToCart}
-              className="btn-gold hover:btn-gold-hover flex-1 flex items-center justify-center gap-1.5 rounded-sm py-2 text-[10px] uppercase tracking-wider font-bold cursor-pointer"
+              className="btn-gold hover:btn-gold-hover flex-1 flex items-center justify-center gap-1.5 rounded-sm py-2.5 text-[10px] uppercase tracking-wider font-bold cursor-pointer shadow-goldy transition-transform active:scale-95"
             >
               <ShoppingBag className="size-3.5" /> Add to Cart
             </button>
@@ -73,10 +67,10 @@ export function ProductCard({ product }: { product: Product }) {
                 e.stopPropagation();
                 setShowQuickView(true);
               }}
-              className="btn-outline-gold flex items-center justify-center rounded-sm px-3 py-2 text-[10px] font-bold text-gold hover:bg-gold hover:text-primary-foreground cursor-pointer"
+              className="btn-outline-gold flex items-center justify-center rounded-sm px-3 py-2.5 text-[10px] font-bold text-gold hover:bg-gold hover:text-primary-foreground cursor-pointer transition-transform active:scale-95"
               title="Quick View Product Details"
             >
-              <Eye className="size-3.5" />
+              <Eye className="size-4" />
             </button>
           </div>
         </div>

@@ -84,7 +84,7 @@ export function ResetPassword() {
                 <span>Invalid or missing reset token link. Please request a new password reset link.</span>
               </div>
               <button
-                onClick={() => navigate({ to: "/login" })}
+                onClick={() => navigate("/login")}
                 className="btn-gold hover:btn-gold-hover w-full rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider"
               >
                 Back to Sign In

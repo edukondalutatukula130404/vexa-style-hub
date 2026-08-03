@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Truck,
   ArrowRight,
+  ArrowLeft,
   CheckCircle2,
   Sparkles,
   Ruler,
@@ -302,10 +303,10 @@ export function ProductDetailPage() {
   const handleBuyNow = () => {
     addToCart(getProductWithColor(), selectedSize, quantity);
     if (isLoggedIn) {
-      navigate({ to: "/dashboard", search: { tab: "cart" } });
+      navigate("/dashboard?tab=cart");
     } else {
       localStorage.setItem("vexa_redirect_after_login", "/dashboard?tab=cart");
-      navigate({ to: "/login" });
+      navigate("/login");
     }
   };
 
@@ -316,7 +317,7 @@ export function ProductDetailPage() {
       : product.rating.toFixed(1);
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-12">
+    <section className="mx-auto max-w-7xl px-5 pt-28 pb-12">
       {/* Toast Notification */}
       {addedToast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border border-gold/50 bg-card p-4 text-xs shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -328,8 +329,7 @@ export function ProductDetailPage() {
             </p>
           </div>
           <Link
-            to="/dashboard"
-            search={{ tab: "cart" }}
+            to="/dashboard?tab=cart"
             className="ml-3 rounded-sm bg-gold px-3 py-1.5 text-[10px] font-bold uppercase text-primary-foreground hover:opacity-90"
           >
             View Bag
@@ -337,6 +337,17 @@ export function ProductDetailPage() {
         </div>
       )}
 
+
+      {/* Mobile & Desktop Back Button */}
+      <div className="mb-6 flex items-center justify-between">
+        <Link
+          to="/products"
+          className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold backdrop-blur transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
+        >
+          <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
+          <span>Back to Products</span>
+        </Link>
+      </div>
 
       {/* Main Product Grid */}
       <div className="grid gap-12 lg:grid-cols-12 items-start">

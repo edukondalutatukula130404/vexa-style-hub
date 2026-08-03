@@ -69,7 +69,7 @@ export function Register() {
   };
 
   return (
-    <section className="mx-auto grid max-w-md px-5 py-20">
+    <section className="mx-auto grid max-w-md px-5 pt-28 pb-20">
       <Reveal>
         <div className="rounded-sm border border-border bg-card p-9 shadow-goldy">
           <div className="text-center">

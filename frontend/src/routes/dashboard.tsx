@@ -186,16 +186,10 @@ export function UserDashboard() {
         }
       }
 
-      setMyOrders((prev) => {
+      setMyOrders(() => {
         const map = new Map();
         // First set cached demo orders
         cachedDemoOrders.forEach((item) => {
-          if (item && (item._id || (item as any).id)) {
-            map.set(item._id || (item as any).id, item);
-          }
-        });
-        // Set prev state items
-        prev.forEach((item) => {
           if (item && (item._id || (item as any).id)) {
             map.set(item._id || (item as any).id, item);
           }
@@ -222,6 +216,11 @@ export function UserDashboard() {
 
   useEffect(() => {
     fetchMyOrders();
+    const handleOrdersUpdated = () => {
+      fetchMyOrders(true);
+    };
+    window.addEventListener("vexa_orders_updated", handleOrdersUpdated);
+    return () => window.removeEventListener("vexa_orders_updated", handleOrdersUpdated);
   }, [user?.email, activeTab]);
 
   const handleUpdateProfile = (e: React.FormEvent) => {
@@ -374,8 +373,8 @@ export function UserDashboard() {
   const CurrentIcon = currentNavItem.icon;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="min-h-screen bg-background pt-24 sm:pt-28 pb-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* PAGE HEADER BANNER */}
         <div className="mb-6 border-b border-border/60 pb-5">
           <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">MY ACCOUNT</h1>

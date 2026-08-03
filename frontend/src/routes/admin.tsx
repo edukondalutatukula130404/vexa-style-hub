@@ -464,6 +464,20 @@ export function Admin() {
     setStatusUpdatedMsg(`Booking #${String(orderId).slice(-8).toUpperCase()} status updated to "${newStatus}"!`);
     setTimeout(() => setStatusUpdatedMsg(""), 3500);
 
+    // Sync status update to local demo orders in localStorage & dispatch update event
+    if (typeof window !== "undefined") {
+      try {
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        const updated = cached.map((o: any) =>
+          o._id === orderId || o.id === orderId ? { ...o, status: newStatus } : o
+        );
+        localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
+        window.dispatchEvent(new Event("vexa_orders_updated"));
+      } catch (e) {
+        console.warn("Failed to update cached demo orders:", e);
+      }
+    }
+
     try {
       await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: "PUT",

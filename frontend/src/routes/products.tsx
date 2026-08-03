@@ -35,7 +35,7 @@ export function Products() {
   }, [products, active, searchQuery, sortBy]);
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-16">
+    <section className="mx-auto max-w-7xl px-5 pt-28 pb-16">
       <Reveal className="text-center">
         <p className="text-[10px] uppercase tracking-[0.3em] text-gold">The complete collection</p>
         <h1 className="mt-4 font-display text-4xl sm:text-5xl">Engineered Essentials</h1>

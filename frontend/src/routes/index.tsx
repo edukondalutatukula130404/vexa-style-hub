@@ -241,11 +241,10 @@ function Home() {
         <div className="relative mx-auto max-w-7xl px-5 py-16 lg:py-24">
           <div className="grid gap-10 lg:grid-cols-2 items-center">
             <div className="animate-fade-up">
-              <span className="inline-block rounded-full border border-gold/50 bg-gold/10 px-4 py-1.5 text-[10px] uppercase tracking-[0.3em] text-gold font-bold shadow-sm">
-                ELEVATE YOUR EVERYDAY STYLE
-              </span>
-              <h1 className="mt-7 font-display text-5xl leading-[1.05] sm:text-6xl lg:text-7xl font-bold text-foreground">
-                PREMIUM T-SHIRT
+              <h1 className="mt-4 font-display text-5xl leading-[1.05] sm:text-6xl lg:text-7xl font-bold text-foreground">
+                PREMIUM
+                <br />
+                T-SHIRT
                 <br />
                 <span className="text-gold-gradient">COLLECTION</span>
               </h1>
@@ -413,37 +412,6 @@ function Home() {
               </div>
             </div>
 
-            {/* Banner Slider Arrow Controls & Indicator Dots */}
-            <div className="absolute bottom-5 right-5 z-20 flex items-center gap-3 rounded-full border border-gold/40 bg-background/80 px-4 py-2 backdrop-blur-md shadow-sm">
-              <button
-                onClick={() => setBannerIndex((prev) => (prev - 1 + activePromoBanners.length) % activePromoBanners.length)}
-                className="flex size-7 items-center justify-center rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-primary-foreground transition-all"
-                aria-label="Previous banner slide"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-
-              <div className="flex items-center gap-1.5">
-                {activePromoBanners.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setBannerIndex(idx)}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      bannerIndex === idx ? "w-6 bg-gold" : "w-2 bg-muted-foreground/40 hover:bg-gold/60"
-                    }`}
-                    aria-label={`Banner slide ${idx + 1}`}
-                  />
-                ))}
-              </div>
-
-              <button
-                onClick={() => setBannerIndex((prev) => (prev + 1) % activePromoBanners.length)}
-                className="flex size-7 items-center justify-center rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-primary-foreground transition-all"
-                aria-label="Next banner slide"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
           </div>
         </div>
       </section>
@@ -480,11 +448,14 @@ function Home() {
           ))}
         </div>
 
-        <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {/* Featured Products List (Side scrolling on mobile, grid on desktop) */}
+        <div className="mt-10 flex overflow-x-auto gap-5 pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:grid sm:gap-8 sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((p, i) => (
-            <Reveal key={p.id} delay={(i % 4) * 90}>
-              <ProductCard product={p} />
-            </Reveal>
+            <div key={p.id} className="w-[280px] shrink-0 snap-start sm:w-auto sm:shrink sm:snap-none">
+              <Reveal delay={(i % 4) * 90}>
+                <ProductCard product={p} />
+              </Reveal>
+            </div>
           ))}
         </div>
       </section>

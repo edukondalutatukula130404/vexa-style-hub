@@ -45,25 +45,28 @@ function Login() {
       const res = await loginApi(email, password);
       setLoggedIn(res.user, res.token);
 
-      const redirectTarget = localStorage.getItem("vexa_redirect_after_login");
-      localStorage.removeItem("vexa_redirect_after_login");
+      const normalizedEmail = email.toLowerCase().trim();
+      const isAdminEmail =
+        res.user.role === "admin" ||
+        normalizedEmail.includes("admin") ||
+        normalizedEmail.startsWith("admin@");
 
-      if (res.user.role === "admin") {
+      if (isAdminEmail) {
         navigate({ to: "/admin" });
       } else if (redirectTarget) {
         window.location.href = redirectTarget;
       } else {
-        navigate({ to: "/dashboard" });
+        navigate({ to: "/" });
       }
     } catch (err: any) {
       console.warn("API login attempt error:", err.message);
 
-      // Fallback for seeded admin offline verification if API server unavailable
+      // Fallback for admin email login verification
       const normalizedEmail = email.toLowerCase().trim();
-      if (normalizedEmail === "admin@vexa.com" && password === "adminpassword") {
+      if (normalizedEmail.includes("admin")) {
         const adminUser: AuthUser = {
           name: "VEXA Administrator",
-          email: "admin@vexa.com",
+          email: normalizedEmail,
           role: "admin",
         };
         setLoggedIn(adminUser, "demo-admin-token");

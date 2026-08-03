@@ -71,6 +71,9 @@ export async function loginApi(email: string, password: string): Promise<{ token
     }
     return data;
   } catch (err: any) {
+    if (err.message === "Failed to fetch" || err.name === "TypeError") {
+      throw new Error("Unable to connect to backend server (http://localhost:5000). Please ensure the backend server is running.");
+    }
     throw new Error(err.message || "Failed to connect to authentication server");
   }
 }
@@ -88,6 +91,9 @@ export async function registerApi(name: string, email: string, password: string)
     }
     return data;
   } catch (err: any) {
+    if (err.message === "Failed to fetch" || err.name === "TypeError") {
+      throw new Error("Unable to connect to backend server (http://localhost:5000). Please ensure the backend server is running.");
+    }
     throw new Error(err.message || "Failed to connect to registration server");
   }
 }
@@ -105,6 +111,9 @@ export async function forgotPasswordApi(email: string): Promise<{ success: boole
     }
     return data;
   } catch (err: any) {
+    if (err.message === "Failed to fetch" || err.name === "TypeError") {
+      throw new Error("Unable to connect to backend server (http://localhost:5000). Please ensure the backend server is running.");
+    }
     throw new Error(err.message || "Failed to connect to authentication server");
   }
 }
@@ -122,6 +131,9 @@ export async function resetPasswordApi(params: { email?: string; code?: string; 
     }
     return data;
   } catch (err: any) {
+    if (err.message === "Failed to fetch" || err.name === "TypeError") {
+      throw new Error("Unable to connect to backend server (http://localhost:5000). Please ensure the backend server is running.");
+    }
     throw new Error(err.message || "Failed to connect to authentication server");
   }
 }

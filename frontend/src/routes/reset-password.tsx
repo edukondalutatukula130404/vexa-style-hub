@@ -64,7 +64,7 @@ function ResetPassword() {
         if (res.user.role === "admin") {
           navigate({ to: "/admin" });
         } else {
-          navigate({ to: "/dashboard" });
+          navigate({ to: "/" });
         }
       }, 2000);
     } catch (err: any) {

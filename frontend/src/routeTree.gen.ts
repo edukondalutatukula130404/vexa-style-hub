@@ -20,6 +20,7 @@ import { Route as ProductsRouteImport } from './routes/products'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ProductIdRouteImport } from './routes/product.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -76,6 +77,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductIdRoute = ProductIdRouteImport.update({
+  id: '/product/$id',
+  path: '/product/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/product/$id': typeof ProductIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/product/$id': typeof ProductIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/product/$id': typeof ProductIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/sitemap.xml'
+    | '/product/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/sitemap.xml'
+    | '/product/$id'
   id:
     | '__root__'
     | '/'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/sitemap.xml'
+    | '/product/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +183,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ProductIdRoute: typeof ProductIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/product/$id': {
+      id: '/product/$id'
+      path: '/product/$id'
+      fullPath: '/product/$id'
+      preLoaderRoute: typeof ProductIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -267,6 +287,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ProductIdRoute: ProductIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

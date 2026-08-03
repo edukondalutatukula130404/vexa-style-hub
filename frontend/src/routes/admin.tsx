@@ -87,8 +87,78 @@ export function Admin() {
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
   const { products: catalogProducts } = useProducts();
-  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "add-item" | "users" | "home-media">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "orders" | "add-item" | "categories" | "users" | "home-media">("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Category Manager State
+  const [categoriesList, setCategoriesList] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("vexa_custom_categories");
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+    }
+    return ["Oversized Fit", "Classic Fit", "Limited Drop", "Signature Drop", "Luxury Heavyweight", "Graphic Series"];
+  });
+  const [newCatInput, setNewCatInput] = useState("");
+  const [catMsg, setCatMsg] = useState("");
+
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatInput.trim()) return;
+    const catName = newCatInput.trim();
+    if (categoriesList.includes(catName)) {
+      setCatMsg(`Category "${catName}" already exists!`);
+      setTimeout(() => setCatMsg(""), 3000);
+      return;
+    }
+    const updated = [...categoriesList, catName];
+    setCategoriesList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_custom_categories", JSON.stringify(updated));
+    }
+    setNewCatInput("");
+    setCatMsg(`New Category "${catName}" added successfully!`);
+    setTimeout(() => setCatMsg(""), 3500);
+  };
+
+  const handleDeleteCategory = (catName: string) => {
+    const updated = categoriesList.filter((c) => c !== catName);
+    setCategoriesList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_custom_categories", JSON.stringify(updated));
+    }
+    setCatMsg(`Category "${catName}" removed.`);
+    setTimeout(() => setCatMsg(""), 3000);
+  };
+
+  // Inventory & Stock State
+  const [stockMap, setStockMap] = useState<Record<string, number>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("vexa_product_stock");
+        if (stored) return JSON.parse(stored);
+      } catch (e) {}
+    }
+    const initial: Record<string, number> = {};
+    catalogProducts.forEach((p, idx) => {
+      initial[p.id] = idx % 3 === 0 ? 5 : idx % 4 === 0 ? 0 : 35 + idx * 5;
+    });
+    return initial;
+  });
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [stockUpdatedMsg, setStockUpdatedMsg] = useState("");
+
+  const handleUpdateStock = (productId: string, newQty: number) => {
+    const safeQty = Math.max(0, newQty);
+    const updated = { ...stockMap, [productId]: safeQty };
+    setStockMap(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_product_stock", JSON.stringify(updated));
+    }
+    setStockUpdatedMsg("Stock units updated successfully!");
+    setTimeout(() => setStockUpdatedMsg(""), 2500);
+  };
 
   // Orders State
   const [orders, setOrders] = useState<OrderItem[]>([]);
@@ -100,12 +170,14 @@ export function Admin() {
 
   const adminTabsList = useMemo(() => [
     { id: "overview", label: "Overview & Sales", icon: BarChart3 },
-    { id: "home-media", label: "Home Page Media & Banners", icon: Image },
-    { id: "orders", label: `Customer Bookings (${orders.length})`, icon: Package },
+    { id: "inventory", label: `Inventory Management (${catalogProducts.length})`, icon: Boxes },
     { id: "add-item", label: `Collection Catalog (${catalogProducts.length})`, icon: PlusCircle },
+    { id: "orders", label: `Customer Bookings (${orders.length})`, icon: Package },
     { id: "users", label: `Registered Users (${usersList.length})`, icon: Users },
+    { id: "categories", label: `Category Manager (${categoriesList.length})`, icon: Sparkles },
+    { id: "home-media", label: "Home Page Media", icon: Image },
     { id: "logout", label: "Logout", icon: LogOut, isLogout: true },
-  ], [orders.length, usersList.length, catalogProducts.length]);
+  ], [orders.length, usersList.length, catalogProducts.length, categoriesList.length]);
 
   // Home Page Media State
   const [heroImgUrl, setHeroImgUrl] = useState<string>(() => {
@@ -457,7 +529,7 @@ export function Admin() {
   const maxSales = Math.max(...sales);
 
   return (
-    <div className="min-h-screen bg-background pt-20">
+    <div className="min-h-screen bg-background pt-6 sm:pt-8">
       <div className="mx-auto max-w-7xl px-3 sm:px-4 py-6 sm:py-8">
         <div className="grid gap-6 lg:gap-8 lg:grid-cols-[300px_1fr]">
           {/* MOBILE ADMIN DROPDOWN (< lg) */}
@@ -552,94 +624,256 @@ export function Admin() {
             </div>
 
             <nav className="mt-6 space-y-1.5">
-              <button
-                onClick={() => setActiveTab("overview")}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
-                  activeTab === "overview"
-                    ? "bg-gold text-primary-foreground shadow-goldy"
-                    : "text-muted-foreground hover:bg-surface hover:text-gold"
-                }`}
-              >
-                <BarChart3 className="size-4 shrink-0" /> Overview & Sales
-              </button>
-
-              <button
-                onClick={() => setActiveTab("home-media")}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
-                  activeTab === "home-media"
-                    ? "bg-gold text-primary-foreground shadow-goldy"
-                    : "text-muted-foreground hover:bg-surface hover:text-gold"
-                }`}
-              >
-                <Image className="size-4 shrink-0" /> Home Page Media
-              </button>
-
-              <button
-                onClick={() => setActiveTab("orders")}
-                className={`flex w-full items-center justify-between rounded-lg px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
-                  activeTab === "orders"
-                    ? "bg-gold text-primary-foreground shadow-goldy font-bold"
-                    : "text-muted-foreground hover:bg-surface hover:text-gold"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 whitespace-nowrap">
-                  <Package className="size-4 shrink-0" /> Customer Bookings
-                </div>
-                {orders.length > 0 && (
-                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold shrink-0 ${activeTab === "orders" ? "bg-black/20 text-white" : "bg-gold/20 text-gold"}`}>
-                    {orders.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab("add-item")}
-                className={`flex w-full items-center justify-between rounded-lg px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
-                  activeTab === "add-item"
-                    ? "bg-gold text-primary-foreground shadow-goldy font-bold"
-                    : "text-muted-foreground hover:bg-surface hover:text-gold"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 whitespace-nowrap">
-                  <PlusCircle className="size-4 shrink-0" /> Collection Catalog
-                </div>
-                {catalogProducts.length > 0 && (
-                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold shrink-0 ${activeTab === "add-item" ? "bg-black/20 text-white" : "bg-gold/20 text-gold"}`}>
-                    {catalogProducts.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab("users")}
-                className={`flex w-full items-center justify-between rounded-lg px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
-                  activeTab === "users"
-                    ? "bg-gold text-primary-foreground shadow-goldy"
-                    : "text-muted-foreground hover:bg-surface hover:text-gold"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 whitespace-nowrap">
-                  <Users className="size-4 shrink-0" /> Registered Users
-                </div>
-                {usersList.length > 0 && (
-                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold shrink-0 ${activeTab === "users" ? "bg-black/20 text-white" : "bg-gold/20 text-gold"}`}>
-                    {usersList.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={logout}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap text-muted-foreground transition-all hover:bg-destructive/15 hover:text-destructive cursor-pointer"
-              >
-                <LogOut className="size-4 shrink-0 text-destructive/80" /> Logout
-              </button>
+              {adminTabsList.map((t) => {
+                const Icon = t.icon;
+                const isSelected = activeTab === t.id && !t.isLogout;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      if (t.isLogout) {
+                        logout();
+                      } else {
+                        setActiveTab(t.id as any);
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                      t.isLogout
+                        ? "text-muted-foreground hover:bg-destructive/15 hover:text-destructive mt-3 pt-3 border-t border-border/60"
+                        : isSelected
+                        ? "bg-gold text-primary-foreground shadow-goldy font-bold"
+                        : "text-muted-foreground hover:bg-surface hover:text-gold"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 whitespace-nowrap">
+                      <Icon className="size-4 shrink-0" /> {t.label}
+                    </div>
+                  </button>
+                );
+              })}
             </nav>
           </aside>
 
           {/* MAIN CONTENT AREA */}
           <main className="min-h-[500px] rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
+            {/* TAB: INVENTORY MANAGEMENT */}
+            {activeTab === "inventory" && (
+              <div className="space-y-8 animate-in fade-in duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Stock Control Panel</span>
+                    <h2 className="font-display text-2xl font-semibold text-foreground">Inventory & Warehouse Management</h2>
+                    <p className="text-xs text-muted-foreground mt-1">Track warehouse stock levels, low-stock warnings, and update product quantities live.</p>
+                  </div>
+                  {stockUpdatedMsg && (
+                    <span className="rounded-md bg-emerald-500/15 border border-emerald-500/40 px-3 py-1.5 text-xs font-bold text-emerald-400 animate-in fade-in">
+                      ✓ {stockUpdatedMsg}
+                    </span>
+                  )}
+                </div>
+
+                {/* Stock KPI Summary Cards */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-xl border border-gold/40 bg-gold/10 p-5 shadow-sm">
+                    <span className="text-[10px] uppercase tracking-wider text-gold font-bold">Total Catalog Products</span>
+                    <p className="font-display text-2xl font-bold text-foreground mt-1">{catalogProducts.length} Items</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-5 shadow-sm">
+                    <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">In Stock Items</span>
+                    <p className="font-display text-2xl font-bold text-emerald-400 mt-1">
+                      {catalogProducts.filter((p) => (stockMap[p.id] ?? 25) > 10).length} Items
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 shadow-sm">
+                    <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold">Low Stock Warning</span>
+                    <p className="font-display text-2xl font-bold text-amber-400 mt-1">
+                      {catalogProducts.filter((p) => (stockMap[p.id] ?? 25) >= 1 && (stockMap[p.id] ?? 25) <= 10).length} Items
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-5 shadow-sm">
+                    <span className="text-[10px] uppercase tracking-wider text-rose-400 font-bold">Out of Stock</span>
+                    <p className="font-display text-2xl font-bold text-rose-400 mt-1">
+                      {catalogProducts.filter((p) => (stockMap[p.id] ?? 25) === 0).length} Items
+                    </p>
+                  </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={inventorySearch}
+                      onChange={(e) => setInventorySearch(e.target.value)}
+                      placeholder="Search inventory by title or category..."
+                      className="w-full rounded-sm border border-border bg-card py-2.5 pl-9 pr-3 text-xs outline-none focus:border-gold"
+                    />
+                  </div>
+                </div>
+
+                {/* Inventory Table */}
+                <div className="space-y-3">
+                  {catalogProducts
+                    .filter((p) =>
+                      p.name.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+                      p.category.toLowerCase().includes(inventorySearch.toLowerCase())
+                    )
+                    .map((item) => {
+                      const qty = stockMap[item.id] ?? 25;
+                      const isOut = qty === 0;
+                      const isLow = qty > 0 && qty <= 10;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm hover:border-gold/50 transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="size-16 rounded-lg object-cover border border-border shrink-0"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-display text-sm font-bold text-foreground">{item.name}</h4>
+                                <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold border border-gold/30">
+                                  {item.category}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Price: <span className="font-bold text-gold">₹{item.price.toLocaleString("en-IN")}</span>
+                              </p>
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <span
+                                  className={`rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                    isOut
+                                      ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                                      : isLow
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                                      : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                                  }`}
+                                >
+                                  {isOut ? "🔴 Out of Stock" : isLow ? "🟡 Low Stock Warning" : "🟢 In Stock"}
+                                </span>
+                                <span className="text-xs font-bold text-foreground">({qty} units)</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick Adjust Buttons */}
+                          <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStock(item.id, qty - 5)}
+                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
+                            >
+                              -5
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStock(item.id, qty - 1)}
+                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
+                            >
+                              -1
+                            </button>
+                            <input
+                              type="number"
+                              min={0}
+                              value={qty}
+                              onChange={(e) => handleUpdateStock(item.id, Number(e.target.value))}
+                              className="w-16 rounded-sm border border-gold/40 bg-background py-1.5 px-2 text-center text-xs font-bold text-gold outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStock(item.id, qty + 1)}
+                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
+                            >
+                              +1
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStock(item.id, qty + 10)}
+                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
+                            >
+                              +10
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: CATEGORY MANAGER */}
+            {activeTab === "categories" && (
+              <div className="space-y-8 animate-in fade-in duration-300">
+                <div className="border-b border-border pb-4">
+                  <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Catalog Taxonomy</span>
+                  <h2 className="font-display text-2xl font-semibold text-foreground">Category Manager & Custom Collections</h2>
+                  <p className="text-xs text-muted-foreground mt-1">Add new product categories dynamically for assigning collection items and organizing the store.</p>
+                </div>
+
+                {catMsg && (
+                  <div className="rounded-lg border border-gold/40 bg-gold/10 p-4 text-xs font-bold text-gold">
+                    ✓ {catMsg}
+                  </div>
+                )}
+
+                {/* ADD NEW CATEGORY FORM */}
+                <form onSubmit={handleAddCategory} className="rounded-xl border border-gold/40 bg-card p-6 shadow-sm space-y-4">
+                  <h3 className="font-display text-base font-bold text-foreground">Add New Category</h3>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={newCatInput}
+                      onChange={(e) => setNewCatInput(e.target.value)}
+                      placeholder="e.g. Acid Wash Drops, Heavyweight Hoodies, Winter Wear..."
+                      className="flex-1 rounded-sm border border-border bg-background px-4 py-3 text-xs outline-none focus:border-gold text-foreground"
+                    />
+                    <button
+                      type="submit"
+                      className="btn-gold hover:btn-gold-hover rounded-sm px-6 py-3 text-xs font-bold uppercase tracking-wider shrink-0 cursor-pointer"
+                    >
+                      + Add Category
+                    </button>
+                  </div>
+                </form>
+
+                {/* CATEGORIES GRID */}
+                <div className="space-y-4">
+                  <h3 className="font-display text-base font-bold text-foreground">Active Catalog Categories ({categoriesList.length})</h3>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {categoriesList.map((catName) => {
+                      const count = catalogProducts.filter((p) => p.category.toLowerCase() === catName.toLowerCase()).length;
+                      return (
+                        <div
+                          key={catName}
+                          className="flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-sm hover:border-gold/60 transition-all"
+                        >
+                          <div>
+                            <span className="font-display text-sm font-bold text-foreground block">{catName}</span>
+                            <span className="text-[11px] text-muted-foreground">{count} items in collection</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(catName)}
+                            className="text-xs font-bold text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-1"
+                            title="Delete category"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* TAB 1: OVERVIEW */}
             {activeTab === "overview" && (
               <div className="space-y-8">
@@ -1100,16 +1334,26 @@ export function Admin() {
                       </div>
 
                       <div>
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category</label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category</label>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("categories")}
+                            className="text-[10px] font-bold text-gold hover:underline uppercase tracking-wider cursor-pointer"
+                          >
+                            + Add Category
+                          </button>
+                        </div>
                         <select
                           value={newItemCategory}
                           onChange={(e) => setNewItemCategory(e.target.value)}
                           className="mt-1.5 w-full rounded-sm border border-border bg-background px-4 py-3 text-xs outline-none focus:border-gold"
                         >
-                          <option value="Oversized">Oversized Fit</option>
-                          <option value="Classic">Classic Fit</option>
-                          <option value="Limited">Limited Drop</option>
-                          <option value="Graphic">Graphic Edition</option>
+                          {categoriesList.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>

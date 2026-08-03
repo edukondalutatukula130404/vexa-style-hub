@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Menu, X, ShoppingBag, User } from "lucide-react";
+import { Menu, X, ShoppingBag, User, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const baseLinks = [
@@ -14,7 +14,7 @@ const baseLinks = [
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const { isLoggedIn, isAdmin } = useAuth();
+  const { isLoggedIn, isAdmin, logout } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -22,6 +22,11 @@ export function Navbar() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Hide header navigation completely on admin portal
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
+    return null;
+  }
 
   const accountPath = isAdmin ? "/admin" : "/dashboard";
 
@@ -99,7 +104,7 @@ export function Navbar() {
               </Link>
               <Link
                 to="/products"
-                className="btn-gold hover:btn-gold-hover flex items-center gap-2 rounded-sm px-5 py-2.5 text-[10px]"
+                className="btn-gold hover:btn-gold-hover hidden sm:flex items-center gap-2 rounded-sm px-5 py-2.5 text-[10px]"
               >
                 <ShoppingBag className="size-3.5" />
                 Shop
@@ -119,7 +124,7 @@ export function Navbar() {
       {/* Mobile Drawer */}
       <div
         className={`overflow-hidden border-t border-border bg-background/95 backdrop-blur-xl transition-all duration-500 lg:hidden ${
-          open ? "mt-4 max-h-[420px]" : "max-h-0"
+          open ? "mt-4 max-h-[480px]" : "max-h-0"
         }`}
       >
         <ul className="flex flex-col gap-1 px-6 py-4">
@@ -135,15 +140,28 @@ export function Navbar() {
             </li>
           ))}
           {isLoggedIn ? (
-            <li>
-              <Link
-                to={accountPath}
-                onClick={() => setOpen(false)}
-                className="block py-2.5 text-sm font-bold uppercase tracking-[0.2em] text-gold"
-              >
-                {isAdmin ? "Admin Portal" : "My Account"}
-              </Link>
-            </li>
+            <>
+              <li>
+                <Link
+                  to={accountPath}
+                  onClick={() => setOpen(false)}
+                  className="block py-2.5 text-sm font-bold uppercase tracking-[0.2em] text-gold"
+                >
+                  {isAdmin ? "Admin Portal" : "My Account"}
+                </Link>
+              </li>
+              <li className="pt-2 border-t border-border/50">
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    logout();
+                  }}
+                  className="flex items-center gap-2.5 py-2.5 text-sm font-bold uppercase tracking-[0.2em] text-destructive hover:opacity-80 transition-opacity cursor-pointer w-full text-left"
+                >
+                  <LogOut className="size-4" /> Log Out
+                </button>
+              </li>
+            </>
           ) : (
             <li>
               <Link

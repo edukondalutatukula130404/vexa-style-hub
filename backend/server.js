@@ -43,16 +43,19 @@ app.use('/api/items', require('./routes/itemRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 
-// 404 Handler
-app.use('*', (req, res) => {
-  res.status(404).json({ success: false, message: 'API Route Not Found' });
-});
-
 // Central Error Handler Middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`⚠️ Port ${PORT} is already in use. The VEXA backend server is ALREADY active and running on http://localhost:${PORT}`);
+  } else {
+    console.error('Server error:', err);
+  }
 });

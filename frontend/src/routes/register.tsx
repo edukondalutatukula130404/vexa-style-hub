@@ -61,7 +61,7 @@ function Register() {
       if (redirectTarget) {
         window.location.href = redirectTarget;
       } else {
-        navigate({ to: "/dashboard" });
+        navigate({ to: "/" });
       }
     } catch (err: any) {
       console.warn("Registration API error:", err.message);

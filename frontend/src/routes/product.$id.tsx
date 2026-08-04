@@ -247,6 +247,8 @@ export function ProductDetailPage() {
   };
 
   // Related products (excluding current)
+
+
   const relatedProducts = useMemo(() => {
     if (!product) return [];
     const sameCat = products.filter(
@@ -345,7 +347,7 @@ export function ProductDetailPage() {
           className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold backdrop-blur transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
         >
           <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
-          <span>Back to Products</span>
+          <span>Back</span>
         </Link>
       </div>
 
@@ -361,13 +363,13 @@ export function ProductDetailPage() {
                 alt={`${product.name} in ${selectedColor.name}`}
                 className="h-[480px] sm:h-[580px] w-full object-cover object-center transition-all duration-700 group-hover:scale-105 animate-in fade-in duration-300"
               />
-              <span className="absolute left-5 top-5 rounded-full border border-gold/50 bg-background/80 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-gold backdrop-blur-md">
+              <span className="absolute left-5 top-5 rounded-full border border-gold/50 bg-black/85 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-gold">
                 {product.category} Collection
               </span>
               <span className="btn-gold absolute right-5 top-5 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider">
                 {discountOff}% OFF
               </span>
-              <span className="absolute bottom-5 left-5 rounded-full border border-gold/40 bg-black/80 px-4 py-1.5 text-[10px] font-semibold text-gold backdrop-blur-md">
+              <span className="absolute bottom-5 left-5 rounded-full border border-gold/40 bg-black/85 px-4 py-1.5 text-[10px] font-semibold text-gold">
                 240 GSM Heavyweight Cotton
               </span>
             </div>

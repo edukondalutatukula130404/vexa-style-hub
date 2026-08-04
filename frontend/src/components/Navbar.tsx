@@ -27,9 +27,6 @@ export function Navbar() {
       const currentScrollY = window.scrollY;
       setScrolled(currentScrollY > 20);
 
-      // Automatically close mobile menu options drawer on scroll up/down
-      setOpen(false);
-
       if (currentScrollY > lastScrollY && currentScrollY > 80) {
         // Scrolling down -> hide navbar
         setVisible(false);
@@ -100,120 +97,104 @@ export function Navbar() {
         </ul>
 
         {/* Right Section Controls */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Cart Button (Desktop only, hidden on mobile screens) */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Cart Button */}
           <Link
             to="/dashboard?tab=cart"
-            className="btn-gold hover:btn-gold-hover hidden sm:flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] cursor-pointer shadow-goldy"
+            className="btn-gold hover:btn-gold-hover flex items-center gap-2 rounded-sm px-3.5 py-2 text-xs font-bold uppercase tracking-[0.16em] cursor-pointer shadow-goldy"
+            title="View Cart"
           >
             <ShoppingCart className="size-4" />
-            <span>Cart</span>
+            <span className="hidden sm:inline">Cart</span>
             {totalCartCount > 0 && (
-              <span className="ml-1 flex size-5 items-center justify-center rounded-full bg-background text-[10px] font-extrabold text-gold shadow border border-gold/50 font-mono">
+              <span className="flex size-4.5 items-center justify-center rounded-full bg-background text-[10px] font-extrabold text-gold shadow border border-gold/50 font-mono">
                 {totalCartCount}
               </span>
             )}
           </Link>
 
-          {isLoggedIn ? (
-            <div className="flex items-center gap-2">
-              <Link
-                to={accountPath}
-                className="hidden sm:flex items-center gap-1.5 rounded-sm border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-gold transition-all hover:bg-gold hover:text-primary-foreground shadow-sm"
-              >
-                <User className="size-3.5" />
-                {isAdmin ? "Admin" : "My Account"}
-              </Link>
-              <button
-                aria-label="Toggle menu"
-                onClick={() => setOpen((o) => !o)}
-                className="text-gold lg:hidden p-1.5 cursor-pointer rounded-md hover:bg-gold/10 transition-colors"
-              >
-                {open ? <X className="size-6" /> : <Menu className="size-6" />}
-              </button>
-            </div>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                className="hidden text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-gold sm:block"
-              >
-                Login
-              </Link>
-              <button
-                aria-label="Toggle menu"
-                onClick={() => setOpen((o) => !o)}
-                className="text-gold lg:hidden p-1.5 cursor-pointer rounded-md hover:bg-gold/10 transition-colors"
-              >
-                {open ? <X className="size-6" /> : <Menu className="size-6" />}
-              </button>
-            </>
-          )}
+          {/* Desktop Web App: Three-Lines Icon -> Opens My Account Page */}
+          <Link
+            to={isLoggedIn ? accountPath : "/login"}
+            className="hidden lg:flex items-center justify-center p-2.5 rounded-sm border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
+            title={isLoggedIn ? (isAdmin ? "Admin Portal" : "My Account Dashboard") : "Login / Account"}
+          >
+            <Menu className="size-5" />
+          </Link>
+
+          {/* Mobile View: Three-Lines Icon -> Toggles Mobile Navigation Dropdown Menu */}
+          <button
+            type="button"
+            aria-label="Toggle Navigation Menu"
+            onClick={() => setOpen((o) => !o)}
+            className="flex lg:hidden items-center justify-center p-2.5 rounded-sm border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
+            title="Toggle Menu"
+          >
+            {open ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
         </div>
       </nav>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Navigation Dropdown Menu (Triggers on Mobile Three-Lines Click) */}
       <div
-        className={`overflow-hidden border-t border-border bg-background/95 backdrop-blur-xl transition-all duration-500 lg:hidden ${
-          open ? "mt-3 max-h-[480px]" : "max-h-0"
+        className={`overflow-hidden border-t border-gold/30 bg-card/98 backdrop-blur-2xl shadow-2xl transition-all duration-500 ease-in-out lg:hidden ${
+          open ? "mt-3 max-h-[520px] opacity-100 py-3" : "max-h-0 opacity-0 py-0 border-transparent pointer-events-none"
         }`}
       >
-        <ul className="flex flex-col gap-1 px-6 py-4">
+        <ul className="flex flex-col gap-1 px-6 py-2 divide-y divide-border/30">
           {baseLinks.map((l) => (
-            <li key={l.to}>
+            <li key={l.to} className="py-1">
               <NavLink
                 to={l.to}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `block py-2.5 text-sm uppercase tracking-[0.2em] transition-colors ${
-                    isActive ? "text-gold font-bold" : "text-muted-foreground hover:text-gold"
+                  `flex items-center justify-between py-2 text-xs font-bold uppercase tracking-[0.22em] transition-all duration-300 ${
+                    isActive ? "text-gold font-extrabold translate-x-1" : "text-muted-foreground hover:text-gold"
                   }`
                 }
               >
-                {l.label}
+                {({ isActive }) => (
+                  <>
+                    <span>{l.label}</span>
+                    {isActive && <span className="size-1.5 rounded-full bg-gold shadow-goldy" />}
+                  </>
+                )}
               </NavLink>
             </li>
           ))}
-          <li>
-            <Link
-              to="/dashboard?tab=cart"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 py-2.5 text-sm font-bold uppercase tracking-[0.2em] text-gold"
-            >
-              <ShoppingCart className="size-4" /> My Cart ({totalCartCount})
-            </Link>
-          </li>
+
           {isLoggedIn ? (
             <>
-              <li>
+              <li className="py-1.5">
                 <Link
                   to={accountPath}
                   onClick={() => setOpen(false)}
-                  className="block py-2.5 text-sm font-bold uppercase tracking-[0.2em] text-gold"
+                  className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-[0.22em] text-gold"
                 >
-                  {isAdmin ? "Admin Portal" : "My Account"}
+                  <User className="size-4" /> {isAdmin ? "Admin Portal" : "My Account"}
                 </Link>
               </li>
-              <li className="pt-2 border-t border-border/50">
+              <li className="pt-2">
                 <button
+                  type="button"
                   onClick={() => {
                     setOpen(false);
                     logout();
                   }}
-                  className="flex items-center gap-2.5 py-2.5 text-sm font-bold uppercase tracking-[0.2em] text-destructive hover:opacity-80 transition-opacity cursor-pointer w-full text-left"
+                  className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-[0.22em] text-destructive hover:opacity-80 transition-opacity cursor-pointer w-full text-left"
                 >
                   <LogOut className="size-4" /> Log Out
                 </button>
               </li>
             </>
           ) : (
-            <li>
+            <li className="py-1.5">
               <Link
                 to="/login"
                 onClick={() => setOpen(false)}
-                className="block py-2.5 text-sm uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-gold"
+                className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-[0.22em] text-gold"
               >
-                Login
+                <User className="size-4" /> Login / Sign Up
               </Link>
             </li>
           )}

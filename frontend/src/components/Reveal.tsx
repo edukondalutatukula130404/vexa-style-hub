@@ -14,19 +14,37 @@ export function Reveal({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
+    // Fallback: Ensure element becomes visible even if IntersectionObserver fails on mobile
+    const timer = setTimeout(() => {
+      if (el && !el.classList.contains("is-visible")) {
+        el.classList.add("is-visible");
+      }
+    }, 400);
+
+    if (typeof IntersectionObserver === "undefined") {
+      el.classList.add("is-visible");
+      clearTimeout(timer);
+      return;
+    }
+
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
           if (e.isIntersecting) {
             el.classList.add("is-visible");
+            clearTimeout(timer);
             io.unobserve(el);
           }
         });
       },
-      { threshold: 0.15 },
+      { threshold: 0.01, rootMargin: "0px 0px 100px 0px" },
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      clearTimeout(timer);
+      io.disconnect();
+    };
   }, []);
 
   return (

@@ -1,5 +1,5 @@
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   User as UserIcon,
   Package,
@@ -25,11 +25,14 @@ import {
   Sparkles,
   ChevronDown,
   RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  Camera,
+  Upload,
+  Edit3,
 } from "lucide-react";
 import { products, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
-import { useAuth, API_URL } from "@/lib/auth";
+import { useAuth, API_URL, setLoggedIn } from "@/lib/auth";
 import { useCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
 
 type OrderItem = {
@@ -85,34 +88,175 @@ export function UserDashboard() {
     }
   }, [isLoggedIn, navigate]);
 
-  // Orders State
+  // Orders State & Sort Options
   const [myOrders, setMyOrders] = useState<OrderItem[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [orderSortBy, setOrderSortBy] = useState<"recent" | "oldest" | "price-high" | "price-low">("recent");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("All");
 
-  // Profile Form State
+  const sortedOrders = useMemo(() => {
+    if (!Array.isArray(myOrders)) return [];
+    let result = myOrders.filter((o) => o && typeof o === "object");
+
+    if (orderStatusFilter !== "All") {
+      result = result.filter((o) => (o?.status || "").toLowerCase() === orderStatusFilter.toLowerCase());
+    }
+
+    return result.sort((a, b) => {
+      if (!a || !b) return 0;
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+      if (orderSortBy === "recent") {
+        return dateB - dateA;
+      } else if (orderSortBy === "oldest") {
+        return dateA - dateB;
+      } else if (orderSortBy === "price-high") {
+        return (b.totalAmount || 0) - (a.totalAmount || 0);
+      } else if (orderSortBy === "price-low") {
+        return (a.totalAmount || 0) - (b.totalAmount || 0);
+      }
+      return dateB - dateA;
+    });
+  }, [myOrders, orderSortBy, orderStatusFilter]);
+
+  // Profile Form & Avatar State
   const [profileName, setProfileName] = useState(user?.name || "Aarav Sharma");
   const [profileEmail, setProfileEmail] = useState(user?.email || "aarav@example.com");
   const [profileMobile, setProfileMobile] = useState("9876543210");
   const [profileSavedMsg, setProfileSavedMsg] = useState("");
+  const [profilePic, setProfilePic] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("vexa_profile_avatar") || "";
+    }
+    return "";
+  });
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileSavedMsg("Image size should be less than 5MB.");
+      setTimeout(() => setProfileSavedMsg(""), 3000);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        const base64 = reader.result;
+        setProfilePic(base64);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("vexa_profile_avatar", base64);
+        }
+        setProfileSavedMsg("Profile picture updated successfully!");
+        setTimeout(() => setProfileSavedMsg(""), 3500);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAvatar = () => {
+    setProfilePic("");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("vexa_profile_avatar");
+    }
+    setProfileSavedMsg("Profile picture removed.");
+    setTimeout(() => setProfileSavedMsg(""), 3000);
+  };
 
   // Address Form State
-  const [savedAddresses, setSavedAddresses] = useState([
-    {
-      id: "1",
-      name: "Home Address",
-      address: "100 Feet Road, Indiranagar, Stage 2",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pincode: "560038",
-      mobile: "9876543210",
-      isDefault: true,
-    },
-  ]);
+  const [savedAddresses, setSavedAddresses] = useState(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("vexa_saved_addresses");
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch {}
+      }
+    }
+    return [
+      {
+        id: "1",
+        name: "Home Address",
+        address: "100 Feet Road, Indiranagar, Stage 2",
+        city: "Bengaluru",
+        state: "Karnataka",
+        pincode: "560038",
+        mobile: "9876543210",
+        isDefault: true,
+      },
+    ];
+  });
   const [showAddAddress, setShowAddAddress] = useState(false);
   const [newStreet, setNewStreet] = useState("");
   const [newCity, setNewCity] = useState("");
   const [newState, setNewState] = useState("");
   const [newPincode, setNewPincode] = useState("");
+
+  // Address Editing State
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editStreet, setEditStreet] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editState, setEditState] = useState("");
+  const [editPincode, setEditPincode] = useState("");
+  const [editMobile, setEditMobile] = useState("");
+
+  const handleStartEditAddress = (addr: (typeof savedAddresses)[0]) => {
+    setEditingAddressId(addr.id);
+    setEditLabel(addr.name || "Home Address");
+    setEditStreet(addr.address || "");
+    setEditCity(addr.city || "");
+    setEditState(addr.state || "");
+    setEditPincode(addr.pincode || "");
+    setEditMobile(addr.mobile || "9876543210");
+  };
+
+  const handleSaveEditAddress = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAddressId) return;
+
+    const updated = savedAddresses.map((addr) =>
+      addr.id === editingAddressId
+        ? {
+            ...addr,
+            name: editLabel.trim() || "Saved Address",
+            address: editStreet.trim(),
+            city: editCity.trim(),
+            state: editState.trim(),
+            pincode: editPincode.trim(),
+            mobile: editMobile.trim(),
+          }
+        : addr
+    );
+
+    setSavedAddresses(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_saved_addresses", JSON.stringify(updated));
+    }
+    setEditingAddressId(null);
+  };
+
+  const handleDeleteAddress = (id: string) => {
+    const updated = savedAddresses.filter((a) => a.id !== id);
+    setSavedAddresses(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_saved_addresses", JSON.stringify(updated));
+    }
+  };
+
+  const handleSetDefaultAddress = (id: string) => {
+    const updated = savedAddresses.map((a) => ({
+      ...a,
+      isDefault: a.id === id,
+    }));
+    setSavedAddresses(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_saved_addresses", JSON.stringify(updated));
+    }
+  };
 
   // Order Placement State & Checkout Flow
   const [cartCheckoutStep, setCartCheckoutStep] = useState<"cart" | "address" | "payment">("cart");
@@ -132,6 +276,7 @@ export function UserDashboard() {
     "EDUKONDALU (+91 9876543210), 100 Feet Road, Indiranagar, Stage 2, Bengaluru, Karnataka - 560038"
   );
   const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [orderSuccessMsg, setOrderSuccessMsg] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Sync user auth details when available
@@ -141,7 +286,28 @@ export function UserDashboard() {
       setProfileEmail(user.email);
       if (user.name) setShippingName(user.name);
     }
+    if (typeof window !== "undefined") {
+      const savedMobile = localStorage.getItem("vexa_profile_mobile");
+      if (savedMobile) setProfileMobile(savedMobile);
+    }
   }, [user]);
+
+  const handleUpdateProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (user) {
+      const updatedUser = {
+        ...user,
+        name: profileName,
+        email: profileEmail,
+      };
+      setLoggedIn(updatedUser);
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_profile_mobile", profileMobile);
+    }
+    setProfileSavedMsg("Profile updated successfully!");
+    setTimeout(() => setProfileSavedMsg(""), 4000);
+  };
 
   const [refreshMsg, setRefreshMsg] = useState("");
 
@@ -222,12 +388,6 @@ export function UserDashboard() {
     window.addEventListener("vexa_orders_updated", handleOrdersUpdated);
     return () => window.removeEventListener("vexa_orders_updated", handleOrdersUpdated);
   }, [user?.email, activeTab]);
-
-  const handleUpdateProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    setProfileSavedMsg("Profile updated successfully!");
-    setTimeout(() => setProfileSavedMsg(""), 3000);
-  };
 
   const handleAddAddress = (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,15 +536,17 @@ export function UserDashboard() {
     <div className="min-h-screen bg-background pt-24 sm:pt-28 pb-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* PAGE HEADER BANNER */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-5">
+        <div className="border-b border-border pb-6">
           <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">MY ACCOUNT</h1>
-          <Link
-            to="/products"
-            className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
-          >
-            <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
-            <span>Back to Products</span>
-          </Link>
+          <div className="mt-3">
+            <Link
+              to="/products"
+              className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
+            >
+              <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
+              <span>Back</span>
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:gap-8 lg:grid-cols-[280px_1fr]">
@@ -397,9 +559,13 @@ export function UserDashboard() {
               className="flex w-full items-center justify-between rounded-xl border border-gold/40 bg-card p-4 shadow-sm transition-all hover:border-gold cursor-pointer"
             >
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
-                  {(profileName || user?.name || "U")[0].toUpperCase()}
-                </div>
+                {profilePic ? (
+                  <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+                ) : (
+                  <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
+                    {(profileName || user?.name || "U")[0].toUpperCase()}
+                  </div>
+                )}
                 <div className="overflow-hidden text-left">
                   <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
                   <p className="text-[11px] text-muted-foreground truncate">{profileEmail}</p>
@@ -452,9 +618,13 @@ export function UserDashboard() {
           {/* DESKTOP SIDEBAR (>= lg) */}
           <aside className="hidden lg:block h-fit rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-3 border-b border-border pb-6">
-              <div className="flex size-11 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-lg font-bold text-gold shrink-0 shadow-sm">
-                {(profileName || user?.name || "U")[0].toUpperCase()}
-              </div>
+              {profilePic ? (
+                <img src={profilePic} alt={profileName} className="size-11 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+              ) : (
+                <div className="flex size-11 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-lg font-bold text-gold shrink-0 shadow-sm">
+                  {(profileName || user?.name || "U")[0].toUpperCase()}
+                </div>
+              )}
               <div className="overflow-hidden">
                 <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
                 <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
@@ -498,12 +668,81 @@ export function UserDashboard() {
               <div className="space-y-6 max-w-2xl">
                 <div className="border-b border-border pb-4">
                   <h2 className="font-display text-2xl font-bold text-foreground">My Profile</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Manage your personal profile and account credentials.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Manage your personal profile, credentials, and contact information.</p>
+                </div>
+
+                {/* Profile Header Avatar Card */}
+                <div className="flex flex-col sm:flex-row items-center gap-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
+                  {/* Avatar Container with Hover Overlay */}
+                  <div className="relative group size-20 shrink-0">
+                    {profilePic ? (
+                      <img
+                        src={profilePic}
+                        alt={profileName}
+                        className="size-20 rounded-full object-cover border-2 border-gold shadow-md"
+                      />
+                    ) : (
+                      <div className="flex size-20 items-center justify-center rounded-full border-2 border-gold bg-gold/15 font-display text-3xl font-extrabold text-gold shadow-md">
+                        {(profileName || user?.name || "U")[0].toUpperCase()}
+                      </div>
+                    )}
+                    <label
+                      htmlFor="profile-pic-input-main"
+                      className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-gold"
+                      title="Upload / Change Photo"
+                    >
+                      <Camera className="size-6" />
+                    </label>
+                    <input
+                      type="file"
+                      id="profile-pic-input-main"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                  </div>
+
+                  {/* Profile Text & Action Buttons */}
+                  <div className="flex-1 text-center sm:text-left space-y-1 overflow-hidden">
+                    <h3 className="font-display text-xl font-bold text-foreground truncate">{profileName}</h3>
+                    <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gold pt-0.5">VEXA Insider Club Member</p>
+
+                    {/* Edit & Delete Profile Pic Controls */}
+                    <div className="flex items-center justify-center sm:justify-start gap-2 pt-3">
+                      <label
+                        htmlFor="profile-pic-input-btn"
+                        className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-gold/10 px-3.5 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
+                      >
+                        <Camera className="size-3.5" />
+                        {profilePic ? "Edit Photo" : "Upload Photo"}
+                      </label>
+                      <input
+                        type="file"
+                        id="profile-pic-input-btn"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                      />
+
+                      {profilePic && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveAvatar}
+                          className="flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                          title="Delete Profile Photo"
+                        >
+                          <Trash2 className="size-3.5" />
+                          Delete Photo
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {profileSavedMsg && (
-                  <div className="flex items-center gap-2.5 rounded-lg border border-gold/40 bg-gold/10 p-3.5 text-xs text-gold font-semibold">
-                    <CheckCircle2 className="size-4 shrink-0" />
+                  <div className="flex items-center gap-2.5 rounded-lg border border-gold/50 bg-gold/15 p-4 text-xs text-gold font-bold animate-in fade-in slide-in-from-top-1 duration-300 shadow-sm">
+                    <CheckCircle2 className="size-5 shrink-0 text-gold" />
                     <span>{profileSavedMsg}</span>
                   </div>
                 )}
@@ -511,40 +750,48 @@ export function UserDashboard() {
                 <form onSubmit={handleUpdateProfile} className="space-y-5">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Full Name</label>
+                      <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                        <UserIcon className="size-3.5 text-gold" /> Full Name
+                      </label>
                       <input
                         type="text"
                         value={profileName}
                         onChange={(e) => setProfileName(e.target.value)}
-                        className="mt-2 w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold"
+                        className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                        required
                       />
                     </div>
 
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Email Address</label>
+                      <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                        <Mail className="size-3.5 text-gold" /> Email Address
+                      </label>
                       <input
-                        disabled
                         type="email"
                         value={profileEmail}
-                        className="mt-2 w-full rounded-sm border border-border bg-surface px-4 py-3 text-xs text-muted-foreground outline-none cursor-not-allowed"
+                        onChange={(e) => setProfileEmail(e.target.value)}
+                        className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                        required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Mobile Number</label>
+                    <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                      <Phone className="size-3.5 text-gold" /> Mobile Number
+                    </label>
                     <input
                       type="text"
                       value={profileMobile}
                       onChange={(e) => setProfileMobile(e.target.value)}
                       placeholder="9876543210"
-                      className="mt-2 w-full max-w-md rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono"
+                      className="w-full max-w-md rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="mt-4 bg-foreground text-background hover:bg-gold hover:text-primary-foreground inline-flex items-center gap-2 rounded-sm px-8 py-3.5 text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
+                    className="mt-4 bg-gold text-primary-foreground hover:bg-gold/90 inline-flex items-center gap-2 rounded-sm px-8 py-3.5 text-xs font-bold uppercase tracking-[0.18em] transition-all shadow-goldy cursor-pointer"
                   >
                     <Save className="size-4" /> UPDATE PROFILE
                   </button>
@@ -555,7 +802,7 @@ export function UserDashboard() {
             {/* 2. MY ORDERS TAB */}
             {activeTab === "orders" && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-border pb-4 gap-4">
+                <div className="flex flex-wrap items-center justify-between border-b border-border pb-4 gap-4">
                   <div>
                     <h2 className="font-display text-2xl font-bold text-foreground">My Orders</h2>
                     <p className="text-xs text-muted-foreground mt-1">Track your placed orders and shipment progress.</p>
@@ -578,9 +825,47 @@ export function UserDashboard() {
                   </div>
                 </div>
 
-                {myOrders.length > 0 ? (
+                {/* Sort & Filter Controls Bar */}
+                {myOrders.length > 0 && (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+                    {/* Status Filter Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                      {["All", "Processing", "Shipped", "Delivered"].map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setOrderStatusFilter(st)}
+                          className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+                            orderStatusFilter === st
+                              ? "bg-gold text-primary-foreground shadow-sm"
+                              : "border border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
+                          }`}
+                        >
+                          {st}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Sort Selector Dropdown */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Sort By:</span>
+                      <select
+                        value={orderSortBy}
+                        onChange={(e) => setOrderSortBy(e.target.value as any)}
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-gold outline-none focus:border-gold cursor-pointer"
+                      >
+                        <option value="recent">Recent First (Newest)</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="price-high">Price: High to Low</option>
+                        <option value="price-low">Price: Low to High</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {sortedOrders.length > 0 ? (
                   <div className="space-y-4">
-                    {myOrders.map((ord, idx) => (
+                    {sortedOrders.map((ord, idx) => (
                       <div key={ord._id || ord.id || idx} className="rounded-xl border border-border bg-background p-6 shadow-sm">
                         <div className="flex flex-wrap items-center justify-between border-b border-border pb-4 gap-2">
                           <div>
@@ -589,7 +874,7 @@ export function UserDashboard() {
                               #{String(ord._id || ord.id || "ORD-NEW").slice(-8).toUpperCase()}
                             </h4>
                             <p className="text-[10px] text-muted-foreground mt-0.5">
-                              Date: {new Date(ord.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                              Date: {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Recent Order"}
                             </p>
                           </div>
 
@@ -603,16 +888,16 @@ export function UserDashboard() {
                                   : "border-gold/60 bg-gold/10 text-gold"
                               }`}
                             >
-                              {ord.status}
+                              {ord.status || "Processing"}
                             </span>
                             <span className="font-display text-lg font-bold text-foreground">
-                              ₹{ord.totalAmount.toLocaleString("en-IN")}
+                              ₹{(ord.totalAmount || 0).toLocaleString("en-IN")}
                             </span>
                           </div>
                         </div>
 
                         <div className="mt-4 space-y-3">
-                          {ord.items.map((item, idx) => (
+                          {(ord.items || []).map((item, idx) => (
                             <div key={idx} className="flex items-center gap-4">
                               <img
                                 src={item.image}
@@ -727,16 +1012,150 @@ export function UserDashboard() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   {savedAddresses.map((addr) => (
-                    <div key={addr.id} className="rounded-xl border border-border bg-background p-6 space-y-2 relative">
-                      {addr.isDefault && (
-                        <span className="absolute top-4 right-4 rounded-full bg-gold/10 border border-gold/40 px-3 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider">
-                          Default
-                        </span>
+                    <div key={addr.id} className="rounded-xl border border-gold/30 bg-card p-5 space-y-3 shadow-sm transition-all hover:border-gold/60 relative">
+                      {editingAddressId === addr.id ? (
+                        <form onSubmit={handleSaveEditAddress} className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-border pb-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-gold">Edit Delivery Address</span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingAddressId(null)}
+                              className="text-xs text-muted-foreground hover:text-foreground font-semibold cursor-pointer"
+                            >
+                              ✕ Cancel
+                            </button>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Address Title</label>
+                            <input
+                              type="text"
+                              value={editLabel}
+                              onChange={(e) => setEditLabel(e.target.value)}
+                              placeholder="Home / Office / Work"
+                              className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-gold"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Street Address</label>
+                            <input
+                              type="text"
+                              value={editStreet}
+                              onChange={(e) => setEditStreet(e.target.value)}
+                              placeholder="100 Feet Road, Indiranagar"
+                              className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-gold"
+                              required
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">City</label>
+                              <input
+                                type="text"
+                                value={editCity}
+                                onChange={(e) => setEditCity(e.target.value)}
+                                className="mt-1 w-full rounded-sm border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:border-gold"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">State</label>
+                              <input
+                                type="text"
+                                value={editState}
+                                onChange={(e) => setEditState(e.target.value)}
+                                className="mt-1 w-full rounded-sm border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:border-gold"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pincode</label>
+                              <input
+                                type="text"
+                                value={editPincode}
+                                onChange={(e) => setEditPincode(e.target.value)}
+                                className="mt-1 w-full rounded-sm border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:border-gold font-mono"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Mobile Phone</label>
+                            <input
+                              type="text"
+                              value={editMobile}
+                              onChange={(e) => setEditMobile(e.target.value)}
+                              className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-gold font-mono"
+                              required
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-2">
+                            <button
+                              type="submit"
+                              className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-2 text-xs font-bold uppercase tracking-wider cursor-pointer"
+                            >
+                              Save Address
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingAddressId(null)}
+                              className="btn-outline-gold rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-display text-base font-bold text-foreground">{addr.name}</h4>
+                            {addr.isDefault && (
+                              <span className="rounded-full bg-gold/15 border border-gold/50 px-3 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider shadow-sm">
+                                Default
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-muted-foreground leading-relaxed">{addr.address}</p>
+                          <p className="text-xs text-muted-foreground">{addr.city}, {addr.state} — {addr.pincode}</p>
+                          <p className="text-xs text-gold font-mono font-bold pt-1">Phone: +91 {addr.mobile}</p>
+
+                          {/* ACTION BUTTONS ROW */}
+                          <div className="flex items-center gap-2 pt-4 border-t border-border/60 mt-3">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditAddress(addr)}
+                              className="flex items-center gap-1.5 rounded-md border border-gold/50 bg-gold/10 px-3.5 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
+                            >
+                              <Edit3 className="size-3.5" /> Edit
+                            </button>
+
+                            {!addr.isDefault && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetDefaultAddress(addr.id)}
+                                className="rounded-md border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-muted-foreground hover:text-gold hover:border-gold/50 transition-colors cursor-pointer"
+                              >
+                                Set Default
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAddress(addr.id)}
+                              className="flex items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white transition-all ml-auto cursor-pointer"
+                              title="Delete Address"
+                            >
+                              <Trash2 className="size-3.5" /> Delete
+                            </button>
+                          </div>
+                        </>
                       )}
-                      <h4 className="font-display text-sm font-semibold text-foreground">{addr.name}</h4>
-                      <p className="text-xs text-muted-foreground">{addr.address}</p>
-                      <p className="text-xs text-muted-foreground">{addr.city}, {addr.state} — {addr.pincode}</p>
-                      <p className="text-xs text-gold font-mono font-semibold pt-2">Phone: +91 {addr.mobile}</p>
                     </div>
                   ))}
                 </div>
@@ -985,17 +1404,17 @@ export function UserDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 pt-2">
+                      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                         <button
                           type="button"
                           onClick={() => setCartCheckoutStep("cart")}
-                          className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer"
+                          className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer w-full sm:w-auto text-center"
                         >
                           ← Back to Cart
                         </button>
                         <button
                           type="submit"
-                          className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                          className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2 shadow-sm w-full text-center"
                         >
                           Proceed to Payment <ArrowRight className="size-4" />
                         </button>
@@ -1118,11 +1537,11 @@ export function UserDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 pt-2">
+                      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                         <button
                           type="button"
                           onClick={() => setCartCheckoutStep("address")}
-                          className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer"
+                          className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer w-full sm:w-auto text-center"
                         >
                           ← Back to Address
                         </button>
@@ -1130,7 +1549,7 @@ export function UserDashboard() {
                           type="submit"
                           onClick={handlePlaceOrder}
                           disabled={orderSubmitting}
-                          className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider disabled:opacity-70 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                          className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider disabled:opacity-70 cursor-pointer flex items-center justify-center gap-2 shadow-sm w-full text-center"
                         >
                           {orderSubmitting ? (
                             <>
@@ -1138,7 +1557,7 @@ export function UserDashboard() {
                             </>
                           ) : (
                             <>
-                              <CheckCircle2 className="size-4" /> Proceed to Place Order — Total ₹{totalAmount.toLocaleString("en-IN")}
+                              <CheckCircle2 className="size-4" /> Place Order — Total ₹{totalAmount.toLocaleString("en-IN")}
                             </>
                           )}
                         </button>

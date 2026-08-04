@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Search, SlidersHorizontal } from "lucide-react";
 import { useProducts } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
@@ -7,6 +8,7 @@ import { Reveal } from "@/components/Reveal";
 const filters = ["All", "Oversized", "Classic", "Limited"] as const;
 
 export function Products() {
+  const navigate = useNavigate();
   const { products } = useProducts();
   const [active, setActive] = useState<(typeof filters)[number]>("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,7 +37,18 @@ export function Products() {
   }, [products, active, searchQuery, sortBy]);
 
   return (
-    <section className="mx-auto max-w-7xl px-5 pt-28 pb-16">
+    <section className="mx-auto max-w-7xl px-5 pt-24 pb-16">
+      {/* Back Button */}
+      <div className="mb-6 flex items-center justify-start">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
+        >
+          <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
+          <span>Back</span>
+        </button>
+      </div>
       <Reveal className="text-center">
         <p className="text-[10px] uppercase tracking-[0.3em] text-gold">The complete collection</p>
         <h1 className="mt-4 font-display text-4xl sm:text-5xl">Engineered Essentials</h1>

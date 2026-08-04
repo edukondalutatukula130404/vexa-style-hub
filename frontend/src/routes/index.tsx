@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Shirt,
   Wind,
@@ -113,6 +113,15 @@ export function Home() {
   const [featureIndex, setFeatureIndex] = useState(0);
   const [heroIndex, setHeroIndex] = useState(0);
   const [bannerIndex, setBannerIndex] = useState(0);
+  const newArrivalsRef = useRef<HTMLDivElement>(null);
+  const featuredRef = useRef<HTMLDivElement>(null);
+
+  const scrollContainer = (ref: React.RefObject<HTMLDivElement>, direction: "left" | "right") => {
+    if (ref.current) {
+      const scrollAmount = direction === "left" ? -300 : 300;
+      ref.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
 
   // Dynamic Media State managed by Admin Portal
   const [heroImgState, setHeroImgState] = useState<string>(() => {
@@ -201,6 +210,10 @@ export function Home() {
     return products.filter((p) => p.category === selectedCategory);
   }, [products, selectedCategory]);
 
+  const newArrivals = useMemo(() => {
+    return products.slice(0, 4);
+  }, [products]);
+
   return (
     <>
       {/* HERO */}
@@ -260,13 +273,13 @@ export function Home() {
                     height={1400}
                     className="h-[480px] sm:h-[580px] w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/30 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
 
-                  <span className="absolute left-5 top-5 rounded-full border border-gold/50 bg-background/85 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-gold backdrop-blur-md shadow-sm">
+                  <span className="absolute left-5 top-5 rounded-full border border-gold/50 bg-black/85 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-gold shadow-sm">
                     {heroBanners[heroIndex]?.badgeText || "Signature Drop"}
                   </span>
 
-                  <div className="animate-float absolute right-5 top-5 flex size-18 items-center justify-center rounded-full border-2 border-gold/70 bg-background/90 shadow-goldy backdrop-blur-md">
+                  <div className="animate-float absolute right-5 top-5 flex size-18 items-center justify-center rounded-full border-2 border-gold/70 bg-black/90 shadow-goldy">
                     <div className="text-center">
                       <p className="font-display text-base sm:text-lg font-bold text-gold-gradient leading-tight">
                         {heroBanners[heroIndex]?.discount || "30% Off"}
@@ -396,6 +409,36 @@ export function Home() {
         </div>
       </section>
 
+      {/* NEW ARRIVALS */}
+      <section className="mx-auto max-w-7xl px-5 py-12 border-t border-border/40">
+        <div className="text-left mb-6">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.3em] text-gold">LATEST DROPS</p>
+          <h2 className="mt-1 font-display text-3xl sm:text-4xl font-bold text-foreground">
+            New Arrivals
+          </h2>
+          <Link
+            to="/products"
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-gold hover:underline transition-transform hover:translate-x-1"
+          >
+            Explore All ({products.length}) <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+
+        {/* New Arrivals Product Cards */}
+        <div
+          ref={newArrivalsRef}
+          className="mt-6 flex overflow-x-auto gap-5 pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:grid sm:gap-8 sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-4"
+        >
+          {newArrivals.map((p, i) => (
+            <div key={`new-${p.id}`} className="w-[280px] shrink-0 snap-start mobile-snap-item sm:w-auto sm:shrink sm:snap-none">
+              <Reveal delay={i * 90}>
+                <ProductCard product={p} />
+              </Reveal>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* COLLECTION */}
       <section className="mx-auto max-w-7xl px-5 pb-24">
         <Reveal className="flex flex-wrap items-end justify-between gap-4">
@@ -403,11 +446,12 @@ export function Home() {
             <p className="text-[10px] uppercase tracking-[0.3em] text-gold">Explore the catalog</p>
             <h2 className="mt-3 font-display text-3xl sm:text-4xl">Featured Collection</h2>
           </div>
+
           <Link
             to="/products"
             className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gold transition-transform hover:translate-x-1"
           >
-            View all products ({products.length}) <ArrowRight className="size-4" />
+            View all ({products.length}) <ArrowRight className="size-4" />
           </Link>
         </Reveal>
 
@@ -429,9 +473,12 @@ export function Home() {
         </div>
 
         {/* Featured Products List (Side scrolling on mobile, grid on desktop) */}
-        <div className="mt-10 flex overflow-x-auto gap-5 pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:grid sm:gap-8 sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          ref={featuredRef}
+          className="mt-10 flex overflow-x-auto gap-5 pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:grid sm:gap-8 sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-3 xl:grid-cols-4"
+        >
           {filteredProducts.map((p, i) => (
-            <div key={p.id} className="w-[280px] shrink-0 snap-start sm:w-auto sm:shrink sm:snap-none">
+            <div key={p.id} className="w-[280px] shrink-0 snap-start mobile-snap-item sm:w-auto sm:shrink sm:snap-none">
               <Reveal delay={(i % 4) * 90}>
                 <ProductCard product={p} />
               </Reveal>

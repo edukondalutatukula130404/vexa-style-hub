@@ -565,13 +565,17 @@ export function Admin() {
           {/* MOBILE ADMIN HEADER (< lg) */}
           <div className="lg:hidden space-y-3">
             <div className="flex items-center justify-between rounded-xl border border-gold/40 bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex size-9 items-center justify-center rounded-full border border-gold bg-gold/20 text-gold shrink-0">
-                  <ShieldCheck className="size-5" />
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
+                  V
                 </div>
-                <div>
-                  <h3 className="font-display text-sm font-semibold text-foreground">Admin Control Panel</h3>
-                  <p className="text-[10px] text-gold uppercase tracking-wider font-semibold">VEXA Store Manager</p>
+                <div className="flex flex-col justify-center space-y-1">
+                  <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none">
+                    V E X A
+                  </span>
+                  <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none">
+                    WEAR CONFIDENCE
+                  </span>
                 </div>
               </div>
 
@@ -644,13 +648,17 @@ export function Admin() {
             <div className={`flex items-center border-b border-border pb-5 gap-3 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
               {!sidebarCollapsed ? (
                 <>
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="flex size-10 items-center justify-center rounded-full border border-gold bg-gold/20 text-gold shrink-0">
-                      <ShieldCheck className="size-5" />
+                  <div className="flex items-center gap-3 shrink-0 overflow-hidden">
+                    <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
+                      V
                     </div>
-                    <div className="overflow-hidden">
-                      <h3 className="font-display text-sm font-semibold text-foreground truncate">Admin Control Panel</h3>
-                      <p className="text-[10px] text-gold uppercase tracking-wider font-semibold">VEXA Store Manager</p>
+                    <div className="flex flex-col justify-center overflow-hidden space-y-1">
+                      <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
+                        V E X A
+                      </span>
+                      <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
+                        WEAR CONFIDENCE
+                      </span>
                     </div>
                   </div>
 
@@ -664,14 +672,19 @@ export function Admin() {
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                  className="flex size-10 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0"
-                  title="Expand Admin Panel Sidebar"
-                >
-                  <Menu className="size-5" />
-                </button>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
+                    V
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                    className="flex size-8 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0 mt-1"
+                    title="Expand Admin Panel Sidebar"
+                  >
+                    <Menu className="size-4" />
+                  </button>
+                </div>
               )}
             </div>
 

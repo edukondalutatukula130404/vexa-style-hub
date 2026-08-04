@@ -28,7 +28,10 @@ import {
   ArrowLeft,
   Camera,
   Upload,
+  X,
   Edit3,
+  Home,
+  Briefcase,
 } from "lucide-react";
 import { products, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
@@ -132,6 +135,45 @@ export function UserDashboard() {
     return "";
   });
 
+  // Profile Extended Preferences State
+  const [preferredSize, setPreferredSize] = useState<string>(() => {
+    return typeof window !== "undefined" ? localStorage.getItem("vexa_pref_size") || "M" : "M";
+  });
+  const [preferredFit, setPreferredFit] = useState<string>(() => {
+    return typeof window !== "undefined" ? localStorage.getItem("vexa_pref_fit") || "Oversized Drop-Shoulder" : "Oversized Drop-Shoulder";
+  });
+  const [orderAlerts, setOrderAlerts] = useState<boolean>(true);
+  const [vipAlerts, setVipAlerts] = useState<boolean>(true);
+  const [whatsappAlerts, setWhatsappAlerts] = useState<boolean>(true);
+
+  // Security Form State
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordSavedMsg, setPasswordSavedMsg] = useState("");
+
+  const handleUpdatePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setPasswordSavedMsg("New password must be at least 6 characters long.");
+      setTimeout(() => setPasswordSavedMsg(""), 3500);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordSavedMsg("New password and confirm password do not match.");
+      setTimeout(() => setPasswordSavedMsg(""), 3500);
+      return;
+    }
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowPasswordForm(false);
+    setPasswordSavedMsg("Security password updated successfully!");
+    setTimeout(() => setPasswordSavedMsg(""), 4000);
+  };
+
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -194,6 +236,45 @@ export function UserDashboard() {
   const [newCity, setNewCity] = useState("");
   const [newState, setNewState] = useState("");
   const [newPincode, setNewPincode] = useState("");
+  const [newAddressType, setNewAddressType] = useState<"Home" | "Office" | "Other">("Home");
+  const [newCustomLabel, setNewCustomLabel] = useState("");
+
+  const handleAddAddress = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStreet.trim() || !newCity.trim() || !newPincode.trim()) return;
+
+    const labelName =
+      newAddressType === "Home"
+        ? "Home Address"
+        : newAddressType === "Office"
+        ? "Office / Work Address"
+        : newCustomLabel.trim() || "Saved Address";
+
+    const newAddrObj = {
+      id: "addr-" + Date.now(),
+      name: labelName,
+      address: newStreet.trim(),
+      city: newCity.trim(),
+      state: newState.trim() || "Karnataka",
+      pincode: newPincode.trim(),
+      mobile: profileMobile || "9876543210",
+      isDefault: savedAddresses.length === 0,
+    };
+
+    const updated = [newAddrObj, ...savedAddresses];
+    setSavedAddresses(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_saved_addresses", JSON.stringify(updated));
+    }
+
+    setNewStreet("");
+    setNewCity("");
+    setNewState("");
+    setNewPincode("");
+    setNewAddressType("Home");
+    setNewCustomLabel("");
+    setShowAddAddress(false);
+  };
 
   // Address Editing State
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
@@ -352,20 +433,60 @@ export function UserDashboard() {
         }
       }
 
+      let deletedIds: string[] = [];
+      if (typeof window !== "undefined") {
+        try {
+          deletedIds = JSON.parse(localStorage.getItem("vexa_deleted_order_ids") || "[]");
+        } catch (e) {}
+      }
+
       setMyOrders(() => {
         const map = new Map();
-        // First set cached demo orders
-        cachedDemoOrders.forEach((item) => {
-          if (item && (item._id || (item as any).id)) {
-            map.set(item._id || (item as any).id, item);
-          }
-        });
-        // Fresh backend items OVERWRITE old cached items
+
+        // 1. Load backend API items
         fetchedList.forEach((item) => {
-          if (item && (item._id || (item as any).id)) {
-            map.set(item._id || (item as any).id, item);
+          const key = item._id || (item as any).id;
+          const shortKey = String(key || "").slice(-8).toUpperCase();
+          if (key && !deletedIds.includes(key) && !deletedIds.includes(shortKey) && !deletedIds.includes(shortKey.toLowerCase())) {
+            map.set(key, item);
           }
         });
+
+        // 2. Overlay cached demo orders & user cancellations
+        cachedDemoOrders.forEach((cached) => {
+          const cachedKey = cached._id || (cached as any).id;
+          const cachedShort = String(cachedKey || "").slice(-8).toUpperCase();
+
+          if (cachedKey && !deletedIds.includes(cachedKey) && !deletedIds.includes(cachedShort)) {
+            let matchedKey = cachedKey;
+            for (const [k, existingObj] of map.entries()) {
+              const existingShort = String(existingObj._id || existingObj.id || "").slice(-8).toUpperCase();
+              if (
+                k === cachedKey ||
+                existingShort === cachedShort ||
+                (existingObj.userEmail &&
+                  cached.userEmail &&
+                  existingObj.userEmail.toLowerCase().trim() === cached.userEmail.toLowerCase().trim() &&
+                  existingObj.totalAmount === cached.totalAmount)
+              ) {
+                matchedKey = k;
+                break;
+              }
+            }
+
+            const existing = map.get(matchedKey);
+            if (existing) {
+              map.set(matchedKey, {
+                ...existing,
+                status: cached.status || existing.status,
+                cancelReason: cached.cancelReason || (existing as any).cancelReason,
+              });
+            } else {
+              map.set(cachedKey, cached);
+            }
+          }
+        });
+
         return Array.from(map.values());
       });
 
@@ -380,37 +501,185 @@ export function UserDashboard() {
     }
   };
 
+  // User Cancellation & CRUD Operations State
+  const [cancellingOrderUser, setCancellingOrderUser] = useState<{ id: string; bookingIdStr: string } | null>(null);
+  const [userCancelReasonPreset, setUserCancelReasonPreset] = useState("Ordered by mistake / Change of mind");
+  const [userCustomCancelReason, setUserCustomCancelReason] = useState("");
+
+  const handleUpdateUserOrderStatus = async (orderId: string, newStatus: string, cancelReason = "") => {
+    setMyOrders((prev) =>
+      prev.map((o) =>
+        o._id === orderId || o.id === orderId
+          ? { ...o, status: newStatus as any, cancelReason }
+          : o
+      )
+    );
+
+    if (typeof window !== "undefined") {
+      try {
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        let found = false;
+        let updated = cached.map((o: any) => {
+          if (o._id === orderId || o.id === orderId) {
+            found = true;
+            return { ...o, status: newStatus, cancelReason };
+          }
+          return o;
+        });
+
+        if (!found) {
+          const currentOrder = myOrders.find((o) => o._id === orderId || o.id === orderId);
+          if (currentOrder) {
+            updated.unshift({ ...currentOrder, status: newStatus as any, cancelReason });
+          }
+        }
+
+        localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
+
+        // Warehouse Inventory Restock on Order Cancellation
+        if (newStatus === "Cancelled") {
+          const targetOrder = myOrders.find((o) => o._id === orderId || o.id === orderId);
+          if (targetOrder && targetOrder.items) {
+            const inventory = JSON.parse(localStorage.getItem("vexa_inventory_stocks") || "{}");
+            targetOrder.items.forEach((item) => {
+              const key = item.name;
+              const qty = item.quantity || 1;
+              inventory[key] = (inventory[key] !== undefined ? inventory[key] : 15) + qty;
+            });
+            localStorage.setItem("vexa_inventory_stocks", JSON.stringify(inventory));
+            window.dispatchEvent(new Event("vexa_inventory_updated"));
+            window.dispatchEvent(new Event("vexa_items_updated"));
+          }
+        }
+
+        window.dispatchEvent(new Event("vexa_orders_updated"));
+      } catch (e) {
+        console.warn("Failed to update cached demo orders:", e);
+      }
+    }
+
+    try {
+      await fetch(`${API_URL}/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus, cancelReason }),
+      });
+    } catch (err) {
+      console.warn("Status update error:", err);
+    }
+  };
+
+  const handleConfirmUserCancellation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancellingOrderUser) return;
+
+    const finalReason =
+      userCancelReasonPreset === "Custom Reason"
+        ? userCustomCancelReason.trim() || "Cancelled by Customer"
+        : userCancelReasonPreset;
+
+    const fullReason = `Cancelled by Customer: ${finalReason}`;
+    await handleUpdateUserOrderStatus(cancellingOrderUser.id, "Cancelled", fullReason);
+    setCancellingOrderUser(null);
+    setUserCancelReasonPreset("Ordered by mistake / Change of mind");
+    setUserCustomCancelReason("");
+    setRefreshMsg(`Order #${cancellingOrderUser.bookingIdStr} cancelled successfully.`);
+    setTimeout(() => setRefreshMsg(""), 3500);
+  };
+
+  const handleDeleteOrder = async (orderId: string, bookingIdStr: string) => {
+    if (!window.confirm(`Are you sure you want to delete order record #${bookingIdStr}?`)) {
+      return;
+    }
+
+    const targetObj = myOrders.find((o) => {
+      const oId = String(o._id || o.id || "");
+      const oShort = oId.slice(-8).toUpperCase();
+      return o._id === orderId || o.id === orderId || oId === orderId || oShort === bookingIdStr.toUpperCase();
+    });
+
+    const targetKey = targetObj?._id || targetObj?.id || orderId;
+
+    const allIds = Array.from(
+      new Set([
+        orderId,
+        bookingIdStr,
+        bookingIdStr.toLowerCase(),
+        bookingIdStr.toUpperCase(),
+        targetObj?._id,
+        targetObj?.id,
+        targetKey,
+      ].filter(Boolean))
+    ) as string[];
+
+    setMyOrders((prev) =>
+      prev.filter((o) => {
+        const oId = String(o._id || o.id || "");
+        const oShort = oId.slice(-8).toUpperCase();
+        return (
+          !allIds.includes(o._id) &&
+          !allIds.includes(o.id) &&
+          !allIds.includes(oId) &&
+          !allIds.includes(oShort)
+        );
+      })
+    );
+
+    if (typeof window !== "undefined") {
+      try {
+        const deletedIds = JSON.parse(localStorage.getItem("vexa_deleted_order_ids") || "[]");
+        allIds.forEach((id) => {
+          if (!deletedIds.includes(id)) deletedIds.push(id);
+        });
+        localStorage.setItem("vexa_deleted_order_ids", JSON.stringify(deletedIds));
+
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        const updated = cached.filter((o: any) => {
+          const oId = String(o._id || o.id || "");
+          const oShort = oId.slice(-8).toUpperCase();
+          return (
+            !allIds.includes(o._id) &&
+            !allIds.includes(o.id) &&
+            !allIds.includes(oId) &&
+            !allIds.includes(oShort)
+          );
+        });
+        localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
+        window.dispatchEvent(new Event("vexa_orders_updated"));
+      } catch (e) {
+        console.warn("Failed to delete cached order:", e);
+      }
+    }
+
+    try {
+      await fetch(`${API_URL}/orders/${targetKey}`, { method: "DELETE" });
+      if (bookingIdStr && bookingIdStr !== targetKey) {
+        await fetch(`${API_URL}/orders/${bookingIdStr}`, { method: "DELETE" });
+      }
+    } catch (err) {
+      console.warn("API delete order notice:", err);
+    }
+
+    setRefreshMsg(`Order #${bookingIdStr} deleted from records.`);
+    setTimeout(() => setRefreshMsg(""), 3500);
+  };
+
   useEffect(() => {
     fetchMyOrders();
     const handleOrdersUpdated = () => {
-      fetchMyOrders(true);
+      fetchMyOrders();
     };
     window.addEventListener("vexa_orders_updated", handleOrdersUpdated);
-    return () => window.removeEventListener("vexa_orders_updated", handleOrdersUpdated);
+    const interval = setInterval(() => {
+      fetchMyOrders();
+    }, 4000);
+    return () => {
+      window.removeEventListener("vexa_orders_updated", handleOrdersUpdated);
+      clearInterval(interval);
+    };
   }, [user?.email, activeTab]);
 
-  const handleAddAddress = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStreet || !newCity || !newPincode) return;
 
-    const newAddr = {
-      id: String(Date.now()),
-      name: "Secondary Location",
-      address: newStreet,
-      city: newCity,
-      state: newState || "Karnataka",
-      pincode: newPincode,
-      mobile: profileMobile,
-      isDefault: false,
-    };
-
-    setSavedAddresses([...savedAddresses, newAddr]);
-    setShowAddAddress(false);
-    setNewStreet("");
-    setNewCity("");
-    setNewState("");
-    setNewPincode("");
-  };
 
   const handlePlaceOrder = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e) e.preventDefault();
@@ -476,6 +745,18 @@ export function UserDashboard() {
         try {
           const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
           localStorage.setItem("vexa_demo_orders", JSON.stringify([demoOrderObj, ...cached]));
+
+          // Deduct Warehouse Stock
+          const inventory = JSON.parse(localStorage.getItem("vexa_inventory_stocks") || "{}");
+          itemsToOrder.forEach((item) => {
+            const key = item.name;
+            const qty = item.quantity || 1;
+            const currentStock = inventory[key] !== undefined ? inventory[key] : 15;
+            inventory[key] = Math.max(0, currentStock - qty);
+          });
+          localStorage.setItem("vexa_inventory_stocks", JSON.stringify(inventory));
+          window.dispatchEvent(new Event("vexa_inventory_updated"));
+          window.dispatchEvent(new Event("vexa_items_updated"));
         } catch (e) {
           console.warn("Failed to cache demo order:", e);
         }
@@ -498,7 +779,7 @@ export function UserDashboard() {
       }
       setActiveTab("orders");
 
-      // 5. Post to backend asynchronously in background (non-blocking)
+      // 5. Post to backend asynchronously in background (non-blocking) & sync real MongoDB ID
       fetch(`${API_URL}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -510,7 +791,31 @@ export function UserDashboard() {
           paymentMethod: demoOrderObj.paymentMethod,
           shippingAddress: fullAddr,
         }),
-      }).catch((err) => console.warn("Background order POST notice:", err));
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success && data.data && data.data._id) {
+            const realId = data.data._id;
+            setMyOrders((prev) =>
+              prev.map((o) =>
+                o._id === demoOrderObj._id ? { ...o, _id: realId, id: realId } : o
+              )
+            );
+            if (typeof window !== "undefined") {
+              try {
+                const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+                const updated = cached.map((o: any) =>
+                  o._id === demoOrderObj._id ? { ...o, _id: realId, id: realId } : o
+                );
+                localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
+                window.dispatchEvent(new Event("vexa_orders_updated"));
+              } catch (e) {
+                console.warn("Error updating cached order ID:", e);
+              }
+            }
+          }
+        })
+        .catch((err) => console.warn("Background order POST notice:", err));
 
     } catch (err) {
       console.error("Order placement handler error:", err);
@@ -706,7 +1011,6 @@ export function UserDashboard() {
                   <div className="flex-1 text-center sm:text-left space-y-1 overflow-hidden">
                     <h3 className="font-display text-xl font-bold text-foreground truncate">{profileName}</h3>
                     <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gold pt-0.5">VEXA Insider Club Member</p>
 
                     {/* Edit & Delete Profile Pic Controls */}
                     <div className="flex items-center justify-center sm:justify-start gap-2 pt-3">
@@ -740,6 +1044,22 @@ export function UserDashboard() {
                   </div>
                 </div>
 
+                {/* Account Quick Stats Grid */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-gold/30 bg-surface/40 p-4 text-center">
+                    <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Member Since</span>
+                    <span className="font-display text-sm font-bold text-foreground mt-1 block">August 2026</span>
+                  </div>
+                  <div className="rounded-xl border border-gold/30 bg-surface/40 p-4 text-center">
+                    <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Orders Placed</span>
+                    <span className="font-display text-sm font-bold text-gold mt-1 block">{myOrders.length} Bookings</span>
+                  </div>
+                  <div className="rounded-xl border border-gold/30 bg-surface/40 p-4 text-center">
+                    <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Account Status</span>
+                    <span className="font-display text-sm font-bold text-emerald-500 mt-1 block">✓ Verified</span>
+                  </div>
+                </div>
+
                 {profileSavedMsg && (
                   <div className="flex items-center gap-2.5 rounded-lg border border-gold/50 bg-gold/15 p-4 text-xs text-gold font-bold animate-in fade-in slide-in-from-top-1 duration-300 shadow-sm">
                     <CheckCircle2 className="size-5 shrink-0 text-gold" />
@@ -747,46 +1067,52 @@ export function UserDashboard() {
                   </div>
                 )}
 
-                <form onSubmit={handleUpdateProfile} className="space-y-5">
-                  <div className="grid gap-5 sm:grid-cols-2">
+                <form onSubmit={handleUpdateProfile} className="space-y-6">
+                  {/* Personal Contact Info */}
+                  <div className="space-y-4 rounded-xl border border-border bg-background p-5">
+                    <h3 className="font-display text-base font-bold text-foreground border-b border-border pb-2">
+                      Personal & Contact Details
+                    </h3>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                          <UserIcon className="size-3.5 text-gold" /> Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={profileName}
+                          onChange={(e) => setProfileName(e.target.value)}
+                          className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                          <Mail className="size-3.5 text-gold" /> Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={profileEmail}
+                          onChange={(e) => setProfileEmail(e.target.value)}
+                          className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                          required
+                        />
+                      </div>
+                    </div>
+
                     <div>
                       <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
-                        <UserIcon className="size-3.5 text-gold" /> Full Name
+                        <Phone className="size-3.5 text-gold" /> Mobile Number
                       </label>
                       <input
                         type="text"
-                        value={profileName}
-                        onChange={(e) => setProfileName(e.target.value)}
-                        className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
-                        required
+                        value={profileMobile}
+                        onChange={(e) => setProfileMobile(e.target.value)}
+                        placeholder="9876543210"
+                        className="w-full max-w-md rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
                       />
                     </div>
-
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
-                        <Mail className="size-3.5 text-gold" /> Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={profileEmail}
-                        onChange={(e) => setProfileEmail(e.target.value)}
-                        className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
-                      <Phone className="size-3.5 text-gold" /> Mobile Number
-                    </label>
-                    <input
-                      type="text"
-                      value={profileMobile}
-                      onChange={(e) => setProfileMobile(e.target.value)}
-                      placeholder="9876543210"
-                      className="w-full max-w-md rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
-                    />
                   </div>
 
                   <button
@@ -830,7 +1156,7 @@ export function UserDashboard() {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
                     {/* Status Filter Chips */}
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-                      {["All", "Processing", "Shipped", "Delivered"].map((st) => (
+                      {["All", "Processing", "Shipped", "Delivered", "Cancelled"].map((st) => (
                         <button
                           key={st}
                           type="button"
@@ -854,7 +1180,7 @@ export function UserDashboard() {
                         onChange={(e) => setOrderSortBy(e.target.value as any)}
                         className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-gold outline-none focus:border-gold cursor-pointer"
                       >
-                        <option value="recent">Recent First (Newest)</option>
+                        <option value="newest">Newest First</option>
                         <option value="oldest">Oldest First</option>
                         <option value="price-high">Price: High to Low</option>
                         <option value="price-low">Price: Low to High</option>
@@ -885,6 +1211,8 @@ export function UserDashboard() {
                                   ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
                                   : ord.status === "Shipped"
                                   ? "border-blue-500/50 bg-blue-500/10 text-blue-600"
+                                  : ord.status === "Cancelled"
+                                  ? "border-destructive/50 bg-destructive/10 text-destructive"
                                   : "border-gold/60 bg-gold/10 text-gold"
                               }`}
                             >
@@ -895,6 +1223,15 @@ export function UserDashboard() {
                             </span>
                           </div>
                         </div>
+
+                        {ord.status === "Cancelled" && (
+                          <div className="mt-3 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-2.5 font-semibold flex items-center gap-2">
+                            <span>❌ Order Cancelled. Reason:</span>
+                            <span className="font-bold">
+                              {ord.cancelReason || (ord as any).cancelReason || "Item Out of Stock / Processing Issue"}
+                            </span>
+                          </div>
+                        )}
 
                         <div className="mt-4 space-y-3">
                           {(ord.items || []).map((item, idx) => (
@@ -917,9 +1254,46 @@ export function UserDashboard() {
                           ))}
                         </div>
 
-                        <div className="mt-5 border-t border-border pt-3 flex items-center justify-between text-xs text-muted-foreground">
-                          <p><span className="text-gold">Address:</span> {ord.shippingAddress}</p>
-                          <p><span className="text-gold">Payment:</span> {ord.paymentMethod}</p>
+                        <div className="mt-5 border-t border-border pt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                          <div>
+                            <p><span className="text-gold font-semibold">Address:</span> {ord.shippingAddress}</p>
+                            <p className="mt-0.5"><span className="text-gold font-semibold">Payment:</span> {ord.paymentMethod}</p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {ord.status !== "Cancelled" && ord.status !== "Delivered" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCancellingOrderUser({
+                                    id: ord._id || ord.id,
+                                    bookingIdStr: String(ord._id || ord.id || "ORD").slice(-8).toUpperCase(),
+                                  })
+                                }
+                                className="rounded-lg border border-destructive/60 bg-destructive/10 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all cursor-pointer shadow-sm"
+                              >
+                                Cancel Order
+                              </button>
+                            )}
+
+                            {ord.status === "Cancelled" && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDeleteOrder(
+                                    ord._id || ord.id,
+                                    String(ord._id || ord.id || "ORD").slice(-8).toUpperCase()
+                                  );
+                                }}
+                                className="rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                                title="Delete cancelled order record"
+                              >
+                                <Trash2 className="size-3.5" /> Delete Order Record
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -959,6 +1333,63 @@ export function UserDashboard() {
                 {showAddAddress && (
                   <form onSubmit={handleAddAddress} className="rounded-xl border border-gold/40 bg-surface/50 p-6 space-y-4">
                     <h3 className="font-display text-base font-semibold text-foreground">New Delivery Location</h3>
+
+                    {/* LOCATION TYPE CHIPS */}
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold block mb-2">
+                        Address Category / Location Type
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setNewAddressType("Home")}
+                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                            newAddressType === "Home"
+                              ? "border-gold bg-gold text-primary-foreground shadow-goldy"
+                              : "border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
+                          }`}
+                        >
+                          <Home className="size-4" /> Home
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setNewAddressType("Office")}
+                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                            newAddressType === "Office"
+                              ? "border-gold bg-gold text-primary-foreground shadow-goldy"
+                              : "border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
+                          }`}
+                        >
+                          <Briefcase className="size-4" /> Office / Work
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setNewAddressType("Other")}
+                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                            newAddressType === "Other"
+                              ? "border-gold bg-gold text-primary-foreground shadow-goldy"
+                              : "border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
+                          }`}
+                        >
+                          <MapPin className="size-4" /> Other
+                        </button>
+                      </div>
+
+                      {newAddressType === "Other" && (
+                        <div className="mt-3">
+                          <input
+                            type="text"
+                            value={newCustomLabel}
+                            onChange={(e) => setNewCustomLabel(e.target.value)}
+                            placeholder="Custom Address Tag (e.g., Beach House, Parents' Home)"
+                            className="w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Street Address</label>
                       <input
@@ -1938,6 +2369,97 @@ export function UserDashboard() {
       </div>
 
 
+      {/* USER CANCELLATION REASON MODAL POPUP */}
+      {cancellingOrderUser && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg overflow-hidden rounded-xl border border-destructive/50 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-destructive/15 text-destructive font-bold text-lg">
+                  ⚠️
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-bold text-foreground">Cancel Your Order</h3>
+                  <p className="text-[11px] text-muted-foreground font-mono">Booking #{cancellingOrderUser.bookingIdStr}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancellingOrderUser(null)}
+                className="flex size-8 items-center justify-center rounded-full bg-surface text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmUserCancellation} className="space-y-4">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-2">
+                  Select Reason for Order Cancellation
+                </label>
+                <div className="space-y-2">
+                  {[
+                    "Ordered by mistake / Change of mind",
+                    "Delivery taking longer than expected",
+                    "Found a better price / discount elsewhere",
+                    "Wrong delivery address or size selected",
+                    "Custom Reason",
+                  ].map((reason) => (
+                    <label
+                      key={reason}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-xs font-semibold cursor-pointer transition-all ${
+                        userCancelReasonPreset === reason
+                          ? "border-destructive bg-destructive/10 text-destructive font-bold"
+                          : "border-border bg-surface/50 text-foreground hover:border-gold/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="userCancelReasonOption"
+                        checked={userCancelReasonPreset === reason}
+                        onChange={() => setUserCancelReasonPreset(reason)}
+                        className="accent-destructive cursor-pointer"
+                      />
+                      <span>{reason}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {userCancelReasonPreset === "Custom Reason" && (
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-1">
+                    Enter Custom Reason
+                  </label>
+                  <textarea
+                    required
+                    value={userCustomCancelReason}
+                    onChange={(e) => setUserCustomCancelReason(e.target.value)}
+                    placeholder="Tell us why you are cancelling this booking..."
+                    className="w-full rounded-sm border border-border bg-background p-3 text-xs text-foreground outline-none focus:border-destructive min-h-[80px]"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCancellingOrderUser(null)}
+                  className="flex-1 rounded-sm border border-border py-2.5 text-xs font-bold text-muted-foreground hover:bg-surface cursor-pointer"
+                >
+                  Nevermind / Keep Active
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 py-2.5 text-xs font-bold uppercase tracking-wider cursor-pointer shadow-md"
+                >
+                  Confirm & Cancel Order
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

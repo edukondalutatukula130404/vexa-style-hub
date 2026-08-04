@@ -13,7 +13,6 @@ export function ProductCard({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [showQuickView, setShowQuickView] = useState(false);
   const [addedMsg, setAddedMsg] = useState("");
-  const [isHovered, setIsHovered] = useState(false);
 
   const off = Math.round((1 - product.price / product.oldPrice) * 100);
 
@@ -50,9 +49,6 @@ export function ProductCard({ product }: { product: Product }) {
     <>
       <article
         onClick={handleCardClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onTouchStart={() => setIsHovered(true)}
         className="group relative cursor-pointer overflow-hidden rounded-sm border border-border bg-card transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy flex flex-col justify-between"
       >
         <div className="relative overflow-hidden">
@@ -71,6 +67,8 @@ export function ProductCard({ product }: { product: Product }) {
           <span className="btn-gold absolute right-4 top-4 rounded-full px-3 py-1 text-[10px]">
             {off}% Off
           </span>
+
+          {/* Action Options Bar: Always visible on Mobile (< lg), Slide-up Hover on Desktop (>= lg) */}
           <div className="absolute inset-x-0 bottom-0 z-20 flex gap-2 bg-black/95 p-3.5 border-t border-gold/30 transition-all duration-500 ease-out opacity-100 translate-y-0 pointer-events-auto lg:opacity-0 lg:translate-y-full lg:pointer-events-none lg:group-hover:opacity-100 lg:group-hover:translate-y-0 lg:group-hover:pointer-events-auto">
             <button
               onClick={handleAddToCart}
@@ -111,16 +109,6 @@ export function ProductCard({ product }: { product: Product }) {
                 ₹{product.oldPrice.toLocaleString("en-IN")}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowQuickView(true);
-              }}
-              className="text-[10px] text-gold font-semibold uppercase tracking-wider hover:underline cursor-pointer"
-            >
-              Quick View →
-            </button>
           </div>
         </div>
       </article>

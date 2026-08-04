@@ -30,6 +30,10 @@ const orderSchema = new mongoose.Schema(
       enum: ['Processing', 'Shipped', 'Delivered', 'Cancelled'],
       default: 'Processing'
     },
+    cancelReason: {
+      type: String,
+      default: ''
+    },
     paymentMethod: {
       type: String,
       default: 'Cash on Delivery'

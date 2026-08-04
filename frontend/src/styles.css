@@ -251,3 +251,61 @@
 .mobile-snap-item:active {
   transform: scale(0.96);
 }
+
+/* 🖨️ PERFECT 1-PAGE TAX INVOICE PRINT STYLES */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 12mm;
+  }
+
+  /* Hide non-printable elements */
+  header,
+  footer,
+  aside,
+  nav,
+  button,
+  .no-print,
+  .lg\:hidden,
+  .no-print-area {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .printable-invoice-box {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: 1px solid #d4af37 !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+    padding: 18px 24px !important;
+    margin: 0 auto !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+  }
+
+  .printable-invoice-box * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+}

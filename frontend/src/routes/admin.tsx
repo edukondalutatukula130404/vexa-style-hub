@@ -313,6 +313,46 @@ export function Admin() {
   const [editingItem, setEditingItem] = useState<Product | null>(null);
   const [catalogSearch, setCatalogSearch] = useState("");
 
+  // Warehouse Inventory Stock Management State
+  const [inventoryStocks, setInventoryStocks] = useState<Record<string, number>>({});
+
+  const fetchInventory = () => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("vexa_inventory_stocks");
+        if (stored) {
+          setInventoryStocks(JSON.parse(stored));
+        }
+      } catch (e) {}
+    }
+  };
+
+  useEffect(() => {
+    fetchInventory();
+    window.addEventListener("vexa_inventory_updated", fetchInventory);
+    window.addEventListener("vexa_items_updated", fetchInventory);
+    return () => {
+      window.removeEventListener("vexa_inventory_updated", fetchInventory);
+      window.removeEventListener("vexa_items_updated", fetchInventory);
+    };
+  }, []);
+
+  const handleRestockProduct = (productName: string, addQty: number) => {
+    if (typeof window !== "undefined") {
+      try {
+        const current = { ...inventoryStocks };
+        const newQty = (current[productName] !== undefined ? current[productName] : 15) + addQty;
+        current[productName] = newQty;
+        setInventoryStocks(current);
+        localStorage.setItem("vexa_inventory_stocks", JSON.stringify(current));
+        window.dispatchEvent(new Event("vexa_inventory_updated"));
+        window.dispatchEvent(new Event("vexa_items_updated"));
+      } catch (e) {
+        console.warn("Restock error:", e);
+      }
+    }
+  };
+
   // New Collection Form State
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
@@ -418,15 +458,81 @@ export function Admin() {
     setTimeout(() => setItemAddedMsg(""), 4000);
   };
 
-  const fetchOrders = async () => {
-    setLoadingOrders(true);
+  const fetchOrders = async (isManual = false) => {
+    if (isManual) setLoadingOrders(true);
     try {
+      let fetchedList: OrderItem[] = [];
       const res = await fetch(`${API_URL}/orders`);
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.data || []);
-        setOrders(list);
+        fetchedList = Array.isArray(data) ? data : (data.data || []);
       }
+
+      let cachedDemoOrders: OrderItem[] = [];
+      if (typeof window !== "undefined") {
+        try {
+          cachedDemoOrders = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        } catch (e) {
+          console.warn("Failed to parse cached demo orders", e);
+        }
+      }
+
+      let deletedIds: string[] = [];
+      if (typeof window !== "undefined") {
+        try {
+          deletedIds = JSON.parse(localStorage.getItem("vexa_deleted_order_ids") || "[]");
+        } catch (e) {}
+      }
+
+      setOrders(() => {
+        const map = new Map();
+
+        // 1. Add all backend API orders
+        fetchedList.forEach((item) => {
+          const key = item._id || (item as any).id;
+          const shortCode = String(key || "").slice(-8).toUpperCase();
+          if (key && !deletedIds.includes(key) && !deletedIds.includes(shortCode)) {
+            map.set(key, item);
+          }
+        });
+
+        // 2. Overlay cached demo orders & user status updates (matched by ID, booking code, or email+amount)
+        cachedDemoOrders.forEach((cached) => {
+          const cachedKey = cached._id || (cached as any).id;
+          const cachedShort = String(cachedKey || "").slice(-8).toUpperCase();
+
+          if (cachedKey && !deletedIds.includes(cachedKey) && !deletedIds.includes(cachedShort)) {
+            let matchedKey = cachedKey;
+            for (const [k, existingObj] of map.entries()) {
+              const existingShort = String(existingObj._id || existingObj.id || "").slice(-8).toUpperCase();
+              if (
+                k === cachedKey ||
+                existingShort === cachedShort ||
+                (existingObj.userEmail &&
+                  cached.userEmail &&
+                  existingObj.userEmail.toLowerCase().trim() === cached.userEmail.toLowerCase().trim() &&
+                  existingObj.totalAmount === cached.totalAmount)
+              ) {
+                matchedKey = k;
+                break;
+              }
+            }
+
+            const existing = map.get(matchedKey);
+            if (existing) {
+              map.set(matchedKey, {
+                ...existing,
+                status: cached.status || existing.status,
+                cancelReason: cached.cancelReason || (existing as any).cancelReason,
+              });
+            } else {
+              map.set(cachedKey, cached);
+            }
+          }
+        });
+
+        return Array.from(map.values());
+      });
     } catch (err) {
       console.warn("Error fetching admin orders:", err);
     } finally {
@@ -453,14 +559,103 @@ export function Admin() {
   useEffect(() => {
     fetchOrders();
     fetchUsers();
+    const handleOrdersUpdated = () => {
+      fetchOrders();
+    };
+    window.addEventListener("vexa_orders_updated", handleOrdersUpdated);
+    const interval = setInterval(() => {
+      fetchOrders();
+    }, 4000);
+    return () => {
+      window.removeEventListener("vexa_orders_updated", handleOrdersUpdated);
+      clearInterval(interval);
+    };
   }, []);
+
+  const handleDeleteOrderAdmin = async (orderId: string, bookingIdStr: string) => {
+    if (!window.confirm(`Are you sure you want to delete order booking record #${bookingIdStr}?`)) {
+      return;
+    }
+
+    setOrders((prev) => prev.filter((o) => o._id !== orderId && o.id !== orderId));
+    if (selectedOrderDetails && (selectedOrderDetails._id === orderId || (selectedOrderDetails as any).id === orderId)) {
+      setSelectedOrderDetails(null);
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        const deletedIds = JSON.parse(localStorage.getItem("vexa_deleted_order_ids") || "[]");
+        if (!deletedIds.includes(orderId)) {
+          deletedIds.push(orderId);
+          localStorage.setItem("vexa_deleted_order_ids", JSON.stringify(deletedIds));
+        }
+
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        const updated = cached.filter((o: any) => o._id !== orderId && o.id !== orderId);
+        localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
+        window.dispatchEvent(new Event("vexa_orders_updated"));
+      } catch (e) {
+        console.warn("Failed to delete cached order:", e);
+      }
+    }
+
+    try {
+      await fetch(`${API_URL}/orders/${orderId}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("API delete order notice:", err);
+    }
+
+    setStatusUpdatedMsg(`Order #${bookingIdStr} deleted successfully.`);
+    setTimeout(() => setStatusUpdatedMsg(""), 3500);
+  };
 
   const [statusUpdatedMsg, setStatusUpdatedMsg] = useState("");
 
-  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
+  // Cancellation Reason Modal State
+  const [cancellingOrder, setCancellingOrder] = useState<{ id: string; currentStatus: string; bookingIdStr: string } | null>(null);
+  const [cancelReasonPreset, setCancelReasonPreset] = useState("Item Out of Stock / Inventory Shortage");
+  const [customCancelReason, setCustomCancelReason] = useState("");
+
+  const handleStatusSelectChange = (orderId: string, newStatus: string, bookingIdStr: string) => {
+    if (newStatus === "Cancelled") {
+      setCancellingOrder({ id: orderId, currentStatus: newStatus, bookingIdStr });
+      setCancelReasonPreset("Item Out of Stock / Inventory Shortage");
+      setCustomCancelReason("");
+    } else {
+      handleUpdateStatus(orderId, newStatus);
+    }
+  };
+
+  const handleConfirmCancellation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancellingOrder) return;
+
+    const finalReason =
+      cancelReasonPreset === "Custom Reason"
+        ? customCancelReason.trim() || "Administrative Cancellation"
+        : cancelReasonPreset;
+
+    await handleUpdateStatus(cancellingOrder.id, "Cancelled", finalReason);
+    setCancellingOrder(null);
+    setCancelReasonPreset("Item Out of Stock / Inventory Shortage");
+    setCustomCancelReason("");
+  };
+
+  const handleUpdateStatus = async (orderId: string, newStatus: string, cancelReason = "") => {
     setOrders((prev) =>
-      prev.map((o) => (o._id === orderId || o.id === orderId ? { ...o, status: newStatus as any } : o))
+      prev.map((o) =>
+        o._id === orderId || o.id === orderId
+          ? { ...o, status: newStatus as any, cancelReason }
+          : o
+      )
     );
+
+    if (selectedOrderDetails && (selectedOrderDetails._id === orderId || (selectedOrderDetails as any).id === orderId)) {
+      setSelectedOrderDetails((prev) => (prev ? { ...prev, status: newStatus as any, cancelReason } : null));
+    }
+
     setStatusUpdatedMsg(`Booking #${String(orderId).slice(-8).toUpperCase()} status updated to "${newStatus}"!`);
     setTimeout(() => setStatusUpdatedMsg(""), 3500);
 
@@ -469,7 +664,7 @@ export function Admin() {
       try {
         const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
         const updated = cached.map((o: any) =>
-          o._id === orderId || o.id === orderId ? { ...o, status: newStatus } : o
+          o._id === orderId || o.id === orderId ? { ...o, status: newStatus, cancelReason } : o
         );
         localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
         window.dispatchEvent(new Event("vexa_orders_updated"));
@@ -482,7 +677,7 @@ export function Admin() {
       await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, cancelReason }),
       });
     } catch (err) {
       console.warn("Status update error:", err);
@@ -1231,8 +1426,8 @@ export function Admin() {
             {activeTab === "orders" && (
               selectedOrderDetails ? (
                 <div className="space-y-6 animate-in fade-in duration-300">
-                  {/* Sub-page Navigation Header */}
-                  <div className="flex items-center justify-between border-b border-border pb-4">
+                  {/* Sub-page Navigation Header (Hidden on Print) */}
+                  <div className="flex items-center justify-between border-b border-border pb-4 no-print">
                     <button
                       type="button"
                       onClick={() => setSelectedOrderDetails(null)}
@@ -1245,8 +1440,32 @@ export function Admin() {
                     </span>
                   </div>
 
-                  {/* Order Details Main Container */}
-                  <div className="rounded-xl border border-gold/40 bg-card p-6 shadow-goldy space-y-6">
+                  {/* Order Details Main Printable Invoice Container */}
+                  <div className="printable-invoice-box rounded-xl border border-gold/40 bg-card p-6 shadow-goldy space-y-6">
+                    {/* Printable Official Brand Logo Header */}
+                    <div className="flex items-center justify-between border-b border-border pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
+                          V
+                        </div>
+                        <div className="flex flex-col justify-center space-y-0.5">
+                          <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none">
+                            V E X A
+                          </span>
+                          <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none">
+                            WEAR CONFIDENCE
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase tracking-widest text-gold font-extrabold block">Official Tax Invoice</span>
+                        <span className="text-[11px] font-bold text-foreground font-mono">
+                          INV-{String(selectedOrderDetails._id || (selectedOrderDetails as any).id || "ORD").slice(-8).toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
                       <div>
                         <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Booking Reference</span>
@@ -1258,33 +1477,55 @@ export function Admin() {
                         </p>
                       </div>
 
-                      {/* Shipment Status Selector */}
+                      {/* Shipment Status Selector (On Screen) & Status Badge (On Print) */}
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground font-semibold">Shipment Status:</span>
-                        <select
-                          value={selectedOrderDetails.status || "Processing"}
-                          onChange={(e) => {
-                            const newStatus = e.target.value as any;
-                            handleUpdateStatus(selectedOrderDetails._id, newStatus);
-                            setSelectedOrderDetails({ ...selectedOrderDetails, status: newStatus });
-                          }}
-                          className={`rounded-lg border px-3 py-2 text-xs font-bold outline-none cursor-pointer ${
-                            selectedOrderDetails.status === "Delivered"
-                              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
-                              : selectedOrderDetails.status === "Shipped"
-                              ? "border-blue-500/50 bg-blue-500/10 text-blue-600"
-                              : selectedOrderDetails.status === "Cancelled"
-                              ? "border-destructive/50 bg-destructive/10 text-destructive"
-                              : "border-gold/60 bg-gold/10 text-gold"
-                          }`}
-                        >
-                          <option value="Processing">Processing</option>
-                          <option value="Shipped">Shipped</option>
-                          <option value="Delivered">Delivered</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
+                        <div className="no-print">
+                          <select
+                            value={selectedOrderDetails.status || "Processing"}
+                            onChange={(e) => {
+                              const newStatus = e.target.value as any;
+                              handleStatusSelectChange(
+                                selectedOrderDetails._id,
+                                newStatus,
+                                String(selectedOrderDetails._id || (selectedOrderDetails as any).id || "ORD").slice(-8).toUpperCase()
+                              );
+                            }}
+                            className={`rounded-lg border px-3 py-2 text-xs font-bold outline-none cursor-pointer ${
+                              selectedOrderDetails.status === "Delivered"
+                                ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
+                                : selectedOrderDetails.status === "Shipped"
+                                ? "border-blue-500/50 bg-blue-500/10 text-blue-600"
+                                : selectedOrderDetails.status === "Cancelled"
+                                ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                : "border-gold/60 bg-gold/10 text-gold"
+                            }`}
+                          >
+                            <option value="Processing">Processing</option>
+                            <option value="Shipped">Shipped</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                        <span className="hidden print:inline-block rounded-full bg-gold/15 px-3 py-1 text-xs font-bold text-gold border border-gold/40">
+                          {selectedOrderDetails.status || "Processing"}
+                        </span>
                       </div>
                     </div>
+
+                    {selectedOrderDetails.status === "Cancelled" && (
+                      <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-xs space-y-1">
+                        <p className="font-bold text-destructive text-sm flex items-center gap-2">
+                          <X className="size-4" /> Order Cancelled by Administrator
+                        </p>
+                        <p className="text-foreground">
+                          Reason for Cancellation:{" "}
+                          <span className="font-bold text-destructive">
+                            {selectedOrderDetails.cancelReason || (selectedOrderDetails as any).cancelReason || "Item Out of Stock / Administrative Cancellation"}
+                          </span>
+                        </p>
+                      </div>
+                    )}
 
                     {/* Customer Info & Shipping Address Grid */}
                     <div className="grid gap-6 sm:grid-cols-2 text-xs">
@@ -1316,7 +1557,7 @@ export function Admin() {
                               <img
                                 src={item?.image || ""}
                                 alt={item?.name || "Product"}
-                                className="size-16 rounded-lg object-cover border border-border shrink-0"
+                                className="size-14 rounded-lg object-cover border border-border shrink-0"
                               />
                               <div>
                                 <h4 className="font-display text-sm font-bold text-foreground">{item?.name || "Product Tee"}</h4>
@@ -1340,7 +1581,7 @@ export function Admin() {
                     </div>
 
                     {/* Total Amount Breakdown */}
-                    <div className="rounded-lg border border-gold/40 bg-gold/10 p-5 space-y-2 text-xs">
+                    <div className="rounded-lg border border-gold/40 bg-gold/10 p-4 space-y-2 text-xs">
                       <div className="flex justify-between text-muted-foreground">
                         <span>Items Subtotal:</span>
                         <span className="text-foreground font-semibold">₹{(selectedOrderDetails.totalAmount || 0).toLocaleString("en-IN")}</span>
@@ -1355,8 +1596,14 @@ export function Admin() {
                       </div>
                     </div>
 
-                    {/* Action Controls */}
-                    <div className="flex items-center gap-3 pt-2">
+                    {/* Printable Official Footer Note */}
+                    <div className="hidden print:block border-t border-border pt-4 text-center text-[10px] text-muted-foreground space-y-1">
+                      <p className="font-bold text-foreground">Thank you for your order with VEXA Luxury Apparel</p>
+                      <p>For support or inquiries, visit <span className="text-gold font-semibold">www.vexa.store</span> or email <span className="text-gold font-semibold">support@vexa.store</span></p>
+                    </div>
+
+                    {/* On-Screen Action Controls (Hidden on Print) */}
+                    <div className="flex items-center gap-3 pt-2 no-print">
                       <button
                         type="button"
                         onClick={() => setSelectedOrderDetails(null)}
@@ -1466,7 +1713,13 @@ export function Admin() {
                               {/* Status Selector Dropdown */}
                               <select
                                 value={ord.status || "Processing"}
-                                onChange={(e) => handleUpdateStatus(ord._id, e.target.value)}
+                                onChange={(e) =>
+                                  handleStatusSelectChange(
+                                    ord._id,
+                                    e.target.value,
+                                    String(ord._id || ord.id || "ORD").slice(-8).toUpperCase()
+                                  )
+                                }
                                 className={`rounded-lg border px-3 py-2 text-xs font-bold outline-none cursor-pointer transition-colors ${
                                   ord.status === "Delivered"
                                     ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
@@ -1484,6 +1737,13 @@ export function Admin() {
                               </select>
                             </div>
                           </div>
+
+                          {ord.status === "Cancelled" && (ord.cancelReason || (ord as any).cancelReason) && (
+                            <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-2.5 font-semibold flex items-center gap-2">
+                              <span>❌ Reason for Cancellation:</span>
+                              <span className="font-bold">{ord.cancelReason || (ord as any).cancelReason}</span>
+                            </div>
+                          )}
 
                           {/* Items List */}
                           <div className="space-y-3 pt-1">
@@ -1755,15 +2015,30 @@ export function Admin() {
                             </div>
                           </div>
 
-                          {/* Right Section: Stock Status & Action Buttons */}
-                          <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-border shrink-0">
-                            <span
-                              className={`text-[10px] font-bold uppercase tracking-wider ${
-                                prod.stock > 0 ? "text-emerald-500" : "text-destructive"
-                              }`}
-                            >
-                              {prod.stock > 0 ? "In Stock" : "Out of Stock"}
-                            </span>
+                          {/* Right Section: Warehouse Inventory Stock & Action Buttons */}
+                          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-border shrink-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border ${
+                                  (inventoryStocks[prod.name] !== undefined ? inventoryStocks[prod.name] : prod.stock) > 10
+                                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
+                                    : (inventoryStocks[prod.name] !== undefined ? inventoryStocks[prod.name] : prod.stock) > 0
+                                    ? "border-amber-500/50 bg-amber-500/10 text-amber-500"
+                                    : "border-destructive/50 bg-destructive/10 text-destructive"
+                                }`}
+                              >
+                                Warehouse Stock: {inventoryStocks[prod.name] !== undefined ? inventoryStocks[prod.name] : prod.stock} units
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRestockProduct(prod.name, 5)}
+                                className="rounded-md border border-gold/40 bg-gold/10 px-2.5 py-1 text-[10px] font-bold text-gold hover:bg-gold hover:text-black transition-all cursor-pointer"
+                                title="Restock +5 units to Warehouse Inventory"
+                              >
+                                +5 Restock
+                              </button>
+                            </div>
 
                             <div className="flex items-center gap-2 shrink-0">
                               <button
@@ -1957,6 +2232,97 @@ export function Admin() {
           </main>
         </div>
       </div>
+      {/* CANCELLATION REASON MODAL POPUP */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg overflow-hidden rounded-xl border border-destructive/50 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-destructive/15 text-destructive font-bold text-lg">
+                  ⚠️
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-bold text-foreground">Order Cancellation Reason</h3>
+                  <p className="text-[11px] text-muted-foreground font-mono">Booking #{cancellingOrder.bookingIdStr}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancellingOrder(null)}
+                className="flex size-8 items-center justify-center rounded-full bg-surface text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmCancellation} className="space-y-4">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-2">
+                  Select Reason for Cancelling Order
+                </label>
+                <div className="space-y-2">
+                  {[
+                    "Item Out of Stock / Inventory Shortage",
+                    "Delivery Address / Pincode Unserviceable",
+                    "Customer Requested Order Cancellation",
+                    "Payment Verification Failed / Suspicious",
+                    "Custom Reason",
+                  ].map((reason) => (
+                    <label
+                      key={reason}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-xs font-semibold cursor-pointer transition-all ${
+                        cancelReasonPreset === reason
+                          ? "border-destructive bg-destructive/10 text-destructive font-bold"
+                          : "border-border bg-surface/50 text-foreground hover:border-gold/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="cancelReasonOption"
+                        checked={cancelReasonPreset === reason}
+                        onChange={() => setCancelReasonPreset(reason)}
+                        className="accent-destructive cursor-pointer"
+                      />
+                      <span>{reason}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {cancelReasonPreset === "Custom Reason" && (
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-1">
+                    Enter Custom Cancellation Explanation
+                  </label>
+                  <textarea
+                    required
+                    value={customCancelReason}
+                    onChange={(e) => setCustomCancelReason(e.target.value)}
+                    placeholder="Provide specific details on why this booking is being cancelled..."
+                    className="w-full rounded-sm border border-border bg-background p-3 text-xs text-foreground outline-none focus:border-destructive min-h-[80px]"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCancellingOrder(null)}
+                  className="flex-1 rounded-sm border border-border py-2.5 text-xs font-bold text-muted-foreground hover:bg-surface cursor-pointer"
+                >
+                  Nevermind / Keep Active
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 py-2.5 text-xs font-bold uppercase tracking-wider cursor-pointer shadow-md"
+                >
+                  Confirm & Cancel Order
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

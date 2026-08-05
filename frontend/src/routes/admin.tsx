@@ -900,11 +900,11 @@ export function Admin() {
   const maxSales = Math.max(...sales);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-3 sm:px-4 py-4 sm:py-6">
-        <div className={`grid gap-6 lg:gap-8 items-start transition-all duration-300 ${sidebarCollapsed ? "lg:grid-cols-[84px_1fr]" : "lg:grid-cols-[300px_1fr]"}`}>
+    <div className="admin-page-root no-scrollbar min-h-screen bg-background">
+      <div className="mx-auto max-w-7xl px-3 sm:px-4 py-6">
+        <div className="relative flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
           {/* MOBILE ADMIN HEADER (< lg) */}
-          <div className="lg:hidden space-y-3 sticky top-2 z-30 bg-background/95 backdrop-blur-md pb-2">
+          <div className="lg:hidden w-full space-y-3 sticky top-2 z-30 bg-background/95 backdrop-blur-md pb-2">
             <div className="flex items-center justify-between rounded-xl border border-gold/40 bg-card p-4 shadow-sm">
               <div className="flex items-center gap-3 shrink-0">
                 <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
@@ -984,89 +984,95 @@ export function Admin() {
             </div>
           </div>
 
-          {/* DESKTOP ADMIN SIDEBAR (>= lg) */}
-          <aside className={`hidden lg:block sticky top-6 h-fit rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-goldy transition-all duration-300 ${sidebarCollapsed ? "w-[84px] text-center" : "w-full"}`}>
-            <div className={`flex items-center border-b border-border pb-5 gap-3 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
-              {!sidebarCollapsed ? (
-                <>
-                  <div className="flex items-center gap-3 shrink-0 overflow-hidden">
+          {/* DESKTOP ADMIN SIDEBAR (>= lg): Completely Fixed Position */}
+          <aside className={`hidden lg:block fixed top-6 z-30 transition-all duration-300 ${
+            sidebarCollapsed ? "w-[84px]" : "w-[280px]"
+          }`}>
+            <div className="rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-goldy">
+              <div className={`flex items-center border-b border-border pb-4 gap-3 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
+                {!sidebarCollapsed ? (
+                  <>
+                    <div className="flex items-center gap-3 shrink-0 overflow-hidden">
+                      <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
+                        V
+                      </div>
+                      <div className="flex flex-col justify-center overflow-hidden space-y-1">
+                        <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
+                          V E X A
+                        </span>
+                        <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
+                          WEAR CONFIDENCE
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                      className="flex size-9 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0"
+                      title="Collapse Admin Panel Sidebar"
+                    >
+                      <Menu className="size-4.5" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
                     <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
                       V
                     </div>
-                    <div className="flex flex-col justify-center overflow-hidden space-y-1">
-                      <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
-                        V E X A
-                      </span>
-                      <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
-                        WEAR CONFIDENCE
-                      </span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                      className="flex size-8 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0 mt-1"
+                      title="Expand Admin Panel Sidebar"
+                    >
+                      <Menu className="size-4" />
+                    </button>
                   </div>
+                )}
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="flex size-10 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0"
-                    title="Collapse Admin Panel Sidebar"
-                  >
-                    <Menu className="size-5" />
-                  </button>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
-                    V
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="flex size-8 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0 mt-1"
-                    title="Expand Admin Panel Sidebar"
-                  >
-                    <Menu className="size-4" />
-                  </button>
-                </div>
-              )}
+              <nav className="mt-4 space-y-1.5">
+                {adminTabsList.map((t) => {
+                  const Icon = t.icon;
+                  const isSelected = activeTab === t.id && !t.isLogout;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      title={t.label}
+                      onClick={() => {
+                        if (t.isLogout) {
+                          logout();
+                        } else {
+                          setActiveTab(t.id as any);
+                        }
+                      }}
+                      className={`flex w-full items-center rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                        sidebarCollapsed ? "justify-center px-0" : "justify-between px-3.5"
+                      } ${
+                        t.isLogout
+                          ? "text-muted-foreground hover:bg-destructive/15 hover:text-destructive mt-3 pt-3 border-t border-border/60"
+                          : isSelected
+                          ? "bg-gold text-primary-foreground shadow-goldy font-extrabold"
+                          : "text-muted-foreground hover:bg-surface hover:text-gold"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <Icon className="size-4.5 shrink-0" />
+                        {!sidebarCollapsed && <span>{t.label}</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
-
-            <nav className="mt-5 space-y-1.5">
-              {adminTabsList.map((t) => {
-                const Icon = t.icon;
-                const isSelected = activeTab === t.id && !t.isLogout;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    title={t.label}
-                    onClick={() => {
-                      if (t.isLogout) {
-                        logout();
-                      } else {
-                        setActiveTab(t.id as any);
-                      }
-                    }}
-                    className={`flex w-full items-center rounded-lg py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-                      sidebarCollapsed ? "justify-center px-0" : "justify-between px-3.5"
-                    } ${
-                      t.isLogout
-                        ? "text-muted-foreground hover:bg-destructive/15 hover:text-destructive mt-3 pt-3 border-t border-border/60"
-                        : isSelected
-                        ? "bg-gold text-primary-foreground shadow-goldy font-bold"
-                        : "text-muted-foreground hover:bg-surface hover:text-gold"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 whitespace-nowrap">
-                      <Icon className="size-4 shrink-0" />
-                      {!sidebarCollapsed && <span>{t.label}</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
           </aside>
 
-          {/* MAIN CONTENT AREA */}
-          <main className="min-h-[500px] rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto">
+          {/* MAIN CONTENT AREA: Padded for fixed sidebar offset */}
+          <main className={`w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm transition-all duration-300 ${
+            sidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[304px]"
+          }`}>
             {/* TAB: INVENTORY MANAGEMENT */}
             {activeTab === "inventory" && (
               <div className="space-y-8 animate-in fade-in duration-300">
@@ -1382,165 +1388,6 @@ export function Admin() {
               </div>
             )}
 
-            {/* TAB: HOME PAGE MEDIA & BANNERS */}
-            {activeTab === "home-media" && (
-              <div className="space-y-6">
-                <div className="border-b border-border pb-4">
-                  <h2 className="font-display text-2xl font-semibold text-foreground">Home Page Media & Banner Manager</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Upload or update image URLs for the Home Page hero section and promotional banners.</p>
-                </div>
-
-                {uploadStatusMsg && (
-                  <div className="flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 p-4 text-xs text-gold font-bold animate-in fade-in duration-300">
-                    <Sparkles className="size-5 shrink-0 animate-spin" />
-                    <span>{uploadStatusMsg}</span>
-                  </div>
-                )}
-
-                {savedMediaMsg && (
-                  <div className="flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 p-4 text-xs text-gold font-bold animate-in fade-in duration-300">
-                    <CheckCircle2 className="size-5 shrink-0" />
-                    <span>{savedMediaMsg}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleSaveMedia} className="space-y-8">
-                  {/* HERO IMAGE MANAGER */}
-                  <div className="rounded-xl border border-gold/40 bg-card p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-border pb-3">
-                      <div>
-                        <h3 className="font-display text-lg font-bold text-foreground">1. Main Hero T-Shirt Image</h3>
-                        <p className="text-xs text-muted-foreground">The primary luxury t-shirt image displayed in the Home page hero frame.</p>
-                      </div>
-                      <span className="rounded-full bg-gold/15 px-3 py-1 text-[10px] font-bold text-gold border border-gold/40">HERO IMAGE</span>
-                    </div>
-
-                    <div className="grid gap-6 sm:grid-cols-[180px_1fr] items-center">
-                      <div className="relative h-48 w-full overflow-hidden rounded-xl border border-gold/40 bg-background shadow-sm">
-                        <img src={heroImgUrl} alt="Hero Preview" className="h-full w-full object-cover object-center" />
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-1">Image URL</label>
-                          <input
-                            type="text"
-                            value={heroImgUrl}
-                            onChange={(e) => setHeroImgUrl(e.target.value)}
-                            placeholder="https://example.com/hero-tshirt.png"
-                            className="w-full rounded-sm border border-border bg-background px-4 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block mb-1">Or Upload Local Image File</label>
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-sm border border-dashed border-gold/50 bg-gold/5 py-2.5 px-4 text-xs font-bold text-gold transition-colors hover:bg-gold/15">
-                            <Upload className="size-4" /> Upload New Hero Image
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleFileUpload(e, setHeroImgUrl)}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PROMO BANNER 1 MANAGER */}
-                  <div className="rounded-xl border border-gold/40 bg-card p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-border pb-3">
-                      <div>
-                        <h3 className="font-display text-lg font-bold text-foreground">2. Promotional Showcase Banner 1</h3>
-                        <p className="text-xs text-muted-foreground">Banner image for "URBAN SILHOUETTE COLLECTION" slide.</p>
-                      </div>
-                      <span className="rounded-full bg-gold/15 px-3 py-1 text-[10px] font-bold text-gold border border-gold/40">BANNER 1</span>
-                    </div>
-
-                    <div className="grid gap-6 sm:grid-cols-[180px_1fr] items-center">
-                      <div className="relative h-36 w-full overflow-hidden rounded-xl border border-gold/40 bg-background shadow-sm">
-                        <img src={banner1ImgUrl} alt="Banner 1 Preview" className="h-full w-full object-cover object-center" />
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-1">Image URL</label>
-                          <input
-                            type="text"
-                            value={banner1ImgUrl}
-                            onChange={(e) => setBanner1ImgUrl(e.target.value)}
-                            placeholder="https://example.com/banner1.png"
-                            className="w-full rounded-sm border border-border bg-background px-4 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-sm border border-dashed border-gold/50 bg-gold/5 py-2.5 px-4 text-xs font-bold text-gold transition-colors hover:bg-gold/15">
-                            <Upload className="size-4" /> Upload Banner 1 File
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleFileUpload(e, setBanner1ImgUrl)}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PROMO BANNER 2 MANAGER */}
-                  <div className="rounded-xl border border-gold/40 bg-card p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-border pb-3">
-                      <div>
-                        <h3 className="font-display text-lg font-bold text-foreground">3. Promotional Showcase Banner 2</h3>
-                        <p className="text-xs text-muted-foreground">Banner image for "BESPOKE CUSTOMISATION" slide.</p>
-                      </div>
-                      <span className="rounded-full bg-gold/15 px-3 py-1 text-[10px] font-bold text-gold border border-gold/40">BANNER 2</span>
-                    </div>
-
-                    <div className="grid gap-6 sm:grid-cols-[180px_1fr] items-center">
-                      <div className="relative h-36 w-full overflow-hidden rounded-xl border border-gold/40 bg-background shadow-sm">
-                        <img src={banner2ImgUrl} alt="Banner 2 Preview" className="h-full w-full object-cover object-center" />
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-1">Image URL</label>
-                          <input
-                            type="text"
-                            value={banner2ImgUrl}
-                            onChange={(e) => setBanner2ImgUrl(e.target.value)}
-                            placeholder="https://example.com/banner2.png"
-                            className="w-full rounded-sm border border-border bg-background px-4 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-sm border border-dashed border-gold/50 bg-gold/5 py-2.5 px-4 text-xs font-bold text-gold transition-colors hover:bg-gold/15">
-                            <Upload className="size-4" /> Upload Banner 2 File
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleFileUpload(e, setBanner2ImgUrl)}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn-gold hover:btn-gold-hover flex w-full items-center justify-center gap-2 rounded-sm py-4 text-xs font-bold uppercase tracking-wider shadow-sm"
-                  >
-                    <Save className="size-4" /> Save Home Page Media Changes
-                  </button>
-                </form>
-              </div>
-            )}
 
             {/* TAB 2: MANAGE CUSTOMER BOOKINGS */}
             {activeTab === "orders" && (
@@ -2679,8 +2526,6 @@ export function Admin() {
                 </form>
               </div>
             )}
-
-
 
 
 

@@ -1,7 +1,13 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Instagram, Twitter, Facebook, Mail } from "lucide-react";
 
 export function Footer() {
+  const location = useLocation();
+
+  if (location.pathname.startsWith("/admin") || (typeof window !== "undefined" && window.location.pathname.startsWith("/admin"))) {
+    return null;
+  }
+
   return (
     <footer className="border-t border-border bg-surface/40">
       <div className="mx-auto grid max-w-7xl gap-8 sm:gap-12 px-5 py-12 sm:py-16 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

@@ -871,9 +871,9 @@ export function UserDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:gap-8 lg:grid-cols-[280px_1fr] items-start">
+        <div className="relative flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
           {/* MOBILE RESPONSIVE TAB STRIP (< lg) */}
-          <div className="lg:hidden space-y-3 sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-2">
+          <div className="lg:hidden w-full space-y-3 sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-2">
             {/* Interactive Profile Card - Clicking opens Dashboard Sections slide-down */}
             <button
               type="button"
@@ -937,54 +937,56 @@ export function UserDashboard() {
             </div>
           </div>
 
-          {/* DESKTOP SIDEBAR (>= lg): Sticky Positioned */}
-          <aside className="hidden lg:block sticky top-24 h-fit rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-3 border-b border-border pb-6">
-              {profilePic ? (
-                <img src={profilePic} alt={profileName} className="size-11 rounded-full object-cover border border-gold shadow-sm shrink-0" />
-              ) : (
-                <div className="flex size-11 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-lg font-bold text-gold shrink-0 shadow-sm">
-                  {(profileName || user?.name || "U")[0].toUpperCase()}
+          {/* DESKTOP SIDEBAR (>= lg): Completely Fixed Position */}
+          <aside className="hidden lg:block fixed top-28 z-30 w-[260px]">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center gap-3 border-b border-border pb-6">
+                {profilePic ? (
+                  <img src={profilePic} alt={profileName} className="size-11 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+                ) : (
+                  <div className="flex size-11 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-lg font-bold text-gold shrink-0 shadow-sm">
+                    {(profileName || user?.name || "U")[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="overflow-hidden">
+                  <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
+                  <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
                 </div>
-              )}
-              <div className="overflow-hidden">
-                <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
-                <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
               </div>
-            </div>
 
-            <nav className="mt-6 space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                const isLogout = item.id === "logout";
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (isLogout) {
-                        logout();
-                      } else {
-                        setActiveTab(item.id as TabType);
-                      }
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-xs font-semibold uppercase tracking-wider transition-all ${
-                      isLogout
-                        ? "text-destructive hover:bg-destructive/20 font-bold mt-4 border border-destructive/40 bg-destructive/10 justify-center shadow-sm"
-                        : isActive
-                        ? "bg-gold text-primary-foreground shadow-goldy font-bold"
-                        : "text-muted-foreground hover:bg-surface hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="size-4" /> {item.label}
-                  </button>
-                );
-              })}
-            </nav>
+              <nav className="mt-6 space-y-1.5">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  const isLogout = item.id === "logout";
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        if (isLogout) {
+                          logout();
+                        } else {
+                          setActiveTab(item.id as TabType);
+                        }
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                        isLogout
+                          ? "text-destructive hover:bg-destructive/20 font-bold mt-4 border border-destructive/40 bg-destructive/10 justify-center shadow-sm"
+                          : isActive
+                          ? "bg-gold text-primary-foreground shadow-goldy font-bold"
+                          : "text-muted-foreground hover:bg-surface hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="size-4 shrink-0" /> <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
           </aside>
 
-          {/* MAIN TAB CONTENT AREA: Independent scrollable container on desktop */}
-          <main className="min-h-[520px] rounded-xl border border-border bg-card p-3.5 sm:p-8 shadow-sm min-w-0 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto">
+          {/* MAIN TAB CONTENT AREA: Padded for fixed sidebar offset */}
+          <main className="w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-3.5 sm:p-8 shadow-sm lg:ml-[284px]">
             {/* 1. MY PROFILE TAB */}
             {activeTab === "profile" && (
               <div className="space-y-6 max-w-2xl">

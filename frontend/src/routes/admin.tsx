@@ -330,6 +330,7 @@ export function Admin() {
     { id: "users", label: `Registered Users (${usersList.length})`, icon: Users },
     { id: "coupons", label: `Promo Coupons (${couponsList.length})`, icon: Ticket },
     { id: "reviews", label: `Customer Reviews (${reviewsList.length})`, icon: Star },
+    { id: "home-media", label: "Home Page Media", icon: Image },
     { id: "settings", label: "Store Settings", icon: Settings },
     { id: "logout", label: "Logout", icon: LogOut, isLogout: true },
   ], [orders.length, usersList.length, catalogProducts.length, couponsList.length, reviewsList.length]);
@@ -2596,6 +2597,85 @@ export function Admin() {
                     <Save className="size-4" />
                     <span>Save Store Settings</span>
                   </button>
+                </form>
+              </div>
+            )}
+
+            {/* TAB: HOME PAGE MEDIA */}
+            {activeTab === "home-media" && (
+              <div className="space-y-6">
+                <form onSubmit={handleSaveMedia} className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                    <div>
+                      <h2 className="font-display text-2xl font-semibold text-foreground">Home Page Media Manager</h2>
+                      <p className="text-xs text-muted-foreground mt-1">Upload images & save media changes live across the store.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {savedMediaMsg && (
+                        <span className="rounded-md bg-emerald-500/15 border border-emerald-500/40 px-3 py-1.5 text-xs font-bold text-emerald-400 animate-in fade-in">
+                          ✓ {savedMediaMsg}
+                        </span>
+                      )}
+                      <button
+                        type="submit"
+                        className="flex items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-amber-400 shadow-goldy cursor-pointer shrink-0"
+                      >
+                        <Save className="size-3.5" />
+                        <span>Save Changes</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Main Hero Image */}
+                  <div className="rounded-xl border border-gold/40 bg-card p-5 shadow-xs transition-all hover:border-gold">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <img src={heroImgUrl} alt="Hero" className="size-16 rounded-xl object-cover border border-gold/40 shrink-0 shadow-sm" />
+                        <div>
+                          <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Main Hero Banner Image</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">Primary hero banner background on the store home page.</p>
+                        </div>
+                      </div>
+                      <label className="cursor-pointer shrink-0 rounded-lg border border-gold/50 bg-gold/15 px-3.5 py-2 text-xs font-bold text-gold transition-all hover:bg-gold hover:text-primary-foreground shadow-xs">
+                        <Upload className="size-3.5 inline mr-1.5" /> Upload File
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setHeroImgUrl)} />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Promo Banner 1 */}
+                  <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-gold">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <img src={banner1ImgUrl} alt="Banner 1" className="size-16 rounded-xl object-cover border border-border shrink-0 shadow-sm" />
+                        <div>
+                          <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Promotional Card 1 Image</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">First promotional card banner image featured on home page.</p>
+                        </div>
+                      </div>
+                      <label className="cursor-pointer shrink-0 rounded-lg border border-gold/50 bg-gold/15 px-3.5 py-2 text-xs font-bold text-gold transition-all hover:bg-gold hover:text-primary-foreground shadow-xs">
+                        <Upload className="size-3.5 inline mr-1.5" /> Upload File
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setBanner1ImgUrl)} />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Promo Banner 2 */}
+                  <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-gold">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <img src={banner2ImgUrl} alt="Banner 2" className="size-20 rounded-xl object-cover border border-border shrink-0 shadow-sm" />
+                        <div>
+                          <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Promotional Card 2 Image</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">Second promotional card banner image featured on home page.</p>
+                        </div>
+                      </div>
+                      <label className="cursor-pointer shrink-0 rounded-lg border border-gold/50 bg-gold/15 px-3.5 py-2 text-xs font-bold text-gold transition-all hover:bg-gold hover:text-primary-foreground shadow-xs">
+                        <Upload className="size-3.5 inline mr-1.5" /> Upload File
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setBanner2ImgUrl)} />
+                      </label>
+                    </div>
+                  </div>
                 </form>
               </div>
             )}

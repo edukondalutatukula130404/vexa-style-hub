@@ -1,6 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Menu, X, ShoppingCart, User, LogOut } from "lucide-react";
+import { Menu, X, ShoppingCart, User, LogOut, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 
@@ -41,6 +41,18 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   // Hide header navigation completely on admin portal
   if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
     return null;
@@ -49,157 +61,199 @@ export function Navbar() {
   const accountPath = isAdmin ? "/admin" : "/dashboard";
 
   return (
-    <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 transform ${
-        visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
-      } ${
-        scrolled
-          ? "border-b border-border bg-background/90 backdrop-blur-xl py-2.5 sm:py-3 shadow-sm"
-          : "py-3.5 sm:py-5"
-      }`}
-    >
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6">
-        {/* Brand Logo & Name (Optimized for Mobile Responsive) */}
-        <Link to="/" className="group flex items-center gap-2.5 sm:gap-3 leading-none shrink-0">
-          <img
-            src="/favicon.svg"
-            alt="VEXA Logo"
-            loading="lazy"
-            decoding="async"
-            className="size-7 sm:size-8 rounded-md transition-transform duration-300 group-hover:scale-105 shrink-0"
-          />
-          <div className="flex flex-col justify-center">
-            <span className="font-display text-xl sm:text-2xl font-bold tracking-[0.28em] sm:tracking-[0.35em] text-gold-gradient leading-none">
-              VEXA
-            </span>
-            <span className="mt-0.5 sm:mt-1 text-[8px] sm:text-[9px] font-semibold tracking-[0.22em] sm:tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
-              WEAR CONFIDENCE
-            </span>
-          </div>
-        </Link>
-
-        {/* Navigation Links */}
-        <ul className="hidden items-center gap-8 lg:flex">
-          {baseLinks.map((l) => (
-            <li key={l.to}>
-              <NavLink
-                to={l.to}
-                className={({ isActive }) =>
-                  `relative text-xs uppercase tracking-[0.22em] transition-colors duration-300 after:absolute after:-bottom-2 after:left-0 after:h-px after:w-0 after:bg-gold after:transition-all after:duration-300 hover:after:w-full ${
-                    isActive ? "text-gold font-bold after:w-full" : "text-muted-foreground hover:text-gold"
-                  }`
-                }
-              >
-                {l.label}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-
-        {/* Right Section Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Cart Button */}
-          <Link
-            to="/dashboard?tab=cart"
-            className="btn-gold hover:btn-gold-hover flex items-center gap-2 rounded-sm px-3.5 py-2 text-xs font-bold uppercase tracking-[0.16em] cursor-pointer shadow-goldy"
-            title="View Cart"
-          >
-            <ShoppingCart className="size-4" />
-            <span className="hidden sm:inline">Cart</span>
-            {totalCartCount > 0 && (
-              <span className="flex size-4.5 items-center justify-center rounded-full bg-background text-[10px] font-extrabold text-gold shadow border border-gold/50 font-mono">
-                {totalCartCount}
-              </span>
-            )}
-          </Link>
-
-          {/* Desktop Web App: Three-Lines Icon -> Opens My Account Page */}
-          <Link
-            to={isLoggedIn ? accountPath : "/login"}
-            className="hidden lg:flex items-center justify-center p-2.5 rounded-sm border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
-            title={isLoggedIn ? (isAdmin ? "Admin Portal" : "My Account Dashboard") : "Login / Account"}
-          >
-            <Menu className="size-5" />
-          </Link>
-
-          {/* Mobile View: Three-Lines Icon -> Toggles Mobile Navigation Dropdown Menu */}
-          <button
-            type="button"
-            aria-label="Toggle Navigation Menu"
-            onClick={() => setOpen((o) => !o)}
-            className="flex lg:hidden items-center justify-center p-2.5 rounded-sm border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
-            title="Toggle Menu"
-          >
-            {open ? <X className="size-5" /> : <Menu className="size-5" />}
-          </button>
-        </div>
-      </nav>
-
-      {/* Mobile Navigation Dropdown Menu (Triggers on Mobile Three-Lines Click) */}
-      <div
-        className={`overflow-hidden border-t border-gold/30 bg-card/98 backdrop-blur-2xl shadow-2xl transition-all duration-500 ease-in-out lg:hidden ${
-          open ? "mt-3 max-h-[520px] opacity-100 py-3" : "max-h-0 opacity-0 py-0 border-transparent pointer-events-none"
+    <>
+      <header
+        className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 transform ${
+          visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
+        } ${
+          scrolled
+            ? "border-b border-border bg-background/90 backdrop-blur-xl py-2.5 sm:py-3 shadow-sm"
+            : "py-3.5 sm:py-5"
         }`}
       >
-        <ul className="flex flex-col gap-1 px-6 py-2 divide-y divide-border/30">
-          {baseLinks.map((l) => (
-            <li key={l.to} className="py-1">
-              <NavLink
-                to={l.to}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center justify-between py-2 text-xs font-bold uppercase tracking-[0.22em] transition-all duration-300 ${
-                    isActive ? "text-gold font-extrabold translate-x-1" : "text-muted-foreground hover:text-gold"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span>{l.label}</span>
-                    {isActive && <span className="size-1.5 rounded-full bg-gold shadow-goldy" />}
-                  </>
-                )}
-              </NavLink>
-            </li>
-          ))}
+        <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6">
+          {/* Brand Logo & Name (Optimized for Mobile Responsive) */}
+          <Link to="/" className="group flex items-center gap-2.5 sm:gap-3 leading-none shrink-0">
+            <img
+              src="/favicon.svg"
+              alt="VEXA Logo"
+              loading="lazy"
+              decoding="async"
+              className="size-7 sm:size-8 rounded-md transition-transform duration-300 group-hover:scale-105 shrink-0"
+            />
+            <div className="flex flex-col justify-center">
+              <span className="font-display text-xl sm:text-2xl font-bold tracking-[0.28em] sm:tracking-[0.35em] text-gold-gradient leading-none">
+                VEXA
+              </span>
+              <span className="mt-0.5 sm:mt-1 text-[8px] sm:text-[9px] font-semibold tracking-[0.22em] sm:tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
+                WEAR CONFIDENCE
+              </span>
+            </div>
+          </Link>
 
-          {isLoggedIn ? (
-            <>
-              <li className="py-1.5">
+          {/* Navigation Links */}
+          <ul className="hidden items-center gap-8 lg:flex">
+            {baseLinks.map((l) => (
+              <li key={l.to}>
+                <NavLink
+                  to={l.to}
+                  className={({ isActive }) =>
+                    `relative text-xs uppercase tracking-[0.22em] transition-colors duration-300 after:absolute after:-bottom-2 after:left-0 after:h-px after:w-0 after:bg-gold after:transition-all after:duration-300 hover:after:w-full ${
+                      isActive ? "text-gold font-bold after:w-full" : "text-muted-foreground hover:text-gold"
+                    }`
+                  }
+                >
+                  {l.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+
+          {/* Right Section Controls */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Cart Button */}
+            <Link
+              to="/dashboard?tab=cart"
+              className="relative flex items-center justify-center p-2 text-gold hover:text-gold/80 sm:bg-gold sm:text-primary-foreground sm:hover:bg-gold/90 sm:px-3.5 sm:py-2 sm:rounded-sm sm:shadow-goldy transition-all cursor-pointer active:scale-95 text-xs font-bold uppercase tracking-[0.16em]"
+              title="View Cart"
+            >
+              <ShoppingCart className="size-5 sm:size-4" />
+              <span className="hidden sm:inline sm:ml-2">Cart</span>
+              {totalCartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 sm:static sm:ml-1.5 flex size-4.5 items-center justify-center rounded-full bg-gold text-primary-foreground sm:bg-background sm:text-gold text-[10px] font-extrabold shadow border border-gold/50 font-mono">
+                  {totalCartCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Desktop Web App: Three-Lines Icon -> Opens My Account Page */}
+            <Link
+              to={isLoggedIn ? accountPath : "/login"}
+              className="hidden lg:flex items-center justify-center p-2.5 rounded-sm border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
+              title={isLoggedIn ? (isAdmin ? "Admin Portal" : "My Account Dashboard") : "Login / Account"}
+            >
+              <Menu className="size-5" />
+            </Link>
+
+            {/* Mobile View: Three-Lines Icon -> Opens Right Slide-Over Navigation Drawer */}
+            <button
+              type="button"
+              aria-label="Toggle Navigation Menu"
+              onClick={() => setOpen((o) => !o)}
+              className="flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+              title="Toggle Menu"
+            >
+              {open ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      {/* Backdrop Overlay for Mobile Drawer */}
+      <div
+        onClick={() => setOpen(false)}
+        className={`fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          open ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
+
+      {/* Right-Side Mobile Slide-Over Navigation Drawer Panel */}
+      <aside
+        className={`fixed inset-y-0 right-0 z-[9999] flex w-[280px] xs:w-[320px] flex-col bg-card/98 backdrop-blur-2xl border-l border-gold/40 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {/* Drawer Header */}
+        <div className="flex items-center justify-between border-b border-gold/30 p-5">
+          <div className="flex items-center gap-2.5">
+            <img src="/favicon.svg" alt="VEXA" className="size-7 rounded-md" />
+            <span className="font-display text-lg font-bold tracking-[0.25em] text-gold-gradient">
+              VEXA
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="flex size-8 items-center justify-center rounded-full border border-gold/40 bg-gold/10 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer"
+            title="Close Menu"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Drawer Scrollable Links Container */}
+        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-3">Navigation Menu</p>
+            <ul className="space-y-1.5">
+              {baseLinks.map((l) => (
+                <li key={l.to}>
+                  <NavLink
+                    to={l.to}
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center justify-between rounded-lg px-4 py-3 text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
+                        isActive
+                          ? "bg-gold text-primary-foreground font-extrabold shadow-sm"
+                          : "text-muted-foreground hover:bg-surface hover:text-gold"
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <span>{l.label}</span>
+                        {isActive && <ChevronRight className="size-4 shrink-0" />}
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="border-t border-border/40 pt-5 space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-3">Account Options</p>
+            {isLoggedIn ? (
+              <div className="space-y-2">
                 <Link
                   to={accountPath}
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-[0.22em] text-gold"
+                  className="flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.2em] text-gold hover:bg-gold hover:text-primary-foreground transition-all"
                 >
-                  <User className="size-4" /> {isAdmin ? "Admin Portal" : "My Account"}
+                  <User className="size-4 shrink-0" />
+                  <span>{isAdmin ? "Admin Portal" : "My Account"}</span>
                 </Link>
-              </li>
-              <li className="pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setOpen(false);
                     logout();
                   }}
-                  className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-[0.22em] text-destructive hover:opacity-80 transition-opacity cursor-pointer w-full text-left"
+                  className="flex w-full items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.2em] text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer"
                 >
-                  <LogOut className="size-4" /> Log Out
+                  <LogOut className="size-4 shrink-0" />
+                  <span>Log Out</span>
                 </button>
-              </li>
-            </>
-          ) : (
-            <li className="py-1.5">
+              </div>
+            ) : (
               <Link
                 to="/login"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2 py-2 text-xs font-bold uppercase tracking-[0.22em] text-gold"
+                className="flex items-center gap-3 rounded-lg border border-gold/50 bg-gold px-4 py-3 text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground shadow-goldy hover:bg-gold/90 transition-all"
               >
-                <User className="size-4" /> Login / Sign Up
+                <User className="size-4 shrink-0" />
+                <span>Login / Sign Up</span>
               </Link>
-            </li>
-          )}
-        </ul>
-      </div>
-    </header>
+            )}
+          </div>
+        </div>
+
+        {/* Drawer Footer Tagline */}
+        <div className="border-t border-border/40 p-4 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          WEAR CONFIDENCE • WEAR STYLE
+        </div>
+      </aside>
+    </>
   );
 }
+

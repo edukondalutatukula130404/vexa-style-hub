@@ -5,13 +5,15 @@ const morgan = require('morgan');
 const connectDB = require('./config/db');
 const errorHandler = require('./middlewares/errorHandler');
 const { seedAdmin } = require('./controllers/userController');
+const { seedItems } = require('./controllers/itemController');
 
 // Load environment variables
 dotenv.config();
 
-// Connect to MongoDB Database and Seed Admin User
+// Connect to MongoDB Database and Seed Admin User & Items
 connectDB().then(() => {
   seedAdmin();
+  seedItems();
 });
 
 const app = express();

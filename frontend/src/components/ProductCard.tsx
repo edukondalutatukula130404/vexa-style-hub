@@ -59,7 +59,7 @@ export function ProductCard({ product }: { product: Product }) {
             decoding="async"
             width={900}
             height={1100}
-            className="h-[360px] w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="h-[280px] xs:h-[320px] sm:h-[360px] w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <span className="absolute left-4 top-4 rounded-full border border-gold/60 bg-black/85 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-gold">
             {product.category}

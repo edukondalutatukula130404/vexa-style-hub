@@ -205,14 +205,20 @@ export function Home() {
     return () => clearInterval(heroTimer);
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    if (selectedCategory === "All") return products;
-    return products.filter((p) => p.category === selectedCategory);
-  }, [products, selectedCategory]);
-
   const newArrivals = useMemo(() => {
     return products.slice(0, 4);
   }, [products]);
+
+  const newArrivalIds = useMemo(() => {
+    return new Set(newArrivals.map((n) => n.id));
+  }, [newArrivals]);
+
+  const filteredProducts = useMemo(() => {
+    // Exclude New Arrivals items so Featured Collection shows distinct, non-duplicate tees
+    const remainingProducts = products.filter((p) => !newArrivalIds.has(p.id));
+    if (selectedCategory === "All") return remainingProducts;
+    return remainingProducts.filter((p) => p.category === selectedCategory);
+  }, [products, selectedCategory, newArrivalIds]);
 
   return (
     <>
@@ -234,27 +240,27 @@ export function Home() {
         <div className="relative mx-auto max-w-7xl px-5 py-16 lg:py-24">
           <div className="grid gap-10 lg:grid-cols-2 items-center">
             <div className="animate-fade-up">
-              <h1 className="mt-4 font-display text-5xl leading-[1.05] sm:text-6xl lg:text-7xl font-bold text-foreground">
+              <h1 className="mt-4 font-display text-3xl xs:text-4xl leading-[1.08] sm:text-6xl lg:text-7xl font-bold text-foreground">
                 PREMIUM
                 <br />
                 T-SHIRT
                 <br />
                 <span className="text-gold-gradient">COLLECTION</span>
               </h1>
-              <p className="mt-6 max-w-md text-sm sm:text-base leading-relaxed text-muted-foreground">
+              <p className="mt-5 max-w-md text-xs sm:text-base leading-relaxed text-muted-foreground">
                 Engineered in 240 GSM heavyweight cotton, finished by hand, and cut for the modern oversized silhouette. This is VEXA — wear confidence, wear style.
               </p>
 
-              <div className="mt-9 flex flex-wrap gap-4">
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
                 <Link
                   to="/products"
-                  className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-sm px-8 py-4 text-xs font-bold uppercase tracking-wider shadow-sm"
+                  className="btn-gold hover:btn-gold-hover inline-flex items-center justify-center gap-2 rounded-sm px-7 py-3.5 sm:px-8 sm:py-4 text-xs font-bold uppercase tracking-wider shadow-sm text-center"
                 >
                   SHOP THE DROP <ArrowRight className="size-4" />
                 </Link>
                 <Link
                   to="/about"
-                  className="btn-outline-gold inline-flex items-center rounded-sm px-8 py-4 text-xs font-bold uppercase tracking-wider hover:bg-gold hover:text-primary-foreground shadow-sm"
+                  className="btn-outline-gold inline-flex items-center justify-center rounded-sm px-7 py-3.5 sm:px-8 sm:py-4 text-xs font-bold uppercase tracking-wider hover:bg-gold hover:text-primary-foreground shadow-sm text-center"
                 >
                   OUR STORY
                 </Link>
@@ -262,8 +268,8 @@ export function Home() {
             </div>
 
             <div className="relative flex items-center justify-center">
-              <div className="group relative w-full max-w-lg overflow-hidden rounded-3xl border border-gold/50 bg-card p-3 shadow-goldy transition-all duration-700 hover:border-gold hover:shadow-2xl">
-                <div className="relative w-full overflow-hidden rounded-2xl">
+              <div className="group relative w-full max-w-lg overflow-hidden rounded-2xl sm:rounded-3xl border border-gold/50 bg-card p-2.5 sm:p-3 shadow-goldy transition-all duration-700 hover:border-gold hover:shadow-2xl">
+                <div className="relative w-full overflow-hidden rounded-xl sm:rounded-2xl">
                   <img
                     src={heroImgState}
                     alt="VEXA Premium Luxury Oversized T-Shirt"
@@ -271,11 +277,11 @@ export function Home() {
                     decoding="async"
                     width={1200}
                     height={1400}
-                    className="h-[480px] sm:h-[580px] w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                    className="h-[360px] xs:h-[440px] sm:h-[580px] w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
 
-                  <span className="absolute left-5 top-5 rounded-full border border-gold/50 bg-black/85 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-gold shadow-sm">
+                  <span className="absolute left-3.5 top-3.5 sm:left-5 sm:top-5 rounded-full border border-gold/50 bg-black/85 px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-gold shadow-sm">
                     {heroBanners[heroIndex]?.badgeText || "Signature Drop"}
                   </span>
 

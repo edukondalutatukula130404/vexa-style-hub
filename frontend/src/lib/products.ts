@@ -6,6 +6,8 @@ import charcoal from "@/assets/tee-charcoal.jpg";
 import olive from "@/assets/tee-olive.jpg";
 import luxuryGold from "@/assets/hero_luxury_tshirt.png";
 import rust from "@/assets/tee-rust.png";
+import emerald from "@/assets/tee-emerald.png";
+import lavender from "@/assets/tee-lavender.png";
 
 export type Product = {
   id: string;
@@ -17,11 +19,36 @@ export type Product = {
   color: string;
   rating: number;
   stock: number;
+  isNewDrop?: boolean;
 };
 
 export const SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 
 export const products: Product[] = [
+  {
+    id: "vx-08",
+    name: "Emerald Acid Wash Boxy Tee",
+    price: 1899,
+    oldPrice: 2699,
+    image: emerald,
+    category: "Limited",
+    color: "Emerald Green",
+    rating: 5.0,
+    stock: 14,
+    isNewDrop: true,
+  },
+  {
+    id: "vx-12",
+    name: "Lavender Lilac Drop-Shoulder Tee",
+    price: 1699,
+    oldPrice: 2399,
+    image: lavender,
+    category: "Oversized",
+    color: "Pastel Lavender",
+    rating: 4.9,
+    stock: 18,
+    isNewDrop: true,
+  },
   {
     id: "vx-00",
     name: "Gold-Embroidered Luxe Tee",
@@ -35,7 +62,7 @@ export const products: Product[] = [
   },
   {
     id: "vx-07",
-    name: "Vintage Rust Oversized Tee",
+    name: "Vintage Rust Heavyweight Tee",
     price: 1699,
     oldPrice: 2399,
     image: rust,
@@ -46,7 +73,7 @@ export const products: Product[] = [
   },
   {
     id: "vx-01",
-    name: "Obsidian Oversized Tee",
+    name: "Obsidian Stealth Oversized Tee",
     price: 1499,
     oldPrice: 2199,
     image: black,
@@ -57,56 +84,56 @@ export const products: Product[] = [
   },
   {
     id: "vx-02",
-    name: "Ivory Signature Tee",
+    name: "Ivory Signature Drop-Shoulder Tee",
     price: 1399,
     oldPrice: 1999,
     image: white,
     category: "Classic",
-    color: "Ivory",
+    color: "Ivory White",
     rating: 4.8,
     stock: 27,
   },
   {
     id: "vx-03",
-    name: "Midnight Navy Tee",
+    name: "Midnight Indigo Heavyweight Tee",
     price: 1599,
     oldPrice: 2299,
     image: navy,
     category: "Oversized",
-    color: "Navy",
+    color: "Midnight Navy",
     rating: 4.7,
     stock: 18,
   },
   {
     id: "vx-04",
-    name: "Desert Sand Tee",
+    name: "Desert Sand Minimalist Tee",
     price: 1549,
     oldPrice: 2149,
     image: beige,
     category: "Limited",
-    color: "Sand",
+    color: "Desert Sand",
     rating: 5.0,
     stock: 9,
   },
   {
     id: "vx-05",
-    name: "Charcoal Luxe Tee",
+    name: "Charcoal Luxe Distressed Tee",
     price: 1449,
     oldPrice: 2099,
     image: charcoal,
     category: "Classic",
-    color: "Charcoal",
+    color: "Charcoal Grey",
     rating: 4.6,
     stock: 33,
   },
   {
     id: "vx-06",
-    name: "Olive Heritage Tee",
+    name: "Olive Military Heritage Tee",
     price: 1649,
     oldPrice: 2399,
     image: olive,
     category: "Limited",
-    color: "Olive",
+    color: "Olive Green",
     rating: 4.9,
     stock: 6,
   },

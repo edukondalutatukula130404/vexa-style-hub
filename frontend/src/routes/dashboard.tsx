@@ -33,7 +33,7 @@ import {
   Home,
   Briefcase,
 } from "lucide-react";
-import { products, SIZES, type Product } from "@/lib/products";
+import { products, useProducts, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL, setLoggedIn } from "@/lib/auth";
 import { useCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
@@ -63,6 +63,24 @@ export function UserDashboard() {
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
   const { cartItems, totalAmount } = useCart();
+  const { allProducts } = useProducts();
+
+  const [bookingCategoryFilter, setBookingCategoryFilter] = useState<string>("All");
+  const [bookingSearchQuery, setBookingSearchQuery] = useState<string>("");
+
+  const bookingDisplayProducts = useMemo(() => {
+    const source = Array.isArray(allProducts) && allProducts.length > 0 ? allProducts : products;
+    return source.filter((p) => {
+      const matchCategory =
+        bookingCategoryFilter === "All" ||
+        p.category === bookingCategoryFilter;
+      const matchSearch =
+        !bookingSearchQuery.trim() ||
+        p.name.toLowerCase().includes(bookingSearchQuery.toLowerCase()) ||
+        p.color.toLowerCase().includes(bookingSearchQuery.toLowerCase());
+      return matchCategory && matchSearch;
+    });
+  }, [allProducts, bookingCategoryFilter, bookingSearchQuery]);
   
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window !== "undefined") {
@@ -845,7 +863,7 @@ export function UserDashboard() {
           <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">MY ACCOUNT</h1>
           <div className="mt-3">
             <Link
-              to="/products"
+              to="/"
               className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
             >
               <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
@@ -967,7 +985,7 @@ export function UserDashboard() {
           </aside>
 
           {/* MAIN TAB CONTENT AREA */}
-          <main className="min-h-[520px] rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
+          <main className="min-h-[520px] rounded-xl border border-border bg-card p-3.5 sm:p-8 shadow-sm min-w-0 overflow-hidden">
             {/* 1. MY PROFILE TAB */}
             {activeTab === "profile" && (
               <div className="space-y-6 max-w-2xl">
@@ -1127,13 +1145,13 @@ export function UserDashboard() {
 
             {/* 2. MY ORDERS TAB */}
             {activeTab === "orders" && (
-              <div className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between border-b border-border pb-4 gap-4">
+              <div className="space-y-6 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
                   <div>
-                    <h2 className="font-display text-2xl font-bold text-foreground">My Orders</h2>
+                    <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">My Orders</h2>
                     <p className="text-xs text-muted-foreground mt-1">Track your placed orders and shipment progress.</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
                     {refreshMsg && (
                       <span className="text-xs text-gold font-semibold animate-in fade-in duration-300">
                         {refreshMsg}
@@ -1143,7 +1161,7 @@ export function UserDashboard() {
                       type="button"
                       onClick={() => fetchMyOrders(true)}
                       disabled={loadingOrders}
-                      className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-gold/10 px-4 py-2 text-xs text-gold hover:bg-gold hover:text-primary-foreground font-bold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                      className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-gold/10 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs text-gold hover:bg-gold hover:text-primary-foreground font-bold transition-all disabled:opacity-50 cursor-pointer shadow-sm shrink-0"
                     >
                       <RefreshCw className={`size-3.5 ${loadingOrders ? "animate-spin" : ""}`} />
                       {loadingOrders ? "Refreshing..." : "Refresh"}
@@ -1153,15 +1171,15 @@ export function UserDashboard() {
 
                 {/* Sort & Filter Controls Bar */}
                 {myOrders.length > 0 && (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5 rounded-xl border border-border bg-card p-3 sm:p-4 shadow-sm min-w-0">
                     {/* Status Filter Chips */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0 min-w-0 max-w-full">
                       {["All", "Processing", "Shipped", "Delivered", "Cancelled"].map((st) => (
                         <button
                           key={st}
                           type="button"
                           onClick={() => setOrderStatusFilter(st)}
-                          className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+                          className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                             orderStatusFilter === st
                               ? "bg-gold text-primary-foreground shadow-sm"
                               : "border border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
@@ -1173,7 +1191,7 @@ export function UserDashboard() {
                     </div>
 
                     {/* Sort Selector Dropdown */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center justify-between sm:justify-start gap-2 shrink-0 pt-2 sm:pt-0 border-t border-border/40 sm:border-t-0">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Sort By:</span>
                       <select
                         value={orderSortBy}
@@ -1192,11 +1210,11 @@ export function UserDashboard() {
                 {sortedOrders.length > 0 ? (
                   <div className="space-y-4">
                     {sortedOrders.map((ord, idx) => (
-                      <div key={ord._id || ord.id || idx} className="rounded-xl border border-border bg-background p-6 shadow-sm">
-                        <div className="flex flex-wrap items-center justify-between border-b border-border pb-4 gap-2">
-                          <div>
-                            <span className="text-[10px] uppercase tracking-widest text-gold font-semibold">Order ID</span>
-                            <h4 className="font-display text-base font-bold text-foreground">
+                      <div key={ord._id || ord.id || idx} className="rounded-xl border border-border bg-background p-3.5 sm:p-6 shadow-sm min-w-0 overflow-hidden">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3.5 gap-2.5">
+                          <div className="min-w-0">
+                            <span className="text-[10px] uppercase tracking-widest text-gold font-semibold block">Order ID</span>
+                            <h4 className="font-display text-base font-bold text-foreground tracking-tight truncate">
                               #{String(ord._id || ord.id || "ORD-NEW").slice(-8).toUpperCase()}
                             </h4>
                             <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -1204,9 +1222,9 @@ export function UserDashboard() {
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-border/40 sm:border-t-0">
                             <span
-                              className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-wider font-bold ${
+                              className={`rounded-full border px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] uppercase tracking-wider font-bold shrink-0 ${
                                 ord.status === "Delivered"
                                   ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
                                   : ord.status === "Shipped"
@@ -1218,49 +1236,49 @@ export function UserDashboard() {
                             >
                               {ord.status || "Processing"}
                             </span>
-                            <span className="font-display text-lg font-bold text-foreground">
+                            <span className="font-display text-base sm:text-lg font-bold text-foreground shrink-0">
                               ₹{(ord.totalAmount || 0).toLocaleString("en-IN")}
                             </span>
                           </div>
                         </div>
 
                         {ord.status === "Cancelled" && (
-                          <div className="mt-3 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-2.5 font-semibold flex items-center gap-2">
+                          <div className="mt-3 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-2.5 font-semibold flex flex-wrap items-center gap-1.5 min-w-0 break-words">
                             <span>❌ Order Cancelled. Reason:</span>
-                            <span className="font-bold">
+                            <span className="font-bold break-all">
                               {ord.cancelReason || (ord as any).cancelReason || "Item Out of Stock / Processing Issue"}
                             </span>
                           </div>
                         )}
 
-                        <div className="mt-4 space-y-3">
+                        <div className="mt-3.5 space-y-3">
                           {(ord.items || []).map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-4">
+                            <div key={idx} className="flex items-center gap-3 sm:gap-4 min-w-0">
                               <img
                                 src={item.image}
                                 alt={item.name}
-                                className="size-14 rounded-lg object-cover border border-border"
+                                className="size-12 sm:size-14 rounded-lg object-cover border border-border shrink-0"
                               />
-                              <div className="flex-1">
-                                <h5 className="font-display text-sm font-semibold text-foreground">{item.name}</h5>
-                                <p className="text-xs text-muted-foreground">
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-display text-xs sm:text-sm font-semibold text-foreground truncate">{item.name}</h5>
+                                <p className="text-[11px] sm:text-xs text-muted-foreground truncate mt-0.5">
                                   Size: <span className="text-gold font-bold">{item.size}</span> • Color: {item.color} • Qty: {item.quantity}
                                 </p>
                               </div>
-                              <span className="text-xs font-semibold text-foreground">
+                              <span className="text-xs sm:text-sm font-semibold text-foreground shrink-0 pl-1">
                                 ₹{(item.price * item.quantity).toLocaleString("en-IN")}
                               </span>
                             </div>
                           ))}
                         </div>
 
-                        <div className="mt-5 border-t border-border pt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                          <div>
-                            <p><span className="text-gold font-semibold">Address:</span> {ord.shippingAddress}</p>
-                            <p className="mt-0.5"><span className="text-gold font-semibold">Payment:</span> {ord.paymentMethod}</p>
+                        <div className="mt-4 border-t border-border pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-muted-foreground min-w-0">
+                          <div className="space-y-1 min-w-0 flex-1 break-words">
+                            <p className="break-words leading-relaxed"><span className="text-gold font-semibold">Address:</span> {ord.shippingAddress}</p>
+                            <p className="break-words leading-relaxed"><span className="text-gold font-semibold">Payment:</span> {ord.paymentMethod}</p>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
                             {ord.status !== "Cancelled" && ord.status !== "Delivered" && (
                               <button
                                 type="button"
@@ -1270,7 +1288,7 @@ export function UserDashboard() {
                                     bookingIdStr: String(ord._id || ord.id || "ORD").slice(-8).toUpperCase(),
                                   })
                                 }
-                                className="rounded-lg border border-destructive/60 bg-destructive/10 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all cursor-pointer shadow-sm"
+                                className="w-full sm:w-auto rounded-lg border border-destructive/60 bg-destructive/10 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all cursor-pointer shadow-sm text-center"
                               >
                                 Cancel Order
                               </button>
@@ -1287,7 +1305,7 @@ export function UserDashboard() {
                                     String(ord._id || ord.id || "ORD").slice(-8).toUpperCase()
                                   );
                                 }}
-                                className="rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                                className="w-full sm:w-auto rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
                                 title="Delete cancelled order record"
                               >
                                 <Trash2 className="size-3.5" /> Delete Order Record
@@ -1316,22 +1334,22 @@ export function UserDashboard() {
 
             {/* 3. ADDRESSES TAB */}
             {activeTab === "addresses" && (
-              <div className="space-y-6 max-w-3xl">
-                <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="space-y-6 max-w-3xl min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
                   <div>
-                    <h2 className="font-display text-2xl font-bold text-foreground">Addresses</h2>
+                    <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">Addresses</h2>
                     <p className="text-xs text-muted-foreground mt-1">Manage saved shipping locations for fast checkout.</p>
                   </div>
                   <button
                     onClick={() => setShowAddAddress(!showAddAddress)}
-                    className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold"
+                    className="btn-gold hover:btn-gold-hover inline-flex items-center justify-center gap-2 rounded-sm px-4 py-2.5 text-xs font-bold shrink-0 self-start sm:self-auto cursor-pointer shadow-sm"
                   >
                     <Plus className="size-4" /> Add New Address
                   </button>
                 </div>
 
                 {showAddAddress && (
-                  <form onSubmit={handleAddAddress} className="rounded-xl border border-gold/40 bg-surface/50 p-6 space-y-4">
+                  <form onSubmit={handleAddAddress} className="rounded-xl border border-gold/40 bg-surface/50 p-4 sm:p-6 space-y-4 shadow-sm min-w-0">
                     <h3 className="font-display text-base font-semibold text-foreground">New Delivery Location</h3>
 
                     {/* LOCATION TYPE CHIPS */}
@@ -1339,11 +1357,11 @@ export function UserDashboard() {
                       <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold block mb-2">
                         Address Category / Location Type
                       </label>
-                      <div className="flex flex-wrap items-center gap-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setNewAddressType("Home")}
-                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                          className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
                             newAddressType === "Home"
                               ? "border-gold bg-gold text-primary-foreground shadow-goldy"
                               : "border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
@@ -1355,7 +1373,7 @@ export function UserDashboard() {
                         <button
                           type="button"
                           onClick={() => setNewAddressType("Office")}
-                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                          className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
                             newAddressType === "Office"
                               ? "border-gold bg-gold text-primary-foreground shadow-goldy"
                               : "border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
@@ -1367,7 +1385,7 @@ export function UserDashboard() {
                         <button
                           type="button"
                           onClick={() => setNewAddressType("Other")}
-                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                          className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
                             newAddressType === "Other"
                               ? "border-gold bg-gold text-primary-foreground shadow-goldy"
                               : "border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
@@ -1401,7 +1419,7 @@ export function UserDashboard() {
                         className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
                       />
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-3">
                       <div>
                         <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">City</label>
                         <input
@@ -1435,7 +1453,7 @@ export function UserDashboard() {
                         />
                       </div>
                     </div>
-                    <button type="submit" className="btn-gold hover:btn-gold-hover rounded-sm px-6 py-2.5 text-xs font-bold">
+                    <button type="submit" className="btn-gold hover:btn-gold-hover w-full sm:w-auto rounded-sm px-6 py-2.5 text-xs font-bold cursor-pointer">
                       Save Location
                     </button>
                   </form>
@@ -1443,7 +1461,7 @@ export function UserDashboard() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   {savedAddresses.map((addr) => (
-                    <div key={addr.id} className="rounded-xl border border-gold/30 bg-card p-5 space-y-3 shadow-sm transition-all hover:border-gold/60 relative">
+                    <div key={addr.id} className="rounded-xl border border-gold/30 bg-card p-4 sm:p-5 space-y-3 shadow-sm transition-all hover:border-gold/60 relative min-w-0 overflow-hidden">
                       {editingAddressId === addr.id ? (
                         <form onSubmit={handleSaveEditAddress} className="space-y-3">
                           <div className="flex items-center justify-between border-b border-border pb-2">
@@ -1481,14 +1499,14 @@ export function UserDashboard() {
                             />
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                             <div>
                               <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">City</label>
                               <input
                                 type="text"
                                 value={editCity}
                                 onChange={(e) => setEditCity(e.target.value)}
-                                className="mt-1 w-full rounded-sm border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:border-gold"
+                                className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-gold"
                                 required
                               />
                             </div>
@@ -1498,7 +1516,7 @@ export function UserDashboard() {
                                 type="text"
                                 value={editState}
                                 onChange={(e) => setEditState(e.target.value)}
-                                className="mt-1 w-full rounded-sm border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:border-gold"
+                                className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-gold"
                                 required
                               />
                             </div>
@@ -1508,7 +1526,7 @@ export function UserDashboard() {
                                 type="text"
                                 value={editPincode}
                                 onChange={(e) => setEditPincode(e.target.value)}
-                                className="mt-1 w-full rounded-sm border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:border-gold font-mono"
+                                className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-gold font-mono"
                                 required
                               />
                             </div>
@@ -1525,7 +1543,7 @@ export function UserDashboard() {
                             />
                           </div>
 
-                          <div className="flex items-center gap-2 pt-2">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2">
                             <button
                               type="submit"
                               className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-2 text-xs font-bold uppercase tracking-wider cursor-pointer"
@@ -1543,25 +1561,25 @@ export function UserDashboard() {
                         </form>
                       ) : (
                         <>
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-display text-base font-bold text-foreground">{addr.name}</h4>
+                          <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+                            <h4 className="font-display text-base font-bold text-foreground truncate min-w-0">{addr.name}</h4>
                             {addr.isDefault && (
-                              <span className="rounded-full bg-gold/15 border border-gold/50 px-3 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider shadow-sm">
+                              <span className="rounded-full bg-gold/15 border border-gold/50 px-2.5 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider shrink-0 shadow-sm">
                                 Default
                               </span>
                             )}
                           </div>
 
-                          <p className="text-xs text-muted-foreground leading-relaxed">{addr.address}</p>
-                          <p className="text-xs text-muted-foreground">{addr.city}, {addr.state} — {addr.pincode}</p>
-                          <p className="text-xs text-gold font-mono font-bold pt-1">Phone: +91 {addr.mobile}</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed break-words">{addr.address}</p>
+                          <p className="text-xs text-muted-foreground break-words">{addr.city}, {addr.state} — {addr.pincode}</p>
+                          <p className="text-xs text-gold font-mono font-bold pt-0.5">Phone: +91 {addr.mobile}</p>
 
                           {/* ACTION BUTTONS ROW */}
-                          <div className="flex items-center gap-2 pt-4 border-t border-border/60 mt-3">
+                          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border/60 mt-3">
                             <button
                               type="button"
                               onClick={() => handleStartEditAddress(addr)}
-                              className="flex items-center gap-1.5 rounded-md border border-gold/50 bg-gold/10 px-3.5 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
+                              className="flex items-center justify-center gap-1.5 rounded-md border border-gold/50 bg-gold/10 px-3.5 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
                             >
                               <Edit3 className="size-3.5" /> Edit
                             </button>
@@ -1579,7 +1597,7 @@ export function UserDashboard() {
                             <button
                               type="button"
                               onClick={() => handleDeleteAddress(addr.id)}
-                              className="flex items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white transition-all ml-auto cursor-pointer"
+                              className="flex items-center justify-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white transition-all ml-auto cursor-pointer"
                               title="Delete Address"
                             >
                               <Trash2 className="size-3.5" /> Delete
@@ -1732,16 +1750,16 @@ export function UserDashboard() {
 
                 {/* PAGE STEP 1: ADDRESS DETAILS */}
                 {cartCheckoutStep === "address" && (
-                  <div className="space-y-6 max-w-2xl animate-in fade-in duration-300">
-                    <div className="flex items-center justify-between border-b border-border pb-4">
+                  <div className="space-y-6 max-w-2xl animate-in fade-in duration-300 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-2">
                       <div>
-                        <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Checkout Step 1 of 2</span>
-                        <h2 className="font-display text-2xl font-bold text-foreground">Delivery Address Details</h2>
+                        <span className="text-[10px] uppercase tracking-widest text-gold font-bold block">Checkout Step 1 of 2</span>
+                        <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">Delivery Address Details</h2>
                       </div>
                       <button
                         type="button"
                         onClick={() => setCartCheckoutStep("cart")}
-                        className="text-xs font-semibold uppercase tracking-wider text-gold hover:underline cursor-pointer"
+                        className="text-xs font-semibold uppercase tracking-wider text-gold hover:underline cursor-pointer self-start sm:self-auto"
                       >
                         ← Back to Cart
                       </button>
@@ -1754,14 +1772,14 @@ export function UserDashboard() {
                         setShippingAddress(fullAddr);
                         setCartCheckoutStep("payment");
                       }}
-                      className="rounded-xl border border-gold/40 bg-card p-6 shadow-sm space-y-5"
+                      className="rounded-xl border border-gold/40 bg-card p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5 min-w-0"
                     >
                       <div className="border-b border-border pb-3">
                         <h3 className="font-display text-base font-bold text-foreground">Enter Recipient & Shipping Address</h3>
                         <p className="text-xs text-muted-foreground">Please enter your complete address details before proceeding to payment.</p>
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-3.5 sm:grid-cols-2">
                         <div>
                           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Full Name *</label>
                           <input
@@ -1799,7 +1817,7 @@ export function UserDashboard() {
                         />
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-3">
+                      <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-3">
                         <div>
                           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">City *</label>
                           <input
@@ -2313,53 +2331,152 @@ export function UserDashboard() {
                     )}
                   </div>
                 ) : (
-                  /* DEFAULT CATALOG GRID */
+                  /* DEFAULT CATALOG GRID WITH FILTERS & NEW DROPS */
                   <>
-                    <div className="border-b border-border pb-4">
-                      <span className="text-[10px] uppercase tracking-widest text-gold font-bold">VEXA Collection</span>
-                      <h2 className="font-display text-2xl font-bold text-foreground">Book New Heavyweight Tee</h2>
-                      <p className="text-xs text-muted-foreground mt-1">Select any premium 240 GSM tee to configure size, address & place a direct booking.</p>
-                    </div>
-
-                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                      {products.map((p) => (
-                        <div
-                          key={p.id}
-                          onClick={() => {
-                            setSelectedProduct(p);
-                            setIsCartCheckout(false);
-                            setSelectedSize("M");
-                            setQuantity(1);
-                            setOrderSuccessMsg("");
-                          }}
-                          className="group cursor-pointer rounded-xl border border-border bg-background p-4 transition-all duration-300 hover:border-gold hover:shadow-goldy space-y-3"
-                        >
-                          <div className="relative overflow-hidden rounded-lg">
-                            <img
-                              src={p.image}
-                              alt={p.name}
-                              className="h-48 w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                            <span className="absolute top-2 left-2 rounded-full bg-gold/90 text-primary-foreground px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
-                              {p.category}
-                            </span>
-                          </div>
-
-                          <div className="space-y-1">
-                            <h4 className="font-display text-sm font-semibold text-foreground group-hover:text-gold transition-colors">
-                              {p.name}
-                            </h4>
-                            <p className="text-[11px] text-muted-foreground font-semibold">Color: {p.color}</p>
-                            <div className="flex items-center justify-between pt-1">
-                              <span className="font-display text-base font-bold text-gold">₹{p.price.toLocaleString("en-IN")}</span>
-                              <span className="btn-gold rounded px-3 py-1 text-[10px] uppercase font-bold tracking-wider">
-                                Book Now
-                              </span>
-                            </div>
-                          </div>
+                    <div className="border-b border-border pb-4 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5">
+                            <Sparkles className="size-3.5" /> VEXA Premium Catalog
+                          </span>
+                          <h2 className="font-display text-2xl font-bold text-foreground">Book New Heavyweight Tee</h2>
                         </div>
-                      ))}
+                        
+                        {/* Search Input */}
+                        <div className="relative max-w-xs w-full">
+                          <input
+                            type="text"
+                            placeholder="Search color or name..."
+                            value={bookingSearchQuery}
+                            onChange={(e) => setBookingSearchQuery(e.target.value)}
+                            className="w-full rounded-lg border border-border bg-background px-3.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none"
+                          />
+                          {bookingSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setBookingSearchQuery("")}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">Select any premium 240 GSM drop to configure custom size, delivery address & place a direct order booking.</p>
+
+                      {/* Category Filter Pills */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {["All", "Limited", "Oversized", "Classic"].map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setBookingCategoryFilter(cat)}
+                            className={`rounded-full px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                              bookingCategoryFilter === cat
+                                ? "bg-gold text-primary-foreground shadow-goldy"
+                                : "bg-surface border border-border text-muted-foreground hover:border-gold hover:text-foreground"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                        <span className="ml-auto text-[11px] text-muted-foreground font-semibold">
+                          Showing <span className="text-gold font-bold">{bookingDisplayProducts.length}</span> Products
+                        </span>
+                      </div>
                     </div>
+
+                    {bookingDisplayProducts.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-border bg-card/40 p-12 text-center space-y-2">
+                        <p className="text-sm font-semibold text-foreground">No products found matching "{bookingSearchQuery}"</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBookingCategoryFilter("All");
+                            setBookingSearchQuery("");
+                          }}
+                          className="text-xs text-gold font-bold hover:underline cursor-pointer"
+                        >
+                          Clear Filters & View All Products
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {bookingDisplayProducts.map((p) => {
+                          const discountPercent = p.oldPrice && p.oldPrice > p.price 
+                            ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100)
+                            : 0;
+
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => {
+                                setSelectedProduct(p);
+                                setIsCartCheckout(false);
+                                setSelectedSize("M");
+                                setQuantity(1);
+                                setOrderSuccessMsg("");
+                              }}
+                              className="group cursor-pointer rounded-xl border border-border bg-background p-4 transition-all duration-300 hover:border-gold hover:shadow-goldy space-y-3 relative flex flex-col justify-between"
+                            >
+                              <div className="space-y-3">
+                                <div className="relative overflow-hidden rounded-lg bg-surface/50">
+                                  <img
+                                    src={p.image}
+                                    alt={p.name}
+                                    className="h-52 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  />
+                                  <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                    <span className="rounded-full bg-gold/90 text-primary-foreground px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shadow-sm">
+                                      {p.category}
+                                    </span>
+                                  </div>
+
+                                  {discountPercent > 0 && (
+                                    <span className="absolute top-2 right-2 rounded-md bg-black/70 backdrop-blur-md border border-gold/40 text-gold px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">
+                                      {discountPercent}% OFF
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                                      240 GSM Heavyweight
+                                    </span>
+                                    <span className="text-[10px] text-gold font-bold">★ {p.rating.toFixed(1)}</span>
+                                  </div>
+
+                                  <h4 className="font-display text-sm font-bold text-foreground group-hover:text-gold transition-colors leading-tight">
+                                    {p.name}
+                                  </h4>
+                                  <p className="text-[11px] text-muted-foreground font-medium">
+                                    Color: <span className="text-foreground font-semibold">{p.color}</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-2">
+                                <div>
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="font-display text-base font-bold text-gold">₹{p.price.toLocaleString("en-IN")}</span>
+                                    {p.oldPrice > p.price && (
+                                      <span className="text-[11px] text-muted-foreground line-through">₹{p.oldPrice.toLocaleString("en-IN")}</span>
+                                    )}
+                                  </div>
+                                  <p className="text-[9px] text-emerald-500 font-semibold">In Stock ({p.stock || 12} left)</p>
+                                </div>
+
+                                <span className="btn-gold rounded-sm px-3.5 py-1.5 text-[10px] uppercase font-bold tracking-wider group-hover:bg-gold-hover shadow-sm">
+                                  Book Now →
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

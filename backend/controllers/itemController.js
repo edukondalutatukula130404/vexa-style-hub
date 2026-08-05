@@ -87,3 +87,64 @@ exports.deleteItem = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Seed initial items if DB empty
+exports.seedItems = async () => {
+  try {
+    const count = await Item.countDocuments();
+    if (count === 0) {
+      console.log('📦 Seeding initial VEXA Heavyweight T-Shirt collection items...');
+      const defaultItems = [
+        {
+          name: 'Emerald Acid Wash Boxy Tee',
+          description: '240 GSM heavyweight cotton with custom emerald acid wash texture and drop-shoulder silhouette.',
+          price: 1899,
+          category: 'Limited',
+          collectionType: 'Oversized 240 GSM',
+          image: '',
+          inStock: true
+        },
+        {
+          name: 'Lavender Lilac Drop-Shoulder Tee',
+          description: '240 GSM combed cotton in pastel lilac tone with luxury heavy rib collar.',
+          price: 1699,
+          category: 'Oversized',
+          collectionType: 'Oversized 240 GSM',
+          image: '',
+          inStock: true
+        },
+        {
+          name: 'Gold-Embroidered Luxe Tee',
+          description: 'High-density 240 GSM luxury cream cotton featuring metallic gold chest embroidery.',
+          price: 1799,
+          category: 'Limited',
+          collectionType: 'Limited Edition',
+          image: '',
+          inStock: true
+        },
+        {
+          name: 'Vintage Rust Heavyweight Tee',
+          description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
+          price: 1699,
+          category: 'Oversized',
+          collectionType: 'Explore Collections',
+          image: '',
+          inStock: true
+        },
+        {
+          name: 'Obsidian Stealth Oversized Tee',
+          description: 'Deep obsidian black 240 GSM pre-shrunk cotton with subtle tone-on-tone silicone branding.',
+          price: 1499,
+          category: 'Oversized',
+          collectionType: 'Explore Collections',
+          image: '',
+          inStock: true
+        }
+      ];
+      await Item.insertMany(defaultItems);
+      console.log('✅ Default VEXA items seeded successfully into database');
+    }
+  } catch (err) {
+    console.error('Error seeding items:', err.message);
+  }
+};

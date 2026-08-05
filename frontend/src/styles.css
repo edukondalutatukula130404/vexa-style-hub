@@ -79,6 +79,13 @@
   --shadow-deep: 0 25px 60px -25px oklch(0 0 0 / 12%);
 }
 
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  max-width: 100vw;
+  -webkit-tap-highlight-color: transparent;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -89,6 +96,9 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
   }
 
   h1,

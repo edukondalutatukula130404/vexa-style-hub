@@ -363,13 +363,13 @@ export function ProductDetailPage() {
                 alt={`${product.name} in ${selectedColor.name}`}
                 className="h-[480px] sm:h-[580px] w-full object-cover object-center transition-all duration-700 group-hover:scale-105 animate-in fade-in duration-300"
               />
-              <span className="absolute left-5 top-5 rounded-full border border-gold/50 bg-black/85 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-gold">
+              <span className="absolute left-5 top-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-md">
                 {product.category} Collection
               </span>
               <span className="btn-gold absolute right-5 top-5 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider">
                 {discountOff}% OFF
               </span>
-              <span className="absolute bottom-5 left-5 rounded-full border border-gold/40 bg-black/85 px-4 py-1.5 text-[10px] font-semibold text-gold">
+              <span className="absolute bottom-5 left-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold text-[#1c1917] shadow-md">
                 240 GSM Heavyweight Cotton
               </span>
             </div>

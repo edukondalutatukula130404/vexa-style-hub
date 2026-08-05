@@ -215,10 +215,8 @@ export function Home() {
 
   const filteredProducts = useMemo(() => {
     // Exclude New Arrivals items so Featured Collection shows distinct, non-duplicate tees
-    const remainingProducts = products.filter((p) => !newArrivalIds.has(p.id));
-    if (selectedCategory === "All") return remainingProducts;
-    return remainingProducts.filter((p) => p.category === selectedCategory);
-  }, [products, selectedCategory, newArrivalIds]);
+    return products.filter((p) => !newArrivalIds.has(p.id));
+  }, [products, newArrivalIds]);
 
   return (
     <>
@@ -232,7 +230,7 @@ export function Home() {
             decoding="async"
             width={1600}
             height={1104}
-            className="h-full w-full object-cover opacity-25 mix-blend-multiply transition-opacity duration-700"
+            className="h-full w-full object-cover opacity-25 mix-blend-multiply blur-md scale-105 transition-all duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/70 to-background" />
         </div>
@@ -281,7 +279,7 @@ export function Home() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
 
-                  <span className="absolute left-3.5 top-3.5 sm:left-5 sm:top-5 rounded-full border border-gold/50 bg-black/85 px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-gold shadow-sm">
+                  <span className="absolute left-3.5 top-3.5 sm:left-5 sm:top-5 rounded-full border border-gold/60 bg-[#f4efe6] px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#1c1917] shadow-md">
                     {heroBanners[heroIndex]?.badgeText || "Signature Drop"}
                   </span>
 
@@ -298,12 +296,7 @@ export function Home() {
           </div>
         </div>
 
-        {/* PROMO ANNOUNCEMENT BANNER */}
-        <div className="bg-gradient-to-r from-gold/30 via-gold to-gold/30 py-2.5 px-4 text-center border-y border-gold/40 shadow-sm">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground">
-            ✨ SPECIAL OFFER: FLAT 30% OFF ON ALL OVERSIZED TEES | FREE EXPRESS SHIPPING NATIONWIDE ✨
-          </p>
-        </div>
+
 
         {/* marquee */}
         <div className="relative overflow-hidden border-b border-border py-4">
@@ -342,12 +335,12 @@ export function Home() {
         </Reveal>
 
         {/* 2x2 Grid Features Section (2 in line 1, 2 in line 2) */}
-        <div className="mt-10 grid grid-cols-2 gap-3.5 sm:gap-6 lg:grid-cols-4">
+        <div className="mt-10 grid grid-cols-2 gap-3.5 sm:gap-6 lg:grid-cols-4 items-stretch">
           {features.map((f, i) => {
             const Icon = f.icon;
             return (
-              <Reveal key={f.title} delay={i * 90}>
-                <div className="group h-full rounded-2xl border border-gold/40 bg-card p-5 sm:p-8 text-center shadow-goldy transition-all duration-300 hover:-translate-y-1 hover:border-gold">
+              <Reveal key={f.title} delay={i * 90} className="h-full w-full flex flex-col">
+                <div className="group flex h-full w-full flex-col items-center justify-center rounded-2xl border border-gold/40 bg-card p-5 sm:p-8 text-center shadow-goldy transition-all duration-300 hover:-translate-y-1 hover:border-gold">
                   <div className="mx-auto flex size-12 sm:size-14 items-center justify-center rounded-2xl border border-gold/50 bg-gold/15 text-gold shadow-sm transition-transform group-hover:scale-110">
                     <Icon className="size-6 sm:size-7 text-gold" />
                   </div>
@@ -385,7 +378,7 @@ export function Home() {
 
             {/* Banner Text Overlay */}
             <div className="relative z-10 flex h-full min-h-[360px] sm:min-h-[420px] lg:min-h-[460px] max-w-2xl flex-col justify-center p-6 sm:p-12 lg:p-16">
-              <span className="inline-block w-fit rounded-full border border-gold/50 bg-gold/15 px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-gold shadow-sm">
+              <span className="inline-block w-fit rounded-full border border-gold/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-md">
                 {activePromoBanners[bannerIndex].tag}
               </span>
 
@@ -461,22 +454,7 @@ export function Home() {
           </Link>
         </Reveal>
 
-        {/* Category Tabs (Non-scrolling 4-column grid on mobile) */}
-        <div className="mt-8 grid grid-cols-4 gap-1.5 sm:flex sm:w-auto sm:items-center sm:gap-2">
-          {["All", "Oversized", "Classic", "Limited"].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`w-full rounded-full py-2 px-1 text-[9px] sm:px-5 sm:text-[10px] font-semibold uppercase tracking-wider sm:tracking-[0.2em] transition-all duration-300 text-center ${
-                selectedCategory === cat
-                  ? "bg-gold text-primary-foreground shadow-goldy font-bold"
-                  : "border border-border bg-card text-muted-foreground hover:border-gold hover:text-gold"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+
 
         {/* Featured Products List (Side scrolling on mobile, grid on desktop) */}
         <div
@@ -484,8 +462,8 @@ export function Home() {
           className="mt-10 flex overflow-x-auto gap-5 pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:grid sm:gap-8 sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-3 xl:grid-cols-4"
         >
           {filteredProducts.map((p, i) => (
-            <div key={p.id} className="w-[280px] shrink-0 snap-start mobile-snap-item sm:w-auto sm:shrink sm:snap-none">
-              <Reveal delay={(i % 4) * 90}>
+            <div key={p.id} className="w-[280px] shrink-0 snap-start mobile-snap-item sm:w-auto sm:shrink sm:snap-none flex flex-col h-full">
+              <Reveal delay={(i % 4) * 90} className="h-full w-full flex flex-col">
                 <ProductCard product={p} />
               </Reveal>
             </div>

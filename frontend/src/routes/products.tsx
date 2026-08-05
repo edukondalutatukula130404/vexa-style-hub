@@ -111,7 +111,7 @@ export function Products() {
       {list.length > 0 ? (
         <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {list.map((p, i) => (
-            <Reveal key={p.id} delay={(i % 4) * 90}>
+            <Reveal key={p.id} delay={(i % 4) * 90} className="h-full w-full flex flex-col">
               <ProductCard product={p} />
             </Reveal>
           ))}

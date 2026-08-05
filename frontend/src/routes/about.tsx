@@ -54,16 +54,7 @@ export function About() {
   return (
     <>
       {/* HERO SECTION */}
-      <section className="relative overflow-hidden border-b border-border">
-        <img
-          src={heroImg}
-          alt="VEXA studio display of premium t-shirts"
-          loading="lazy"
-          decoding="async"
-          width={1600}
-          height={1104}
-          className="absolute inset-0 h-full w-full object-cover opacity-20 transition-opacity duration-700"
-        />
+      <section className="relative overflow-hidden border-b border-border bg-background">
         <div className="relative mx-auto max-w-4xl px-5 py-24 text-center">
           <Reveal>
             <p className="text-[10px] uppercase tracking-[0.35em] text-gold font-semibold">Est. 2024 • Bengaluru, India</p>
@@ -81,10 +72,10 @@ export function About() {
 
       {/* STATS HIGHLIGHT */}
       <section className="mx-auto max-w-7xl px-5 py-20">
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
           {stats.map((s, i) => (
-            <Reveal key={s.l} delay={i * 100}>
-              <div className="rounded-xl border border-border bg-card p-8 text-center transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy">
+            <Reveal key={s.l} delay={i * 100} className="h-full w-full flex flex-col">
+              <div className="flex h-full min-h-[140px] w-full flex-col items-center justify-center rounded-xl border border-border bg-card p-6 sm:p-8 text-center transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy">
                 <p className="font-display text-3xl font-bold text-gold-gradient">{s.k}</p>
                 <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground font-medium">
                   {s.l}

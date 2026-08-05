@@ -49,9 +49,9 @@ export function ProductCard({ product }: { product: Product }) {
     <>
       <article
         onClick={handleCardClick}
-        className="group relative cursor-pointer overflow-hidden rounded-sm border border-border bg-card transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy flex flex-col justify-between"
+        className="group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy flex flex-col justify-between h-full w-full"
       >
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden shrink-0">
           <img
             src={product.image}
             alt={`${product.name} in ${product.color}`}
@@ -61,7 +61,7 @@ export function ProductCard({ product }: { product: Product }) {
             height={1100}
             className="h-[280px] xs:h-[320px] sm:h-[360px] w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
-          <span className="absolute left-4 top-4 rounded-full border border-gold/60 bg-black/85 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-gold">
+          <span className="absolute left-4 top-4 rounded-full border border-gold/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[#1c1917] font-extrabold shadow-md">
             {product.category}
           </span>
           <span className="btn-gold absolute right-4 top-4 rounded-full px-3 py-1 text-[10px]">
@@ -89,20 +89,23 @@ export function ProductCard({ product }: { product: Product }) {
           </div>
         </div>
 
-        <div className="space-y-2 p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-base text-foreground group-hover:text-gold transition-colors">
-              {product.name}
-            </h3>
-            <span className="flex items-center gap-1 text-xs text-gold font-bold">
-              <Star className="size-3 fill-current text-gold" />
-              {product.rating}
-            </span>
+        <div className="space-y-3 p-5 flex-1 flex flex-col justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-display text-base font-bold text-foreground group-hover:text-gold transition-colors line-clamp-2 min-h-[2.8rem] flex items-center">
+                {product.name}
+              </h3>
+              <span className="flex items-center gap-1 text-xs text-gold font-bold shrink-0 pt-0.5">
+                <Star className="size-3 fill-current text-gold" />
+                {product.rating}
+              </span>
+            </div>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              {product.color}
+            </p>
           </div>
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            {product.color}
-          </p>
-          <div className="flex items-baseline justify-between pt-1">
+
+          <div className="flex items-baseline justify-between pt-2 border-t border-border/30 mt-auto">
             <div className="flex items-baseline gap-2">
               <span className="text-lg font-bold text-gold">₹{product.price.toLocaleString("en-IN")}</span>
               <span className="text-sm text-muted-foreground line-through">
@@ -150,7 +153,7 @@ export function ProductCard({ product }: { product: Product }) {
                     alt={product.name}
                     className="h-80 sm:h-96 w-full object-cover"
                   />
-                  <span className="absolute left-3 top-3 rounded-full border border-gold/60 bg-black/85 px-3 py-1 text-[10px] uppercase tracking-wider text-gold">
+                  <span className="absolute left-3 top-3 rounded-full border border-gold/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] uppercase tracking-wider text-[#1c1917] font-extrabold shadow-md">
                     {product.category}
                   </span>
                   <span className="btn-gold absolute right-3 top-3 rounded-full px-3 py-1 text-[10px] font-bold">

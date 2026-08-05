@@ -82,6 +82,8 @@ export function UserDashboard() {
     });
   }, [allProducts, bookingCategoryFilter, bookingSearchQuery]);
   
+  const [searchParams] = useSearchParams();
+
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -90,18 +92,15 @@ export function UserDashboard() {
         return tabParam as TabType;
       }
     }
-    return "orders";
+    return "profile";
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get("tab");
-      if (tabParam && ["profile", "orders", "addresses", "cart", "support"].includes(tabParam)) {
-        setActiveTab(tabParam as TabType);
-      }
+    const tabParam = searchParams.get("tab");
+    if (tabParam && ["profile", "orders", "addresses", "cart", "support", "booking"].includes(tabParam)) {
+      setActiveTab(tabParam as TabType);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -859,8 +858,8 @@ export function UserDashboard() {
     <div className="min-h-screen bg-background pt-24 sm:pt-28 pb-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* PAGE HEADER BANNER */}
-        <div className="border-b border-border pb-6">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">MY ACCOUNT</h1>
+        <div className="pb-6">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">MY PROFILE</h1>
           <div className="mt-3">
             <Link
               to="/"
@@ -872,9 +871,9 @@ export function UserDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:gap-8 lg:grid-cols-[280px_1fr]">
+        <div className="grid gap-6 lg:gap-8 lg:grid-cols-[280px_1fr] items-start">
           {/* MOBILE RESPONSIVE TAB STRIP (< lg) */}
-          <div className="lg:hidden space-y-3">
+          <div className="lg:hidden space-y-3 sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-2">
             {/* Interactive Profile Card - Clicking opens Dashboard Sections slide-down */}
             <button
               type="button"
@@ -938,8 +937,8 @@ export function UserDashboard() {
             </div>
           </div>
 
-          {/* DESKTOP SIDEBAR (>= lg) */}
-          <aside className="hidden lg:block h-fit rounded-xl border border-border bg-card p-6 shadow-sm">
+          {/* DESKTOP SIDEBAR (>= lg): Sticky Positioned */}
+          <aside className="hidden lg:block sticky top-24 h-fit rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-3 border-b border-border pb-6">
               {profilePic ? (
                 <img src={profilePic} alt={profileName} className="size-11 rounded-full object-cover border border-gold shadow-sm shrink-0" />
@@ -984,8 +983,8 @@ export function UserDashboard() {
             </nav>
           </aside>
 
-          {/* MAIN TAB CONTENT AREA */}
-          <main className="min-h-[520px] rounded-xl border border-border bg-card p-3.5 sm:p-8 shadow-sm min-w-0 overflow-hidden">
+          {/* MAIN TAB CONTENT AREA: Independent scrollable container on desktop */}
+          <main className="min-h-[520px] rounded-xl border border-border bg-card p-3.5 sm:p-8 shadow-sm min-w-0 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto">
             {/* 1. MY PROFILE TAB */}
             {activeTab === "profile" && (
               <div className="space-y-6 max-w-2xl">
@@ -2428,7 +2427,7 @@ export function UserDashboard() {
                                     className="h-52 w-full object-cover transition-transform duration-500 group-hover:scale-105"
                                   />
                                   <div className="absolute top-2 left-2 flex flex-col gap-1">
-                                    <span className="rounded-full bg-gold/90 text-primary-foreground px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shadow-sm">
+                                    <span className="rounded-full border border-gold/60 bg-[#f4efe6] px-3 py-1 text-[9px] font-extrabold uppercase tracking-wider text-[#1c1917] shadow-md">
                                       {p.category}
                                     </span>
                                   </div>

@@ -161,6 +161,18 @@ export function mapDbItemToProduct(item: any): Product {
   };
 }
 
+function deduplicateProductKeys(list: Product[]): Product[] {
+  const seenIds = new Set<string>();
+  return list.map((item, idx) => {
+    let uniqueId = item.id || `prod-${idx}`;
+    if (seenIds.has(uniqueId)) {
+      uniqueId = `${item.id}-dup-${idx}`;
+    }
+    seenIds.add(uniqueId);
+    return { ...item, id: uniqueId };
+  });
+}
+
 export function useProducts() {
   const [allProducts, setAllProducts] = useState<Product[]>(() => {
     // Initial sync from localStorage custom items
@@ -182,7 +194,7 @@ export function useProducts() {
     const filteredDefaults = products.filter(
       (p) => !dbNames.has(p.name.toLowerCase())
     );
-    return [...localCustom, ...filteredDefaults];
+    return deduplicateProductKeys([...localCustom, ...filteredDefaults]);
   });
 
   const [loading, setLoading] = useState(true);
@@ -232,7 +244,7 @@ export function useProducts() {
       (p) => !customNames.has(p.name.toLowerCase())
     );
 
-    setAllProducts([...combinedCustom, ...filteredDefaults]);
+    setAllProducts(deduplicateProductKeys([...combinedCustom, ...filteredDefaults]));
     setLoading(false);
   };
 

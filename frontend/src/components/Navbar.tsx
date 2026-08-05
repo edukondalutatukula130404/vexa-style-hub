@@ -1,13 +1,13 @@
 import { Link, NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Menu, X, ShoppingCart, User, LogOut, ChevronRight } from "lucide-react";
+import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 
 const baseLinks = [
   { to: "/", label: "Home" },
-  { to: "/products", label: "Products" },
   { to: "/about", label: "About Us" },
+  { to: "/products", label: "Products" },
   { to: "/contact", label: "Contact Us" },
   { to: "/faq", label: "FAQ" },
 ];
@@ -58,7 +58,7 @@ export function Navbar() {
     return null;
   }
 
-  const accountPath = isAdmin ? "/admin" : "/dashboard";
+  const accountPath = isAdmin ? "/admin" : "/dashboard?tab=profile";
 
   return (
     <>
@@ -126,14 +126,26 @@ export function Navbar() {
               )}
             </Link>
 
-            {/* Desktop Web App: Three-Lines Icon -> Opens My Account Page */}
-            <Link
-              to={isLoggedIn ? accountPath : "/login"}
-              className="hidden lg:flex items-center justify-center p-2.5 rounded-sm border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
-              title={isLoggedIn ? (isAdmin ? "Admin Portal" : "My Account Dashboard") : "Login / Account"}
-            >
-              <Menu className="size-5" />
-            </Link>
+            {/* Desktop Web App: Login / Profile Button */}
+            {isLoggedIn ? (
+              <Link
+                to={accountPath}
+                className="btn-outline-gold hidden lg:inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold hover:bg-gold hover:text-primary-foreground transition-all shadow-sm cursor-pointer"
+                title={isAdmin ? "Admin Portal" : "My Profile Dashboard"}
+              >
+                <User className="size-4" />
+                <span>{isAdmin ? "Admin Portal" : "Profile"}</span>
+                <ChevronDown className="size-3.5" />
+              </Link>
+            ) : (
+              <Link
+                to="/login"
+                className="btn-gold hover:btn-gold-hover hidden lg:inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition-all shadow-goldy cursor-pointer active:scale-95"
+              >
+                <User className="size-4" />
+                <span>Login</span>
+              </Link>
+            )}
 
             {/* Mobile View: Three-Lines Icon -> Opens Right Slide-Over Navigation Drawer */}
             <button
@@ -143,7 +155,7 @@ export function Navbar() {
               className="flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
               title="Toggle Menu"
             >
-              {open ? <X className="size-5" /> : <Menu className="size-5" />}
+              {open ? <ChevronDown className="size-5" /> : <Menu className="size-5" />}
             </button>
           </div>
         </nav>
@@ -177,7 +189,7 @@ export function Navbar() {
             className="flex size-8 items-center justify-center rounded-full border border-gold/40 bg-gold/10 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer"
             title="Close Menu"
           >
-            <X className="size-4" />
+            <ChevronDown className="size-4" />
           </button>
         </div>
 
@@ -221,7 +233,7 @@ export function Navbar() {
                   className="flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.2em] text-gold hover:bg-gold hover:text-primary-foreground transition-all"
                 >
                   <User className="size-4 shrink-0" />
-                  <span>{isAdmin ? "Admin Portal" : "My Account"}</span>
+                  <span>{isAdmin ? "Admin Portal" : "Profile"}</span>
                 </Link>
                 <button
                   type="button"

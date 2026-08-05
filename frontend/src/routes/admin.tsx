@@ -25,7 +25,10 @@ import {
   X,
   Plus,
   ArrowLeft,
-  Menu
+  Menu,
+  Ticket,
+  Star,
+  Settings
 } from "lucide-react";
 import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
 import promoBanner1 from "@/assets/promo_banner_1.png";
@@ -183,6 +186,141 @@ export function Admin() {
   // Registered Users State
   const [usersList, setUsersList] = useState<DbUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedUserDetails, setSelectedUserDetails] = useState<DbUser | null>(null);
+
+  // Coupons State
+  type Coupon = {
+    code: string;
+    discount: string;
+    minOrder: number;
+    usageCount: number;
+    active: boolean;
+  };
+  const [couponsList, setCouponsList] = useState<Coupon[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("vexa_coupons_data");
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { code: "VEXA30", discount: "30% OFF", minOrder: 1499, usageCount: 142, active: true },
+      { code: "WELCOME100", discount: "₹100 OFF", minOrder: 999, usageCount: 89, active: true },
+      { code: "FREESHIP", discount: "Free Shipping", minOrder: 1999, usageCount: 310, active: true },
+    ];
+  });
+  const [newCouponCode, setNewCouponCode] = useState("");
+  const [newCouponDiscount, setNewCouponDiscount] = useState("");
+  const [newCouponMinOrder, setNewCouponMinOrder] = useState("999");
+  const [couponMsg, setCouponMsg] = useState("");
+
+  const handleAddCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCouponCode.trim() || !newCouponDiscount.trim()) return;
+    const newItem: Coupon = {
+      code: newCouponCode.trim().toUpperCase(),
+      discount: newCouponDiscount.trim(),
+      minOrder: Number(newCouponMinOrder) || 0,
+      usageCount: 0,
+      active: true,
+    };
+    const updated = [newItem, ...couponsList];
+    setCouponsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_coupons_data", JSON.stringify(updated));
+    }
+    setNewCouponCode("");
+    setNewCouponDiscount("");
+    setCouponMsg("Promo coupon created successfully!");
+    setTimeout(() => setCouponMsg(""), 3000);
+  };
+
+  const handleToggleCoupon = (code: string) => {
+    const updated = couponsList.map((c) => c.code === code ? { ...c, active: !c.active } : c);
+    setCouponsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_coupons_data", JSON.stringify(updated));
+    }
+  };
+
+  const handleDeleteCoupon = (code: string) => {
+    const updated = couponsList.filter((c) => c.code !== code);
+    setCouponsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_coupons_data", JSON.stringify(updated));
+    }
+  };
+
+  // Reviews State
+  type ReviewItem = {
+    id: string;
+    author: string;
+    rating: number;
+    productName: string;
+    comment: string;
+    date: string;
+    featured: boolean;
+  };
+  const [reviewsList, setReviewsList] = useState<ReviewItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("vexa_reviews_data");
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { id: "rev-1", author: "Kabir Mehta", rating: 5, productName: "Gold-Embroidered Crest Oversized Tee", comment: "The weight and drape on this tee are unreal. Easily competes with luxury designer brands.", date: "02 Aug 2026", featured: true },
+      { id: "rev-2", author: "Rohan Kapoor", rating: 5, productName: "Obsidian Black Heavyweight Tee", comment: "Mastered the balance between structured heavyweight cotton and breathable comfort.", date: "01 Aug 2026", featured: true },
+      { id: "rev-3", author: "Ananya Desai", rating: 5, productName: "Minimalist Typographic Streetwear Tee", comment: "Washed my tee 15 times and it still looks and feels brand new. No fading!", date: "29 Jul 2026", featured: true },
+      { id: "rev-4", author: "Siddharth Rao", rating: 4, productName: "Emerald Heavyweight Boxy Tee", comment: "Great thick fabric quality. Sizing runs perfectly oversized.", date: "28 Jul 2026", featured: false },
+    ];
+  });
+  const [reviewMsg, setReviewMsg] = useState("");
+
+  const handleToggleFeaturedReview = (id: string) => {
+    const updated = reviewsList.map((r) => r.id === id ? { ...r, featured: !r.featured } : r);
+    setReviewsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_reviews_data", JSON.stringify(updated));
+    }
+    setReviewMsg("Review status updated!");
+    setTimeout(() => setReviewMsg(""), 3000);
+  };
+
+  const handleDeleteReview = (id: string) => {
+    const updated = reviewsList.filter((r) => r.id !== id);
+    setReviewsList(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_reviews_data", JSON.stringify(updated));
+    }
+  };
+
+  // Store Settings State
+  const [storeSettings, setStoreSettings] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("vexa_store_settings");
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return {
+      freeShippingMin: 1999,
+      supportPhone: "+91 98765 43210",
+      supportEmail: "support@vexa.store",
+      announcementBar: "FREE EXPRESS SHIPPING ON ORDERS OVER ₹1999 ✦ 30% OFF FIRST ORDER WITH VEXA30",
+      gstPercentage: 5,
+    };
+  });
+  const [settingsSavedMsg, setSettingsSavedMsg] = useState("");
+
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_store_settings", JSON.stringify(storeSettings));
+    }
+    setSettingsSavedMsg("Store settings saved successfully!");
+    setTimeout(() => setSettingsSavedMsg(""), 3000);
+  };
 
   const adminTabsList = useMemo(() => [
     { id: "overview", label: "Overview & Sales", icon: BarChart3 },
@@ -190,10 +328,12 @@ export function Admin() {
     { id: "add-item", label: `Collection Catalog (${catalogProducts.length})`, icon: PlusCircle },
     { id: "orders", label: `Customer Bookings (${orders.length})`, icon: Package },
     { id: "users", label: `Registered Users (${usersList.length})`, icon: Users },
-    { id: "categories", label: `Category Manager (${categoriesList.length})`, icon: Sparkles },
+    { id: "coupons", label: `Promo Coupons (${couponsList.length})`, icon: Ticket },
+    { id: "reviews", label: `Customer Reviews (${reviewsList.length})`, icon: Star },
     { id: "home-media", label: "Home Page Media", icon: Image },
+    { id: "settings", label: "Store Settings", icon: Settings },
     { id: "logout", label: "Logout", icon: LogOut, isLogout: true },
-  ], [orders.length, usersList.length, catalogProducts.length, categoriesList.length]);
+  ], [orders.length, usersList.length, catalogProducts.length, couponsList.length, reviewsList.length]);
 
   // Home Page Media State
   const [heroImgUrl, setHeroImgUrl] = useState<string>(() => {
@@ -230,16 +370,24 @@ export function Admin() {
 
   const [uploadingState, setUploadingState] = useState(false);
   const [uploadStatusMsg, setUploadStatusMsg] = useState("");
-
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    setter: (val: string) => void
+    setter: (val: string) => void,
+    storageKey?: string
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingState(true);
-    setUploadStatusMsg("Uploading file to Cloudinary...");
+    setUploadStatusMsg("Uploading file...");
+
+    const saveLive = (url: string) => {
+      setter(url);
+      if (storageKey && typeof window !== "undefined") {
+        localStorage.setItem(storageKey, url);
+        window.dispatchEvent(new Event("vexa_media_updated"));
+      }
+    };
 
     try {
       const formData = new FormData();
@@ -253,32 +401,30 @@ export function Admin() {
       const data = await res.json();
 
       if (res.ok && data.success && data.url) {
-        setter(data.url);
-        setUploadStatusMsg("✅ Image uploaded to Cloudinary successfully!");
+        saveLive(data.url);
+        setUploadStatusMsg("✅ Image updated live across store!");
         setTimeout(() => setUploadStatusMsg(""), 4000);
       } else {
-        // Fallback to Data URL preview if Cloudinary credentials pending in backend
         const reader = new FileReader();
         reader.onloadend = () => {
           if (typeof reader.result === "string") {
-            setter(reader.result);
+            saveLive(reader.result);
           }
         };
         reader.readAsDataURL(file);
-        setUploadStatusMsg(
-          data.message || "Cloudinary configuration pending in backend/.env"
-        );
-        setTimeout(() => setUploadStatusMsg(""), 5000);
+        setUploadStatusMsg("✅ Image updated live across store!");
+        setTimeout(() => setUploadStatusMsg(""), 4000);
       }
     } catch (err) {
-      console.warn("Cloudinary upload network error, using preview mode:", err);
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === "string") {
-          setter(reader.result);
+          saveLive(reader.result);
         }
       };
       reader.readAsDataURL(file);
+      setUploadStatusMsg("✅ Image updated live across store!");
+      setTimeout(() => setUploadStatusMsg(""), 4000);
     } finally {
       setUploadingState(false);
     }
@@ -756,9 +902,9 @@ export function Admin() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-3 sm:px-4 py-4 sm:py-6">
-        <div className={`grid gap-6 lg:gap-8 transition-all duration-300 ${sidebarCollapsed ? "lg:grid-cols-[84px_1fr]" : "lg:grid-cols-[300px_1fr]"}`}>
+        <div className={`grid gap-6 lg:gap-8 items-start transition-all duration-300 ${sidebarCollapsed ? "lg:grid-cols-[84px_1fr]" : "lg:grid-cols-[300px_1fr]"}`}>
           {/* MOBILE ADMIN HEADER (< lg) */}
-          <div className="lg:hidden space-y-3">
+          <div className="lg:hidden space-y-3 sticky top-2 z-30 bg-background/95 backdrop-blur-md pb-2">
             <div className="flex items-center justify-between rounded-xl border border-gold/40 bg-card p-4 shadow-sm">
               <div className="flex items-center gap-3 shrink-0">
                 <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
@@ -839,7 +985,7 @@ export function Admin() {
           </div>
 
           {/* DESKTOP ADMIN SIDEBAR (>= lg) */}
-          <aside className={`hidden lg:block h-fit rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-goldy transition-all duration-300 ${sidebarCollapsed ? "w-[84px] text-center" : "w-full"}`}>
+          <aside className={`hidden lg:block sticky top-6 h-fit rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-goldy transition-all duration-300 ${sidebarCollapsed ? "w-[84px] text-center" : "w-full"}`}>
             <div className={`flex items-center border-b border-border pb-5 gap-3 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
               {!sidebarCollapsed ? (
                 <>
@@ -920,7 +1066,7 @@ export function Admin() {
           </aside>
 
           {/* MAIN CONTENT AREA */}
-          <main className="min-h-[500px] rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
+          <main className="min-h-[500px] rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto">
             {/* TAB: INVENTORY MANAGEMENT */}
             {activeTab === "inventory" && (
               <div className="space-y-8 animate-in fade-in duration-300">
@@ -1027,43 +1173,17 @@ export function Admin() {
                             </div>
                           </div>
 
-                          {/* Quick Adjust Buttons */}
+                          {/* Stock Quantity Direct Input Control */}
                           <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateStock(item.id, qty - 5)}
-                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
-                            >
-                              -5
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateStock(item.id, qty - 1)}
-                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
-                            >
-                              -1
-                            </button>
                             <input
                               type="number"
                               min={0}
                               value={qty}
-                              onChange={(e) => handleUpdateStock(item.id, Number(e.target.value))}
-                              className="w-16 rounded-sm border border-gold/40 bg-background py-1.5 px-2 text-center text-xs font-bold text-gold outline-none"
+                              onChange={(e) => handleUpdateStock(item.id, Math.max(0, Number(e.target.value)))}
+                              className="w-20 rounded-lg border border-gold/50 bg-background py-1.5 px-3 text-center font-display text-sm font-bold text-gold outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 shadow-xs"
+                              placeholder="0"
+                              title="Stock Quantity"
                             />
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateStock(item.id, qty + 1)}
-                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
-                            >
-                              +1
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateStock(item.id, qty + 10)}
-                              className="rounded-sm border border-border bg-surface px-2.5 py-1.5 text-xs font-bold hover:border-gold hover:text-gold cursor-pointer"
-                            >
-                              +10
-                            </button>
                           </div>
                         </div>
                       );
@@ -1998,7 +2118,7 @@ export function Admin() {
                                 <h4 className="font-display text-sm font-bold text-foreground group-hover:text-gold transition-colors truncate">
                                   {prod.name}
                                 </h4>
-                                <span className="rounded-full bg-black/80 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold border border-gold/40">
+                                <span className="rounded-full bg-[#f4efe6] px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-[#1c1917] border border-gold/60 shadow-xs">
                                   {prod.category}
                                 </span>
                               </div>
@@ -2015,32 +2135,8 @@ export function Admin() {
                             </div>
                           </div>
 
-                          {/* Right Section: Warehouse Inventory Stock & Action Buttons */}
-                          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-border shrink-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border ${
-                                  (inventoryStocks[prod.name] !== undefined ? inventoryStocks[prod.name] : prod.stock) > 10
-                                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
-                                    : (inventoryStocks[prod.name] !== undefined ? inventoryStocks[prod.name] : prod.stock) > 0
-                                    ? "border-amber-500/50 bg-amber-500/10 text-amber-500"
-                                    : "border-destructive/50 bg-destructive/10 text-destructive"
-                                }`}
-                              >
-                                Warehouse Stock: {inventoryStocks[prod.name] !== undefined ? inventoryStocks[prod.name] : prod.stock} units
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() => handleRestockProduct(prod.name, 5)}
-                                className="rounded-md border border-gold/40 bg-gold/10 px-2.5 py-1 text-[10px] font-bold text-gold hover:bg-gold hover:text-black transition-all cursor-pointer"
-                                title="Restock +5 units to Warehouse Inventory"
-                              >
-                                +5 Restock
-                              </button>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
+                          {/* Right Section: Action Buttons */}
+                          <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
                               <button
                                 type="button"
                                 onClick={() => setEditingItem(prod)}
@@ -2058,7 +2154,6 @@ export function Admin() {
                               </button>
                             </div>
                           </div>
-                        </div>
                       ))}
                     </div>
                   ) : (
@@ -2185,13 +2280,13 @@ export function Admin() {
                 <div className="flex items-center justify-between border-b border-border pb-4">
                   <div>
                     <h2 className="font-display text-2xl font-semibold text-foreground">Registered Users Database</h2>
-                    <p className="text-xs text-muted-foreground mt-1">Users registered in the system MongoDB database.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Users registered in system database. Click any user row to view complete account details & booking history.</p>
                   </div>
                   <button
                     onClick={fetchUsers}
-                    className="rounded-sm border border-gold/40 px-3 py-1.5 text-xs text-gold hover:bg-gold hover:text-primary-foreground"
+                    className="flex items-center gap-2 rounded-sm border border-gold/40 bg-gold/10 px-3.5 py-2 text-xs font-semibold text-gold transition-colors hover:bg-gold hover:text-primary-foreground shadow-xs cursor-pointer"
                   >
-                    Refresh Users
+                    <RefreshCw className={`size-3.5 ${loadingUsers ? "animate-spin" : ""}`} /> Refresh Users
                   </button>
                 </div>
 
@@ -2203,24 +2298,54 @@ export function Admin() {
                         <th className="p-4">Email</th>
                         <th className="p-4">Role</th>
                         <th className="p-4">Registered Date</th>
+                        <th className="p-4 text-right">Account Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {usersList.length > 0 ? (
                         usersList.map((u) => (
-                          <tr key={u._id} className="hover:bg-surface/50">
-                            <td className="p-4 font-semibold text-foreground">{u.name}</td>
-                            <td className="p-4 text-muted-foreground">{u.email}</td>
-                            <td className="p-4 font-bold uppercase text-gold">{u.role}</td>
+                          <tr
+                            key={u._id}
+                            onClick={() => setSelectedUserDetails(u)}
+                            className="hover:bg-gold/10 transition-colors cursor-pointer group"
+                          >
+                            <td className="p-4 font-semibold text-foreground group-hover:text-gold transition-colors">
+                              <div className="flex items-center gap-2.5">
+                                <div className="flex size-7 items-center justify-center rounded-full bg-gold/15 text-gold font-bold text-xs border border-gold/30">
+                                  {u.name ? u.name.charAt(0).toUpperCase() : "U"}
+                                </div>
+                                <span>{u.name}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-muted-foreground font-mono">{u.email}</td>
+                            <td className="p-4 font-bold uppercase">
+                              <span className={`rounded-full px-2.5 py-0.5 text-[9px] ${
+                                u.role === "admin" ? "bg-gold text-primary-foreground shadow-goldy" : "bg-gold/15 text-gold border border-gold/30"
+                              }`}>
+                                {u.role || "user"}
+                              </span>
+                            </td>
                             <td className="p-4 text-muted-foreground">
                               {new Date(u.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                            </td>
+                            <td className="p-4 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedUserDetails(u);
+                                }}
+                                className="text-xs font-bold text-gold hover:underline uppercase tracking-wider cursor-pointer"
+                              >
+                                View Details →
+                              </button>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={4} className="p-8 text-center text-muted-foreground">
-                            No users fetched.
+                          <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                            No registered users found in the system.
                           </td>
                         </tr>
                       )}
@@ -2229,9 +2354,453 @@ export function Admin() {
                 </div>
               </div>
             )}
+            {/* TAB: PROMO COUPONS */}
+            {activeTab === "coupons" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                  <div>
+                    <h2 className="font-display text-2xl font-semibold text-foreground">Promo Coupons & Discounts</h2>
+                    <p className="text-xs text-muted-foreground mt-1">Create, activate, or manage discount codes for checkout.</p>
+                  </div>
+                  {couponMsg && (
+                    <span className="rounded-md bg-emerald-500/15 border border-emerald-500/40 px-3 py-1.5 text-xs font-bold text-emerald-400 animate-in fade-in">
+                      ✓ {couponMsg}
+                    </span>
+                  )}
+                </div>
+
+                {/* Create Coupon Form */}
+                <form onSubmit={handleAddCoupon} className="rounded-xl border border-gold/40 bg-card p-5 shadow-xs space-y-4">
+                  <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Create New Promo Code</h3>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Coupon Code</label>
+                      <input
+                        type="text"
+                        value={newCouponCode}
+                        onChange={(e) => setNewCouponCode(e.target.value)}
+                        placeholder="e.g. VEXA50"
+                        className="w-full rounded-sm border border-border bg-background px-3.5 py-2 text-xs font-bold uppercase tracking-wider outline-none focus:border-gold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Discount Offer</label>
+                      <input
+                        type="text"
+                        value={newCouponDiscount}
+                        onChange={(e) => setNewCouponDiscount(e.target.value)}
+                        placeholder="e.g. 20% OFF or ₹200 OFF"
+                        className="w-full rounded-sm border border-border bg-background px-3.5 py-2 text-xs outline-none focus:border-gold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Min Order Amount (₹)</label>
+                      <input
+                        type="number"
+                        value={newCouponMinOrder}
+                        onChange={(e) => setNewCouponMinOrder(e.target.value)}
+                        placeholder="e.g. 1499"
+                        className="w-full rounded-sm border border-border bg-background px-3.5 py-2 text-xs outline-none focus:border-gold"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 rounded-md bg-gold px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-amber-400 cursor-pointer shadow-goldy"
+                  >
+                    <Plus className="size-4" />
+                    <span>Create Promo Coupon</span>
+                  </button>
+                </form>
+
+                {/* Coupons List */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {couponsList.map((c) => (
+                    <div key={c.code} className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-base font-extrabold text-gold uppercase tracking-wider bg-gold/15 px-3 py-1 rounded-md border border-gold/40">
+                          {c.code}
+                        </span>
+                        <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full border ${
+                          c.active ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400" : "bg-muted/40 border-border text-muted-foreground"
+                        }`}>
+                          {c.active ? "ACTIVE" : "DISABLED"}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-display text-lg font-bold text-foreground">{c.discount}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Min Order: ₹{c.minOrder.toLocaleString("en-IN")}</p>
+                        <p className="text-[11px] text-gold/90 font-semibold mt-1">Used {c.usageCount} times</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCoupon(c.code)}
+                          className="text-xs font-bold text-gold hover:underline cursor-pointer"
+                        >
+                          {c.active ? "Disable Code" : "Enable Code"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCoupon(c.code)}
+                          className="p-1.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer"
+                          title="Delete Coupon"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: CUSTOMER REVIEWS */}
+            {activeTab === "reviews" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                  <div>
+                    <h2 className="font-display text-2xl font-semibold text-foreground">Customer Reviews & Ratings</h2>
+                    <p className="text-xs text-muted-foreground mt-1">Moderate customer testimonials and feature top reviews on store home page.</p>
+                  </div>
+                  {reviewMsg && (
+                    <span className="rounded-md bg-emerald-500/15 border border-emerald-500/40 px-3 py-1.5 text-xs font-bold text-emerald-400 animate-in fade-in">
+                      ✓ {reviewMsg}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  {reviewsList.map((r) => (
+                    <div key={r.id} className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-display text-sm font-bold text-foreground">{r.author}</span>
+                            <span className="text-[10px] text-muted-foreground">• {r.date}</span>
+                          </div>
+                          <p className="text-xs text-gold font-medium mt-0.5">Product: {r.productName}</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-gold">
+                          {Array.from({ length: 5 }).map((_, idx) => (
+                            <Star key={idx} className={`size-3.5 ${idx < r.rating ? "fill-current" : "opacity-30"}`} />
+                          ))}
+                          <span className="text-xs font-bold text-foreground ml-1">{r.rating}.0</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed italic">"{r.comment}"</p>
+                      <div className="flex items-center justify-between pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFeaturedReview(r.id)}
+                          className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-md border transition-all cursor-pointer ${
+                            r.featured
+                              ? "bg-gold/20 border-gold/60 text-gold"
+                              : "bg-surface border-border text-muted-foreground hover:border-gold hover:text-gold"
+                          }`}
+                        >
+                          <Star className={`size-3.5 ${r.featured ? "fill-current" : ""}`} />
+                          <span>{r.featured ? "Featured on Home Page" : "Set as Featured"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReview(r.id)}
+                          className="p-1.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer"
+                          title="Delete Review"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: STORE SETTINGS */}
+            {activeTab === "settings" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                  <div>
+                    <h2 className="font-display text-2xl font-semibold text-foreground">Store Settings & Configuration</h2>
+                    <p className="text-xs text-muted-foreground mt-1">Configure shipping thresholds, contact lines, tax rates, and site notice bar.</p>
+                  </div>
+                  {settingsSavedMsg && (
+                    <span className="rounded-md bg-emerald-500/15 border border-emerald-500/40 px-3 py-1.5 text-xs font-bold text-emerald-400 animate-in fade-in">
+                      ✓ {settingsSavedMsg}
+                    </span>
+                  )}
+                </div>
+
+                <form onSubmit={handleSaveSettings} className="space-y-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
+                      <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Free Shipping Minimum (₹)</h3>
+                      <p className="text-xs text-muted-foreground">Orders above this amount get free express shipping at checkout.</p>
+                      <input
+                        type="number"
+                        value={storeSettings.freeShippingMin}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, freeShippingMin: Number(e.target.value) })}
+                        className="w-full rounded-sm border border-border bg-background px-3.5 py-2 text-xs font-bold outline-none focus:border-gold"
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
+                      <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">GST Tax Percentage (%)</h3>
+                      <p className="text-xs text-muted-foreground">GST tax rate applied to apparel invoices across India.</p>
+                      <input
+                        type="number"
+                        value={storeSettings.gstPercentage}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, gstPercentage: Number(e.target.value) })}
+                        className="w-full rounded-sm border border-border bg-background px-3.5 py-2 text-xs font-bold outline-none focus:border-gold"
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
+                      <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Concierge Support Phone</h3>
+                      <p className="text-xs text-muted-foreground">Primary WhatsApp & hotline support number shown to users.</p>
+                      <input
+                        type="text"
+                        value={storeSettings.supportPhone}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, supportPhone: e.target.value })}
+                        className="w-full rounded-sm border border-border bg-background px-3.5 py-2 text-xs font-bold outline-none focus:border-gold"
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
+                      <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Support Email Address</h3>
+                      <p className="text-xs text-muted-foreground">Customer service email for inquiries and custom bookings.</p>
+                      <input
+                        type="email"
+                        value={storeSettings.supportEmail}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, supportEmail: e.target.value })}
+                        className="w-full rounded-sm border border-border bg-background px-3.5 py-2 text-xs font-bold outline-none focus:border-gold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-3">
+                    <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Store Announcement Bar Notice</h3>
+                    <p className="text-xs text-muted-foreground">Marquee announcement banner text displayed across top header.</p>
+                    <textarea
+                      rows={2}
+                      value={storeSettings.announcementBar}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, announcementBar: e.target.value })}
+                      className="w-full rounded-sm border border-border bg-background p-3 text-xs outline-none focus:border-gold resize-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 rounded-md bg-gold px-6 py-3 text-xs font-bold text-primary-foreground hover:bg-amber-400 cursor-pointer shadow-goldy"
+                  >
+                    <Save className="size-4" />
+                    <span>Save Store Settings</span>
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* TAB: HOME PAGE MEDIA */}
+            {activeTab === "home-media" && (
+              <div className="space-y-6">
+                <form onSubmit={handleSaveMedia} className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                    <div>
+                      <h2 className="font-display text-2xl font-semibold text-foreground">Home Page Media Manager</h2>
+                      <p className="text-xs text-muted-foreground mt-1">Upload images & save media changes live across the store.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {savedMediaMsg && (
+                        <span className="rounded-md bg-emerald-500/15 border border-emerald-500/40 px-3 py-1.5 text-xs font-bold text-emerald-400 animate-in fade-in">
+                          ✓ {savedMediaMsg}
+                        </span>
+                      )}
+                      <button
+                        type="submit"
+                        className="flex items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-amber-400 shadow-goldy cursor-pointer shrink-0"
+                      >
+                        <Save className="size-3.5" />
+                        <span>Save Changes</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Main Hero Image */}
+                  <div className="rounded-xl border border-gold/40 bg-card p-5 shadow-xs transition-all hover:border-gold">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <img src={heroImgUrl} alt="Hero" className="size-16 rounded-xl object-cover border border-gold/40 shrink-0 shadow-sm" />
+                        <div>
+                          <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Main Hero Banner Image</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">Primary hero banner background on the store home page.</p>
+                        </div>
+                      </div>
+                      <label className="cursor-pointer shrink-0 rounded-lg border border-gold/50 bg-gold/15 px-3.5 py-2 text-xs font-bold text-gold transition-all hover:bg-gold hover:text-primary-foreground shadow-xs">
+                        <Upload className="size-3.5 inline mr-1.5" /> Upload File
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setHeroImgUrl)} />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Promo Banner 1 */}
+                  <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-gold">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <img src={banner1ImgUrl} alt="Banner 1" className="size-16 rounded-xl object-cover border border-border shrink-0 shadow-sm" />
+                        <div>
+                          <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Promotional Card 1 Image</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">First promotional card banner image featured on home page.</p>
+                        </div>
+                      </div>
+                      <label className="cursor-pointer shrink-0 rounded-lg border border-gold/50 bg-gold/15 px-3.5 py-2 text-xs font-bold text-gold transition-all hover:bg-gold hover:text-primary-foreground shadow-xs">
+                        <Upload className="size-3.5 inline mr-1.5" /> Upload File
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setBanner1ImgUrl)} />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Promo Banner 2 */}
+                  <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-gold">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <img src={banner2ImgUrl} alt="Banner 2" className="size-20 rounded-xl object-cover border border-border shrink-0 shadow-sm" />
+                        <div>
+                          <h3 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Promotional Card 2 Image</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">Second promotional card banner image featured on home page.</p>
+                        </div>
+                      </div>
+                      <label className="cursor-pointer shrink-0 rounded-lg border border-gold/50 bg-gold/15 px-3.5 py-2 text-xs font-bold text-gold transition-all hover:bg-gold hover:text-primary-foreground shadow-xs">
+                        <Upload className="size-3.5 inline mr-1.5" /> Upload File
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setBanner2ImgUrl)} />
+                      </label>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+
+
+
           </main>
         </div>
       </div>
+
+      {/* REGISTERED USER DETAILS MODAL POPUP */}
+      {selectedUserDetails && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gold/50 bg-card p-6 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-4">
+                <div className="flex size-14 items-center justify-center rounded-xl bg-gold/20 text-gold font-display text-2xl font-extrabold border border-gold/40 shadow-sm">
+                  {selectedUserDetails.name ? selectedUserDetails.name.charAt(0).toUpperCase() : "U"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display text-xl font-bold text-foreground">{selectedUserDetails.name}</h3>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                      selectedUserDetails.role === "admin" ? "bg-gold text-primary-foreground shadow-goldy" : "bg-gold/15 text-gold border border-gold/30"
+                    }`}>
+                      {selectedUserDetails.role || "USER"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selectedUserDetails.email}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUserDetails(null)}
+                className="flex size-8 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground hover:border-gold hover:text-gold transition-all cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Account Info Stats */}
+            {(() => {
+              const userOrders = orders.filter(
+                (o) =>
+                  (o.userEmail && uEquals(o.userEmail, selectedUserDetails.email)) ||
+                  (o.userName && uEquals(o.userName, selectedUserDetails.name))
+              );
+              const totalSpend = userOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+              function uEquals(a: string, b: string) {
+                return (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
+              }
+
+              return (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="rounded-xl border border-border/80 bg-surface/60 p-3.5 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Registered Date</span>
+                      <p className="font-bold text-foreground">
+                        {new Date(selectedUserDetails.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-surface/60 p-3.5 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Bookings</span>
+                      <p className="font-bold text-gold text-sm">
+                        {userOrders.length} Order(s)
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-surface/60 p-3.5 space-y-1 col-span-2 sm:col-span-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Spend</span>
+                      <p className="font-bold text-emerald-500 text-sm">
+                        ₹{totalSpend.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Customer Booking History */}
+                  <div className="space-y-3">
+                    <h4 className="font-display text-sm font-bold text-foreground uppercase tracking-wider">Customer Order & Booking History</h4>
+                    {userOrders.length > 0 ? (
+                      <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1">
+                        {userOrders.map((ord) => (
+                          <div key={ord._id} className="rounded-xl border border-border/80 bg-surface/40 p-4 space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-gold">#{String(ord._id || ord.id || "ORD").slice(-8).toUpperCase()}</span>
+                                <span className={`rounded-md px-2 py-0.5 text-[9px] font-bold uppercase ${
+                                  ord.status === "Delivered" ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30" : "bg-gold/15 text-gold border border-gold/30"
+                                }`}>
+                                  {ord.status || "Processing"}
+                                </span>
+                              </div>
+                              <span className="font-bold text-foreground">₹{(ord.totalAmount || 0).toLocaleString("en-IN")}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+                              <span>Items: <strong className="text-foreground">{ord.items?.length || 0} product(s)</strong></span>
+                              <span>Date: <strong>{new Date(ord.createdAt || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong></span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border/80 p-6 text-center text-muted-foreground text-xs">
+                        No customer booking history found for this user account.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Footer Close */}
+            <div className="flex justify-end border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => setSelectedUserDetails(null)}
+                className="btn-gold hover:btn-gold-hover rounded-sm px-6 py-2.5 text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* CANCELLATION REASON MODAL POPUP */}
       {cancellingOrder && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">

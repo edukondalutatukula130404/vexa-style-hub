@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, HelpCircle, MessageCircle, Truck, RefreshCw, ShieldCheck } from "lucide-react";
+import { ChevronDown, Search, HelpCircle, MessageCircle, Truck, RefreshCw, ShieldCheck } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
 
 type FAQItem = {
@@ -148,9 +148,9 @@ export function Faq() {
                       </span>
                       <span className="font-display text-base font-medium text-foreground sm:text-lg">{f.q}</span>
                     </div>
-                    <Plus
+                    <ChevronDown
                       className={`size-5 shrink-0 text-gold transition-transform duration-500 ${
-                        isOpen ? "rotate-45" : ""
+                        isOpen ? "rotate-180" : ""
                       }`}
                     />
                   </button>

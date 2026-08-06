@@ -1043,14 +1043,14 @@ export function Admin() {
                       type="button"
                       title={t.label}
                       onClick={() => setActiveTab(t.id as any)}
-                      className={`flex w-full items-center justify-between rounded-lg px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
                         isSelected
                           ? "bg-gold text-primary-foreground shadow-goldy font-extrabold"
                           : "text-muted-foreground hover:bg-surface hover:text-gold"
                       }`}
                     >
-                      <div className="flex items-center gap-3 whitespace-nowrap">
-                        <Icon className="size-4.5 shrink-0" />
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <Icon className="size-4 shrink-0" />
                         <span>{t.label}</span>
                       </div>
                     </button>
@@ -2548,7 +2548,7 @@ export function Admin() {
 
       {/* REGISTERED USER DETAILS MODAL POPUP */}
       {selectedUserDetails && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gold/50 bg-card p-6 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-4">
@@ -2663,7 +2663,7 @@ export function Admin() {
       )}
       {/* CANCELLATION REASON MODAL POPUP */}
       {cancellingOrder && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg overflow-hidden rounded-xl border border-destructive/50 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2.5">

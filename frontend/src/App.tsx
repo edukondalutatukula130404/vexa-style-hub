@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
@@ -17,13 +17,16 @@ import { Faq } from "@/routes/faq";
 import { ResetPassword } from "@/routes/reset-password";
 
 function Layout() {
+  const location = useLocation();
+  const isDashboardRoute = location.pathname === "/dashboard" || location.pathname === "/admin";
+
   return (
     <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground">
       <Navbar />
       <main className="flex-1">
         <Outlet />
       </main>
-      <Footer />
+      {!isDashboardRoute && <Footer />}
     </div>
   );
 }

@@ -36,6 +36,7 @@ import promoBanner2 from "@/assets/promo_banner_2.png";
 import { products, type Product, useProducts } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL } from "@/lib/auth";
+import { Footer } from "@/components/Footer";
 
 type OrderItem = {
   _id: string;
@@ -80,7 +81,9 @@ export function Admin() {
   const { products: catalogProducts } = useProducts();
   const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "orders" | "add-item" | "categories" | "users" | "home-media">("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const isExpanded = !sidebarCollapsed || sidebarHovered;
 
   // Category Manager State
   const [categoriesList, setCategoriesList] = useState<string[]>(() => {
@@ -328,12 +331,10 @@ export function Admin() {
     { id: "add-item", label: `Collection Catalog (${catalogProducts.length})`, icon: PlusCircle },
     { id: "orders", label: `Customer Bookings (${orders.length})`, icon: Package },
     { id: "users", label: `Registered Users (${usersList.length})`, icon: Users },
-    { id: "coupons", label: `Promo Coupons (${couponsList.length})`, icon: Ticket },
-    { id: "reviews", label: `Customer Reviews (${reviewsList.length})`, icon: Star },
     { id: "home-media", label: "Home Page Media", icon: Image },
     { id: "settings", label: "Store Settings", icon: Settings },
     { id: "logout", label: "Logout", icon: LogOut, isLogout: true },
-  ], [orders.length, usersList.length, catalogProducts.length, couponsList.length, reviewsList.length]);
+  ], [orders.length, usersList.length, catalogProducts.length]);
 
   // Home Page Media State
   const [heroImgUrl, setHeroImgUrl] = useState<string>(() => {
@@ -900,8 +901,8 @@ export function Admin() {
   const maxSales = Math.max(...sales);
 
   return (
-    <div className="admin-page-root no-scrollbar min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-3 sm:px-4 py-6">
+    <div className="admin-page-root no-scrollbar min-h-screen bg-background pt-6 sm:pt-8 pb-12 overflow-x-hidden">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="relative flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
           {/* MOBILE ADMIN HEADER (< lg) */}
           <div className="lg:hidden w-full space-y-3 sticky top-2 z-30 bg-background/95 backdrop-blur-md pb-2">
@@ -948,7 +949,7 @@ export function Admin() {
 
               {mobileNavOpen && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-2 space-y-1 rounded-xl border border-gold/50 bg-background/95 p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
-                  {adminTabsList.map((t) => {
+                  {adminTabsList.filter((t) => !t.isLogout).map((t) => {
                     const Icon = t.icon;
                     const isSelected = activeTab === t.id && !t.isLogout;
                     return (
@@ -984,95 +985,100 @@ export function Admin() {
             </div>
           </div>
 
-          {/* DESKTOP ADMIN SIDEBAR (>= lg): Completely Fixed Position */}
-          <aside className={`hidden lg:block fixed top-6 z-30 transition-all duration-300 ${
-            sidebarCollapsed ? "w-[84px]" : "w-[280px]"
-          }`}>
-            <div className="rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-goldy">
-              <div className={`flex items-center border-b border-border pb-4 gap-3 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
-                {!sidebarCollapsed ? (
-                  <>
-                    <div className="flex items-center gap-3 shrink-0 overflow-hidden">
-                      <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
-                        V
-                      </div>
-                      <div className="flex flex-col justify-center overflow-hidden space-y-1">
-                        <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
-                          V E X A
-                        </span>
-                        <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
-                          WEAR CONFIDENCE
-                        </span>
-                      </div>
-                    </div>
+          {/* LEFT CORNER HOVER TRIGGER ZONE: Triggers floating sidebar when cursor touches left screen edge */}
+          <div
+            onMouseEnter={() => setSidebarHovered(true)}
+            className="hidden lg:block fixed top-6 left-0 bottom-0 w-6 z-40 cursor-pointer"
+            title="Hover left edge to open Admin Navigation Sidebar"
+          />
 
-                    <button
-                      type="button"
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="flex size-9 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0"
-                      title="Collapse Admin Panel Sidebar"
-                    >
-                      <Menu className="size-4.5" />
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
-                      V
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="flex size-8 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0 mt-1"
-                      title="Expand Admin Panel Sidebar"
-                    >
-                      <Menu className="size-4" />
-                    </button>
+          {/* DESKTOP ADMIN SIDEBAR (>= lg): Full-Height Viewport Drawer Panel */}
+          <aside
+            onMouseEnter={() => setSidebarHovered(true)}
+            onMouseLeave={() => setSidebarHovered(false)}
+            className={`hidden lg:block fixed top-4 bottom-4 left-4 z-50 w-[280px] transition-all duration-300 transform ${
+              isExpanded
+                ? "translate-x-0 opacity-100 pointer-events-auto"
+                : "-translate-x-[340px] opacity-0 pointer-events-none"
+            }`}
+          >
+            <div className="h-full rounded-2xl border border-gold/50 bg-card/95 backdrop-blur-xl p-5 shadow-2xl flex flex-col justify-between transition-all duration-300">
+              {/* Header Logo & Pin Toggle */}
+              <div className="flex items-center justify-between border-b border-border pb-4 gap-3 shrink-0">
+                <div className="flex items-center gap-3 shrink-0 overflow-hidden">
+                  <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
+                    V
                   </div>
-                )}
+                  <div className="flex flex-col justify-center overflow-hidden space-y-1">
+                    <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
+                      V E X A
+                    </span>
+                    <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
+                      WEAR CONFIDENCE
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className={`flex size-9 items-center justify-center rounded-lg border transition-all cursor-pointer shadow-goldy shrink-0 ${
+                    !sidebarCollapsed ? "border-gold bg-gold text-primary-foreground font-bold" : "border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground"
+                  }`}
+                  title={!sidebarCollapsed ? "Unpin / Auto-Hide Sidebar" : "Pin Admin Sidebar Open"}
+                >
+                  <Menu className="size-4.5" />
+                </button>
               </div>
 
-              <nav className="mt-4 space-y-1.5">
-                {adminTabsList.map((t) => {
+              {/* Middle Scrollable Section Navigation List */}
+              <nav className="my-4 flex-1 space-y-1.5 overflow-y-auto no-scrollbar">
+                {adminTabsList.filter(t => !t.isLogout).map((t) => {
                   const Icon = t.icon;
-                  const isSelected = activeTab === t.id && !t.isLogout;
+                  const isSelected = activeTab === t.id;
                   return (
                     <button
                       key={t.id}
                       type="button"
                       title={t.label}
-                      onClick={() => {
-                        if (t.isLogout) {
-                          logout();
-                        } else {
-                          setActiveTab(t.id as any);
-                        }
-                      }}
-                      className={`flex w-full items-center rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-                        sidebarCollapsed ? "justify-center px-0" : "justify-between px-3.5"
-                      } ${
-                        t.isLogout
-                          ? "text-muted-foreground hover:bg-destructive/15 hover:text-destructive mt-3 pt-3 border-t border-border/60"
-                          : isSelected
+                      onClick={() => setActiveTab(t.id as any)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                        isSelected
                           ? "bg-gold text-primary-foreground shadow-goldy font-extrabold"
                           : "text-muted-foreground hover:bg-surface hover:text-gold"
                       }`}
                     >
                       <div className="flex items-center gap-3 whitespace-nowrap">
                         <Icon className="size-4.5 shrink-0" />
-                        {!sidebarCollapsed && <span>{t.label}</span>}
+                        <span>{t.label}</span>
                       </div>
                     </button>
                   );
                 })}
               </nav>
+
+              {/* Bottom Pinned Logout Button */}
+              <div className="pt-3 border-t border-border/60 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="flex w-full items-center justify-between rounded-lg px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-destructive/15 hover:text-destructive transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 whitespace-nowrap">
+                    <LogOut className="size-4.5 shrink-0" />
+                    <span>Logout</span>
+                  </div>
+                </button>
+              </div>
             </div>
           </aside>
 
-          {/* MAIN CONTENT AREA: Padded for fixed sidebar offset */}
-          <main className={`w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm transition-all duration-300 ${
-            sidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[304px]"
+          {/* ADMIN CONTENT & ALIGNED FOOTER COLUMN: Full width when unpinned, offset when pinned */}
+          <div className={`flex-1 min-w-0 flex flex-col w-full transition-all duration-300 ${
+            !sidebarCollapsed ? "lg:ml-[304px]" : "lg:ml-0"
           }`}>
+            {/* MAIN CONTENT AREA */}
+            <main className="w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
             {/* TAB: INVENTORY MANAGEMENT */}
             {activeTab === "inventory" && (
               <div className="space-y-8 animate-in fade-in duration-300">
@@ -2530,6 +2536,12 @@ export function Admin() {
 
 
           </main>
+
+            {/* Admin Aligned Footer */}
+            <div className="w-full mt-auto pt-8">
+              <Footer />
+            </div>
+          </div>
         </div>
       </div>
 

@@ -25,10 +25,10 @@ import {
   Sparkles,
   ChevronDown,
   RefreshCw,
-  ArrowLeft,
   Camera,
   Upload,
   X,
+  Menu,
   Edit3,
   Home,
   Briefcase,
@@ -37,6 +37,7 @@ import { products, useProducts, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL, setLoggedIn } from "@/lib/auth";
 import { useCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
+import { Footer } from "@/components/Footer";
 
 type OrderItem = {
   _id: string;
@@ -376,6 +377,9 @@ export function UserDashboard() {
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orderSuccessMsg, setOrderSuccessMsg] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const isExpanded = !sidebarCollapsed || sidebarHovered;
 
   // Sync user auth details when available
   useEffect(() => {
@@ -855,42 +859,23 @@ export function UserDashboard() {
   const CurrentIcon = currentNavItem.icon;
 
   return (
-    <div className="min-h-screen bg-background pt-24 sm:pt-28 pb-12">
+    <div className="dashboard-page-root no-scrollbar min-h-screen bg-background pt-20 sm:pt-28 pb-8 sm:pb-12 overflow-x-hidden">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        {/* PAGE HEADER BANNER */}
-        <div className="pb-6">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">MY PROFILE</h1>
-          <div className="mt-3">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
-            >
-              <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
-              <span>Back</span>
-            </Link>
-          </div>
-        </div>
-
         <div className="relative flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
           {/* MOBILE RESPONSIVE TAB STRIP (< lg) */}
-          <div className="lg:hidden w-full space-y-3 sticky top-20 z-30 bg-background/95 backdrop-blur-md pb-2">
-            {/* Interactive Profile Card - Clicking opens Dashboard Sections slide-down */}
+          <div className="lg:hidden w-full sticky top-16 z-30 bg-background/95 backdrop-blur-md py-2 mb-8 sm:mb-8">
+            {/* Interactive Section Selector Button */}
             <button
               type="button"
               onClick={() => setMobileNavOpen((o) => !o)}
-              className="flex w-full items-center justify-between rounded-xl border border-gold/40 bg-card p-4 shadow-sm transition-all hover:border-gold cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl border border-gold/50 bg-card p-3.5 shadow-goldy transition-all hover:border-gold cursor-pointer"
             >
               <div className="flex items-center gap-3 overflow-hidden">
-                {profilePic ? (
-                  <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
-                ) : (
-                  <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
-                    {(profileName || user?.name || "U")[0].toUpperCase()}
-                  </div>
-                )}
+                <div className="flex size-9 items-center justify-center rounded-lg border border-gold/40 bg-gold/15 text-gold shrink-0">
+                  <CurrentIcon className="size-4.5" />
+                </div>
                 <div className="overflow-hidden text-left">
-                  <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
-                  <p className="text-[11px] text-muted-foreground truncate">{profileEmail}</p>
+                  <h3 className="font-display text-sm font-bold text-foreground truncate">{currentNavItem.label}</h3>
                 </div>
               </div>
               <ChevronDown className={`size-5 text-gold shrink-0 transition-transform duration-300 ${mobileNavOpen ? "rotate-180" : ""}`} />
@@ -898,10 +883,9 @@ export function UserDashboard() {
 
             {/* Dashboard Sections Slide-Down Menu */}
             <div className="relative">
-
               {mobileNavOpen && (
                 <div className="rounded-xl border border-gold/50 bg-card p-2 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-2 duration-300 space-y-1 mb-4 z-40">
-                  {navItems.map((item) => {
+                  {navItems.filter((item) => item.id !== "logout").map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
                     const isLogout = item.id === "logout";
@@ -937,24 +921,74 @@ export function UserDashboard() {
             </div>
           </div>
 
-          {/* DESKTOP SIDEBAR (>= lg): Completely Fixed Position */}
-          <aside className="hidden lg:block fixed top-28 z-30 w-[260px]">
-            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-              <div className="flex items-center gap-3 border-b border-border pb-6">
-                {profilePic ? (
-                  <img src={profilePic} alt={profileName} className="size-11 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+          {/* LEFT CORNER HOVER TRIGGER ZONE: Triggers floating sidebar when cursor touches left screen edge */}
+          <div
+            onMouseEnter={() => setSidebarHovered(true)}
+            className="hidden lg:block fixed top-[112px] left-0 bottom-0 w-6 z-40 cursor-pointer"
+            title="Hover left edge to open Navigation Sidebar"
+          />
+
+          {/* DESKTOP SIDEBAR (>= lg): Fixed Viewport Position on Left with Smooth Hover Expand */}
+          <aside
+            onMouseEnter={() => setSidebarHovered(true)}
+            onMouseLeave={() => setSidebarHovered(false)}
+            className={`hidden lg:block fixed top-[112px] z-30 transition-all duration-300 overflow-hidden ${
+              isExpanded ? "w-[280px]" : "w-[84px]"
+            }`}
+          >
+            <div className={`rounded-xl border border-gold/40 bg-card p-4 sm:p-5 transition-all duration-300 ${
+              isExpanded ? "w-[280px] shadow-2xl border-gold/60" : "w-[84px] shadow-goldy"
+            }`}>
+              <div className={`flex items-center border-b border-border pb-4 gap-3 ${!isExpanded ? "justify-center" : "justify-between"}`}>
+                {isExpanded ? (
+                  <>
+                    <div className="flex items-center gap-3 shrink-0 overflow-hidden">
+                      {profilePic ? (
+                        <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+                      ) : (
+                        <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
+                          {(profileName || user?.name || "U")[0].toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex flex-col justify-center overflow-hidden">
+                        <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
+                        <p className="text-[11px] text-muted-foreground truncate">{profileEmail}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                      className={`flex size-9 items-center justify-center rounded-lg border transition-all cursor-pointer shadow-goldy shrink-0 ${
+                        sidebarCollapsed ? "border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground" : "border-gold bg-gold text-primary-foreground font-bold"
+                      }`}
+                      title={sidebarCollapsed ? "Pin Sidebar Expanded" : "Collapse Sidebar"}
+                    >
+                      <Menu className="size-4.5" />
+                    </button>
+                  </>
                 ) : (
-                  <div className="flex size-11 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-lg font-bold text-gold shrink-0 shadow-sm">
-                    {(profileName || user?.name || "U")[0].toUpperCase()}
+                  <div className="flex flex-col items-center gap-2">
+                    {profilePic ? (
+                      <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+                    ) : (
+                      <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
+                        {(profileName || user?.name || "U")[0].toUpperCase()}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                      className="flex size-8 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0 mt-1"
+                      title="Expand & Pin Navigation Sidebar"
+                    >
+                      <Menu className="size-4" />
+                    </button>
                   </div>
                 )}
-                <div className="overflow-hidden">
-                  <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
-                  <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
-                </div>
               </div>
 
-              <nav className="mt-6 space-y-1.5">
+              <nav className="mt-4 space-y-1.5">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -962,6 +996,8 @@ export function UserDashboard() {
                   return (
                     <button
                       key={item.id}
+                      type="button"
+                      title={item.label}
                       onClick={() => {
                         if (isLogout) {
                           logout();
@@ -969,15 +1005,20 @@ export function UserDashboard() {
                           setActiveTab(item.id as TabType);
                         }
                       }}
-                      className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`flex w-full items-center rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                        !isExpanded ? "justify-center px-0" : "justify-between px-3.5"
+                      } ${
                         isLogout
-                          ? "text-destructive hover:bg-destructive/20 font-bold mt-4 border border-destructive/40 bg-destructive/10 justify-center shadow-sm"
+                          ? "text-muted-foreground hover:bg-destructive/15 hover:text-destructive mt-3 pt-3 border-t border-border/60"
                           : isActive
-                          ? "bg-gold text-primary-foreground shadow-goldy font-bold"
-                          : "text-muted-foreground hover:bg-surface hover:text-foreground"
+                          ? "bg-gold text-primary-foreground shadow-goldy font-extrabold"
+                          : "text-muted-foreground hover:bg-surface hover:text-gold"
                       }`}
                     >
-                      <Icon className="size-4 shrink-0" /> <span>{item.label}</span>
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <Icon className="size-4.5 shrink-0" />
+                        {isExpanded && <span>{item.label}</span>}
+                      </div>
                     </button>
                   );
                 })}
@@ -985,16 +1026,15 @@ export function UserDashboard() {
             </div>
           </aside>
 
-          {/* MAIN TAB CONTENT AREA: Padded for fixed sidebar offset */}
-          <main className="w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-3.5 sm:p-8 shadow-sm lg:ml-[284px]">
+          {/* DASHBOARD CONTENT & ALIGNED FOOTER COLUMN: Margin offset keeps content & footer beside fixed sidebar */}
+          <div className={`flex-1 min-w-0 flex flex-col w-full transition-all duration-300 ${
+            sidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[304px]"
+          }`}>
+            {/* MAIN TAB CONTENT AREA */}
+            <main className="w-full flex-1 min-w-0 rounded-xl border-0 bg-transparent p-0 shadow-none lg:border lg:border-border lg:bg-card lg:p-8 lg:shadow-sm">
             {/* 1. MY PROFILE TAB */}
             {activeTab === "profile" && (
-              <div className="space-y-6 max-w-2xl">
-                <div className="border-b border-border pb-4">
-                  <h2 className="font-display text-2xl font-bold text-foreground">My Profile</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Manage your personal profile, credentials, and contact information.</p>
-                </div>
-
+              <div className="space-y-6 w-full pt-2 sm:pt-0">
                 {/* Profile Header Avatar Card */}
                 <div className="flex flex-col sm:flex-row items-center gap-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
                   {/* Avatar Container with Hover Overlay */}
@@ -1063,8 +1103,8 @@ export function UserDashboard() {
                   </div>
                 </div>
 
-                {/* Account Quick Stats Grid */}
-                <div className="grid grid-cols-3 gap-3">
+                {/* Account Quick Stats Grid (Hidden on Mobile Responsive, Visible on Desktop/Tablet sm+) */}
+                <div className="hidden sm:grid sm:grid-cols-3 gap-3">
                   <div className="rounded-xl border border-gold/30 bg-surface/40 p-4 text-center">
                     <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Member Since</span>
                     <span className="font-display text-sm font-bold text-foreground mt-1 block">August 2026</span>
@@ -1087,41 +1127,41 @@ export function UserDashboard() {
                 )}
 
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
-                  {/* Personal Contact Info */}
-                  <div className="space-y-4 rounded-xl border border-border bg-background p-5">
-                    <h3 className="font-display text-base font-bold text-foreground border-b border-border pb-2">
+                  {/* Personal Contact Info Card */}
+                  <div className="space-y-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
+                    <h3 className="font-display text-base font-bold text-foreground border-b border-border pb-3">
                       Personal & Contact Details
                     </h3>
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div>
-                        <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
                           <UserIcon className="size-3.5 text-gold" /> Full Name
                         </label>
                         <input
                           type="text"
                           value={profileName}
                           onChange={(e) => setProfileName(e.target.value)}
-                          className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                          className="w-full rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
                           required
                         />
                       </div>
 
                       <div>
-                        <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
                           <Mail className="size-3.5 text-gold" /> Email Address
                         </label>
                         <input
                           type="email"
                           value={profileEmail}
                           onChange={(e) => setProfileEmail(e.target.value)}
-                          className="w-full rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                          className="w-full rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
                           required
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                      <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
                         <Phone className="size-3.5 text-gold" /> Mobile Number
                       </label>
                       <input
@@ -1129,14 +1169,14 @@ export function UserDashboard() {
                         value={profileMobile}
                         onChange={(e) => setProfileMobile(e.target.value)}
                         placeholder="9876543210"
-                        className="w-full max-w-md rounded-sm border border-border bg-background px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
+                        className="w-full max-w-md rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
                       />
                     </div>
                   </div>
 
                   <button
                     type="submit"
-                    className="mt-4 bg-gold text-primary-foreground hover:bg-gold/90 inline-flex items-center gap-2 rounded-sm px-8 py-3.5 text-xs font-bold uppercase tracking-[0.18em] transition-all shadow-goldy cursor-pointer"
+                    className="w-full sm:w-auto bg-gold text-primary-foreground hover:bg-gold/90 inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3.5 text-xs font-extrabold uppercase tracking-[0.18em] transition-all shadow-goldy cursor-pointer"
                   >
                     <Save className="size-4" /> UPDATE PROFILE
                   </button>
@@ -1146,7 +1186,7 @@ export function UserDashboard() {
 
             {/* 2. MY ORDERS TAB */}
             {activeTab === "orders" && (
-              <div className="space-y-6 min-w-0">
+              <div className="space-y-6 min-w-0 pt-3 sm:pt-0">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
                   <div>
                     <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">My Orders</h2>
@@ -1174,7 +1214,7 @@ export function UserDashboard() {
                 {myOrders.length > 0 && (
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5 rounded-xl border border-border bg-card p-3 sm:p-4 shadow-sm min-w-0">
                     {/* Status Filter Chips */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0 min-w-0 max-w-full">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0 max-w-full">
                       {["All", "Processing", "Shipped", "Delivered", "Cancelled"].map((st) => (
                         <button
                           key={st}
@@ -1335,7 +1375,7 @@ export function UserDashboard() {
 
             {/* 3. ADDRESSES TAB */}
             {activeTab === "addresses" && (
-              <div className="space-y-6 max-w-3xl min-w-0">
+              <div className="space-y-6 max-w-3xl min-w-0 pt-3 sm:pt-0">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
                   <div>
                     <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">Addresses</h2>
@@ -1614,7 +1654,7 @@ export function UserDashboard() {
 
             {/* 4. MY CART TAB (3-Step Page-Level Checkout Flow: Cart -> Address Details -> Payment Option) */}
             {activeTab === "cart" && (
-              <div className="space-y-6">
+              <div className="space-y-6 pt-3 sm:pt-0">
                 {cartCheckoutStep === "cart" && (
                   <>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
@@ -2020,7 +2060,7 @@ export function UserDashboard() {
 
             {/* 5. SUPPORT TAB */}
             {activeTab === "support" && (
-              <div className="space-y-6 max-w-2xl">
+              <div className="space-y-6 max-w-2xl pt-3 sm:pt-0">
                 <div className="border-b border-border pb-4">
                   <h2 className="font-display text-2xl font-bold text-foreground">Support & Client Concierge</h2>
                   <p className="text-xs text-muted-foreground mt-1">Get immediate assistance with sizing, orders, and returns.</p>
@@ -2058,7 +2098,7 @@ export function UserDashboard() {
 
             {/* 6. BOOK NEW TEE / CHECKOUT PAGE TAB */}
             {activeTab === "booking" && (
-              <div className="space-y-6">
+              <div className="space-y-6 pt-3 sm:pt-0">
                 {isCartCheckout || selectedProduct ? (
                   /* INLINE ORDER CHECKOUT PAGE SECTION WITH 2 STEPS */
                   <div className="space-y-6 max-w-2xl animate-in fade-in duration-300">
@@ -2483,6 +2523,12 @@ export function UserDashboard() {
               </div>
             )}
           </main>
+
+            {/* Dashboard Aligned Footer */}
+            <div className="w-full mt-auto pt-8">
+              <Footer />
+            </div>
+          </div>
         </div>
       </div>
 

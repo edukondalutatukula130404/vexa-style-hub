@@ -86,20 +86,28 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Hide scrollbars for admin portal & no-scrollbar utility */
+/* Hide scrollbars for admin & user dashboard portals & no-scrollbar utility */
 html:has(.admin-page-root),
 body:has(.admin-page-root),
+html:has(.dashboard-page-root),
+body:has(.dashboard-page-root),
 .no-scrollbar,
 .admin-page-root,
-.admin-page-root * {
+.dashboard-page-root,
+.admin-page-root *,
+.dashboard-page-root * {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
 html:has(.admin-page-root)::-webkit-scrollbar,
 body:has(.admin-page-root)::-webkit-scrollbar,
+html:has(.dashboard-page-root)::-webkit-scrollbar,
+body:has(.dashboard-page-root)::-webkit-scrollbar,
 .no-scrollbar::-webkit-scrollbar,
 .admin-page-root::-webkit-scrollbar,
-.admin-page-root *::-webkit-scrollbar {
+.dashboard-page-root::-webkit-scrollbar,
+.admin-page-root *::-webkit-scrollbar,
+.dashboard-page-root *::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;

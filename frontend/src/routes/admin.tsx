@@ -996,7 +996,7 @@ export function Admin() {
           <aside
             onMouseEnter={() => setSidebarHovered(true)}
             onMouseLeave={() => setSidebarHovered(false)}
-            className={`hidden lg:block fixed top-4 bottom-4 left-4 z-50 w-[280px] transition-all duration-300 transform ${
+            className={`hidden lg:block fixed top-6 sm:top-8 bottom-6 sm:bottom-8 left-4 sm:left-6 z-50 w-[280px] transition-all duration-300 transform ${
               isExpanded
                 ? "translate-x-0 opacity-100 pointer-events-auto"
                 : "-translate-x-[340px] opacity-0 pointer-events-none"

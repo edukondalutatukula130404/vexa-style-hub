@@ -57,7 +57,7 @@ export function About() {
       <section className="relative overflow-hidden border-b border-border bg-background">
         <div className="relative mx-auto max-w-4xl px-5 py-24 text-center">
           <Reveal>
-            <p className="text-[10px] uppercase tracking-[0.35em] text-gold font-semibold">Est. 2024 • Bengaluru, India</p>
+            <p className="text-[10px] uppercase tracking-[0.35em] text-gold font-semibold">Est. 2026 • Hyderabad, India</p>
             <h1 className="mt-5 font-display text-4xl sm:text-6xl">
               We build the <span className="text-gold-gradient">definitive tee</span>
             </h1>

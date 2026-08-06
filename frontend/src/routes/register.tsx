@@ -69,10 +69,9 @@ export function Register() {
   };
 
   return (
-    <section className="mx-auto grid max-w-md px-5 pt-28 pb-20">
-      <Reveal>
-        <div className="rounded-sm border border-border bg-card p-9 shadow-goldy">
-          <div className="text-center">
+    <section className="mx-auto grid max-w-md px-5 pt-24 sm:pt-28 pb-16">
+      <div className="rounded-2xl border border-gold/40 bg-card p-6 sm:p-9 shadow-goldy">
+        <div className="text-center">
             <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
               VEXA
             </span>
@@ -194,7 +193,6 @@ export function Register() {
             </Link>
           </p>
         </div>
-      </Reveal>
     </section>
   );
 }

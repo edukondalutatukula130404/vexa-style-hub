@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Star, ShoppingBag, Eye, X, Check, ArrowRight, Minus, Plus } from "lucide-react";
+import { Star, ShoppingBag, Eye, X, Check, ArrowRight, Minus, Plus, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SIZES, type Product } from "@/lib/products";
 import { useAuth } from "@/lib/auth";
 import { addToCart } from "@/lib/cart";
+import { useWishlist, toggleWishlist } from "@/lib/wishlist";
 
 export function ProductCard({ product }: { product: Product }) {
   const { isLoggedIn } = useAuth();
+  const { isInWishlist } = useWishlist();
+  const isWishlisted = isInWishlist(product.id);
   const navigate = useNavigate();
   const [selectedSize, setSelectedSize] = useState("M");
   const [quantity, setQuantity] = useState(1);
@@ -37,6 +40,8 @@ export function ProductCard({ product }: { product: Product }) {
     setAddedMsg(`Added ${quantity} × ${product.name} (${selectedSize}) to Cart!`);
     setTimeout(() => setAddedMsg(""), 3000);
 
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
     if (isLoggedIn) {
       navigate("/dashboard?tab=cart");
     } else {
@@ -51,7 +56,7 @@ export function ProductCard({ product }: { product: Product }) {
         onClick={handleCardClick}
         className="group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy flex flex-col justify-between h-full w-full"
       >
-        <div className="relative overflow-hidden shrink-0">
+        <div className="relative overflow-hidden shrink-0 aspect-[3/4] w-full">
           <img
             src={product.image}
             alt={`${product.name} in ${product.color}`}
@@ -59,14 +64,32 @@ export function ProductCard({ product }: { product: Product }) {
             decoding="async"
             width={900}
             height={1100}
-            className="h-[280px] xs:h-[320px] sm:h-[360px] w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
-          <span className="absolute left-4 top-4 rounded-full border border-gold/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[#1c1917] font-extrabold shadow-md">
+          <span className="absolute left-3 top-3 rounded-full border border-gold/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[#1c1917] font-extrabold shadow-md">
             {product.category}
           </span>
-          <span className="btn-gold absolute right-4 top-4 rounded-full px-3 py-1 text-[10px]">
-            {off}% Off
-          </span>
+          <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5">
+            <span className="btn-gold rounded-full px-2.5 py-1 text-[10px] shadow-sm">
+              {off}% Off
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleWishlist(product);
+              }}
+              className={`flex size-8 items-center justify-center rounded-full border transition-all cursor-pointer shadow-md active:scale-90 ${
+                isWishlisted
+                  ? "border-red-500/80 bg-black/90 text-red-500 shadow-red-500/20"
+                  : "border-gold/50 bg-black/70 text-gold hover:bg-gold hover:text-primary-foreground"
+              }`}
+              title={isWishlisted ? "Remove from Wishlist" : "Save to Wishlist"}
+            >
+              <Heart className={`size-4 transition-all ${isWishlisted ? "fill-red-500 text-red-500 scale-110" : ""}`} />
+            </button>
+          </div>
 
           {/* Action Options Bar: Always visible on Mobile (< lg), Slide-up Hover on Desktop (>= lg) */}
           <div className="absolute inset-x-0 bottom-0 z-20 flex gap-2 bg-black/95 p-3.5 border-t border-gold/30 transition-all duration-500 ease-out opacity-100 translate-y-0 pointer-events-auto lg:opacity-0 lg:translate-y-full lg:pointer-events-none lg:group-hover:opacity-100 lg:group-hover:translate-y-0 lg:group-hover:pointer-events-auto">

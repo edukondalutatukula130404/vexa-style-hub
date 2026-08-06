@@ -410,27 +410,32 @@ export function Home() {
 
       {/* NEW ARRIVALS */}
       <section className="mx-auto max-w-7xl px-5 py-12 border-t border-border/40">
-        <div className="text-left mb-6">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.3em] text-gold">LATEST DROPS</p>
-          <h2 className="mt-1 font-display text-3xl sm:text-4xl font-bold text-foreground">
-            New Arrivals
-          </h2>
-          <Link
-            to="/products"
-            className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-gold hover:underline transition-transform hover:translate-x-1"
-          >
-            Explore All ({products.length}) <ArrowRight className="size-3.5" />
-          </Link>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
+          <div>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.3em] text-gold">LATEST DROPS</p>
+            <h2 className="mt-1 font-display text-3xl sm:text-4xl font-bold text-foreground">
+              New Arrivals
+            </h2>
+            <Link
+              to="/products"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-gold hover:underline transition-transform hover:translate-x-1"
+            >
+              Explore All ({products.length}) <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
         </div>
 
-        {/* New Arrivals Product Cards */}
+        {/* New Arrivals Side Scrolling Container */}
         <div
           ref={newArrivalsRef}
-          className="mt-6 flex overflow-x-auto gap-5 pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:grid sm:gap-8 sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-4"
+          className="mt-4 flex gap-5 overflow-x-auto pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar"
         >
           {newArrivals.map((p, i) => (
-            <div key={`new-${p.id}`} className="w-[280px] shrink-0 snap-start mobile-snap-item sm:w-auto sm:shrink sm:snap-none">
-              <Reveal delay={i * 90}>
+            <div
+              key={`new-${p.id}`}
+              className="w-[280px] xs:w-[300px] sm:w-[320px] shrink-0 snap-start flex flex-col h-full"
+            >
+              <Reveal delay={i * 90} className="h-full w-full flex flex-col">
                 <ProductCard product={p} />
               </Reveal>
             </div>
@@ -440,29 +445,29 @@ export function Home() {
 
       {/* COLLECTION */}
       <section className="mx-auto max-w-7xl px-5 pb-24">
-        <Reveal className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div>
             <p className="text-[10px] uppercase tracking-[0.3em] text-gold">Explore the catalog</p>
-            <h2 className="mt-3 font-display text-3xl sm:text-4xl">Featured Collection</h2>
+            <h2 className="mt-1 font-display text-3xl sm:text-4xl font-bold">Featured Collection</h2>
+            <Link
+              to="/products"
+              className="mt-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gold hover:underline transition-transform hover:translate-x-1"
+            >
+              View all ({products.length}) <ArrowRight className="size-4" />
+            </Link>
           </div>
+        </div>
 
-          <Link
-            to="/products"
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gold transition-transform hover:translate-x-1"
-          >
-            View all ({products.length}) <ArrowRight className="size-4" />
-          </Link>
-        </Reveal>
-
-
-
-        {/* Featured Products List (Side scrolling on mobile, grid on desktop) */}
+        {/* Featured Collection Side Scrolling Container */}
         <div
           ref={featuredRef}
-          className="mt-10 flex overflow-x-auto gap-5 pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:grid sm:gap-8 sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-3 xl:grid-cols-4"
+          className="mt-4 flex gap-5 overflow-x-auto pb-6 pt-2 snap-x snap-mandatory scroll-smooth no-scrollbar"
         >
           {filteredProducts.map((p, i) => (
-            <div key={p.id} className="w-[280px] shrink-0 snap-start mobile-snap-item sm:w-auto sm:shrink sm:snap-none flex flex-col h-full">
+            <div
+              key={p.id}
+              className="w-[280px] xs:w-[300px] sm:w-[320px] shrink-0 snap-start flex flex-col h-full"
+            >
               <Reveal delay={(i % 4) * 90} className="h-full w-full flex flex-col">
                 <ProductCard product={p} />
               </Reveal>

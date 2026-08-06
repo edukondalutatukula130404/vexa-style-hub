@@ -1,8 +1,9 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronDown } from "lucide-react";
+import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronDown, Heart } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
+import { useWishlist } from "@/lib/wishlist";
 
 const baseLinks = [
   { to: "/", label: "Home" },
@@ -13,12 +14,16 @@ const baseLinks = [
 ];
 
 export function Navbar() {
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState(true);
   const { isLoggedIn, isAdmin, logout } = useAuth();
   const { cartItems } = useCart();
+  const { wishlistItems } = useWishlist();
   const totalCartCount = (cartItems || []).reduce((acc, item) => acc + (item?.quantity || 1), 0);
+  const wishlistCount = (wishlistItems || []).length;
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -111,52 +116,70 @@ export function Navbar() {
 
           {/* Right Section Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Cart Button */}
-            <Link
-              to="/dashboard?tab=cart"
-              className="relative flex items-center justify-center p-2 text-gold hover:text-gold/80 sm:bg-gold sm:text-primary-foreground sm:hover:bg-gold/90 sm:px-3.5 sm:py-2 sm:rounded-sm sm:shadow-goldy transition-all cursor-pointer active:scale-95 text-xs font-bold uppercase tracking-[0.16em]"
-              title="View Cart"
-            >
-              <ShoppingCart className="size-5 sm:size-4" />
-              <span className="hidden sm:inline sm:ml-2">Cart</span>
-              {totalCartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 sm:static sm:ml-1.5 flex size-4.5 items-center justify-center rounded-full bg-gold text-primary-foreground sm:bg-background sm:text-gold text-[10px] font-extrabold shadow border border-gold/50 font-mono">
-                  {totalCartCount}
-                </span>
-              )}
-            </Link>
+            {/* Wishlist Symbol / Icon (Only visible when user is logged in) */}
+            {isLoggedIn && (
+              <Link
+                to="/dashboard?tab=wishlist"
+                className="relative flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+                title="My Wishlist"
+              >
+                <Heart className="size-5 sm:size-6" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex size-4.5 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-extrabold shadow border border-background font-mono">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
-            {/* Desktop Web App: Login / Profile Button */}
+            {/* Cart Symbol / Icon (Only visible when user is logged in) */}
+            {isLoggedIn && (
+              <Link
+                to="/dashboard?tab=cart"
+                className="relative flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+                title="View Cart"
+              >
+                <ShoppingCart className="size-5 sm:size-6" />
+                {totalCartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex size-4.5 items-center justify-center rounded-full bg-gold text-primary-foreground text-[10px] font-extrabold shadow border border-background font-mono">
+                    {totalCartCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
+            {/* Account / Login Option in Navbar (Hidden on mobile responsive, shown on >= sm) */}
             {isLoggedIn ? (
               <Link
                 to={accountPath}
-                className="btn-outline-gold hidden lg:inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold hover:bg-gold hover:text-primary-foreground transition-all shadow-sm cursor-pointer"
+                className="relative hidden sm:flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
                 title={isAdmin ? "Admin Portal" : "My Profile Dashboard"}
               >
-                <User className="size-4" />
-                <span>{isAdmin ? "Admin Portal" : "Profile"}</span>
-                <ChevronDown className="size-3.5" />
+                <User className="size-5 sm:size-6" />
               </Link>
             ) : (
               <Link
                 to="/login"
-                className="btn-gold hover:btn-gold-hover hidden lg:inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition-all shadow-goldy cursor-pointer active:scale-95"
+                className="btn-gold hover:btn-gold-hover inline-flex items-center gap-1.5 rounded-sm px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-all shadow-goldy cursor-pointer active:scale-95 ml-1"
+                title="Login to Account"
               >
-                <User className="size-4" />
+                <User className="size-3.5" />
                 <span>Login</span>
               </Link>
             )}
 
-            {/* Mobile View: Three-Lines Icon -> Opens Right Slide-Over Navigation Drawer */}
-            <button
-              type="button"
-              aria-label="Toggle Navigation Menu"
-              onClick={() => setOpen((o) => !o)}
-              className="flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
-              title="Toggle Menu"
-            >
-              {open ? <ChevronDown className="size-5" /> : <Menu className="size-5" />}
-            </button>
+            {/* Mobile View: Hamburger Menu Button (Only shown when user IS logged in) */}
+            {isLoggedIn && (
+              <button
+                type="button"
+                aria-label="Toggle Navigation Menu"
+                onClick={() => setOpen((o) => !o)}
+                className="flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+                title="Toggle Menu"
+              >
+                {open ? <ChevronDown className="size-5" /> : <Menu className="size-5" />}
+              </button>
+            )}
           </div>
         </nav>
       </header>

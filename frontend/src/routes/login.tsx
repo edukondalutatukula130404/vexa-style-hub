@@ -96,13 +96,12 @@ export function Login() {
   };
 
   return (
-    <section className="mx-auto grid max-w-md px-5 pt-28 pb-20">
-      <Reveal>
-        <div className="rounded-sm border border-border bg-card p-9 shadow-goldy">
-          <div className="text-center">
-            <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
-              VEXA
-            </span>
+    <section className="mx-auto grid max-w-md px-5 pt-24 sm:pt-28 pb-16">
+      <div className="rounded-2xl border border-gold/40 bg-card p-6 sm:p-9 shadow-goldy">
+        <div className="text-center">
+          <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
+            VEXA
+          </span>
             <h1 className="mt-6 font-display text-3xl">Welcome back</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Sign in to access your VEXA account.
@@ -193,7 +192,6 @@ export function Login() {
             </Link>
           </p>
         </div>
-      </Reveal>
 
       {/* FORGOT PASSWORD 6-DIGIT OTP MODAL */}
       {showForgotModal && (

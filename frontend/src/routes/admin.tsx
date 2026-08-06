@@ -694,7 +694,8 @@ export function Admin() {
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.data || []);
-        setUsersList(list);
+        const onlyUsers = list.filter((u: any) => u && u.role !== "admin");
+        setUsersList(onlyUsers);
       }
     } catch (err) {
       console.warn("Error fetching users list:", err);
@@ -2155,8 +2156,8 @@ export function Admin() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {usersList.length > 0 ? (
-                        usersList.map((u) => (
+                      {usersList.filter((u) => u && u.role !== "admin").length > 0 ? (
+                        usersList.filter((u) => u && u.role !== "admin").map((u) => (
                           <tr
                             key={u._id}
                             onClick={() => setSelectedUserDetails(u)}

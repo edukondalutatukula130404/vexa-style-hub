@@ -32,11 +32,13 @@ import {
   Edit3,
   Home,
   Briefcase,
+  Heart,
 } from "lucide-react";
 import { products, useProducts, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL, setLoggedIn } from "@/lib/auth";
-import { useCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
+import { useCart, addToCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
+import { useWishlist, removeFromWishlist, clearWishlist } from "@/lib/wishlist";
 import { Footer } from "@/components/Footer";
 
 type OrderItem = {
@@ -58,12 +60,13 @@ type OrderItem = {
   createdAt: string;
 };
 
-type TabType = "profile" | "orders" | "addresses" | "cart" | "support" | "booking";
+type TabType = "profile" | "orders" | "addresses" | "cart" | "wishlist" | "support" | "booking";
 
 export function UserDashboard() {
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
   const { cartItems, totalAmount } = useCart();
+  const { wishlistItems } = useWishlist();
   const { allProducts } = useProducts();
 
   const [bookingCategoryFilter, setBookingCategoryFilter] = useState<string>("All");
@@ -89,7 +92,7 @@ export function UserDashboard() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && ["profile", "orders", "addresses", "cart", "support", "booking"].includes(tabParam)) {
+      if (tabParam && ["profile", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
         return tabParam as TabType;
       }
     }
@@ -98,16 +101,19 @@ export function UserDashboard() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["profile", "orders", "addresses", "cart", "support", "booking"].includes(tabParam)) {
+    if (tabParam && ["profile", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
       setActiveTab(tabParam as TabType);
     }
   }, [searchParams]);
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    const tabParam = searchParams.get("tab");
+    const targetTab = tabParam || activeTab;
+    if (!isLoggedIn && targetTab !== "cart" && targetTab !== "wishlist") {
+      localStorage.setItem("vexa_redirect_after_login", `/dashboard?tab=${targetTab}`);
       navigate("/login");
     }
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn, navigate, activeTab, searchParams]);
 
   // Orders State & Sort Options
   const [myOrders, setMyOrders] = useState<OrderItem[]>([]);
@@ -358,7 +364,10 @@ export function UserDashboard() {
   };
 
   // Order Placement State & Checkout Flow
-  const [cartCheckoutStep, setCartCheckoutStep] = useState<"cart" | "address" | "payment">("cart");
+  const [cartCheckoutStep, setCartCheckoutStep] = useState<"cart" | "address" | "payment" | "success">("cart");
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<any>(null);
+  const [showAddNewAddressForm, setShowAddNewAddressForm] = useState(false);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>("M");
   const [quantity, setQuantity] = useState<number>(1);
@@ -380,6 +389,40 @@ export function UserDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const isExpanded = !sidebarCollapsed || sidebarHovered;
+
+  // Dynamic Cart Price, Offer Savings & Delivery Fee Calculations
+  const totalCartItemsCount = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  }, [cartItems]);
+
+  const totalOfferDiscount = useMemo(() => {
+    return cartItems.reduce((sum, item) => {
+      const oldP = item.product?.oldPrice || item.product?.price || 0;
+      const price = item.product?.price || 0;
+      const diff = Math.max(0, oldP - price);
+      return sum + diff * (item.quantity || 1);
+    }, 0);
+  }, [cartItems]);
+
+  const totalOriginalMRP = useMemo(() => {
+    return cartItems.reduce((sum, item) => {
+      const oldP = item.product?.oldPrice || item.product?.price || 0;
+      return sum + oldP * (item.quantity || 1);
+    }, 0);
+  }, [cartItems]);
+
+  const deliveryCharge = useMemo(() => {
+    return totalCartItemsCount === 1 ? 99 : 0;
+  }, [totalCartItemsCount]);
+
+  const finalOrderTotal = useMemo(() => {
+    return totalAmount + deliveryCharge;
+  }, [totalAmount, deliveryCharge]);
+
+  // Scroll to top on active tab or checkout step change
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [activeTab, cartCheckoutStep]);
 
   // Sync user auth details when available
   useEffect(() => {
@@ -745,6 +788,8 @@ export function UserDashboard() {
         ? selectedProduct.price * quantity
         : 0;
 
+      const finalPayable = isCart ? finalOrderTotal : calculatedTotal;
+
       const fullAddr = shippingAddress || `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
 
       const demoOrderObj: OrderItem = {
@@ -752,12 +797,14 @@ export function UserDashboard() {
         userEmail: email,
         userName: name,
         items: itemsToOrder,
-        totalAmount: calculatedTotal,
+        totalAmount: finalPayable,
         status: "Processing",
         paymentMethod: paymentMethod || "Demo Cash on Delivery (COD)",
         shippingAddress: fullAddr,
         createdAt: new Date().toISOString(),
       };
+
+      setLastPlacedOrder(demoOrderObj);
 
       // 1. Instantly append to order state & localStorage cache
       setMyOrders((prev) => [demoOrderObj, ...prev]);
@@ -788,17 +835,16 @@ export function UserDashboard() {
         clearCart();
       }
 
-      // 3. Reset Checkout Flow State
+      // 3. Reset Checkout Flow State to ORDER SUCCESSFUL PAGE
       setSelectedProduct(null);
       setIsCartCheckout(false);
-      setCartCheckoutStep("cart");
+      setCartCheckoutStep("success");
       setCheckoutStep(1);
 
-      // 4. Update URL to ?tab=orders & switch tab directly to MY ORDERS
+      // 4. Keep user on Order Successful Page screen
       if (typeof window !== "undefined") {
-        window.history.pushState({}, "", "/dashboard?tab=orders");
+        window.history.pushState({}, "", "/dashboard?tab=cart");
       }
-      setActiveTab("orders");
 
       // 5. Post to backend asynchronously in background (non-blocking) & sync real MongoDB ID
       fetch(`${API_URL}/orders`, {
@@ -849,6 +895,7 @@ export function UserDashboard() {
     { id: "profile", label: "My Profile", icon: UserIcon },
     { id: "orders", label: "My Orders", icon: Package },
     { id: "cart", label: "My Cart", icon: ShoppingBag },
+    { id: "wishlist", label: "My Wishlist", icon: Heart },
     { id: "booking", label: "Book New Tee", icon: Sparkles },
     { id: "addresses", label: "Addresses", icon: MapPin },
     { id: "support", label: "Support", icon: HelpCircle },
@@ -1694,9 +1741,16 @@ export function UserDashboard() {
                                     Color: {ci.product.color} • Size:{" "}
                                     <span className="text-gold font-bold">{ci.size}</span>
                                   </p>
-                                  <p className="text-xs text-gold font-bold mt-1">
-                                    ₹{ci.product.price.toLocaleString("en-IN")}
-                                  </p>
+                                  <div className="flex items-baseline gap-2 mt-1">
+                                    <span className="text-xs text-gold font-bold">
+                                      ₹{ci.product.price.toLocaleString("en-IN")}
+                                    </span>
+                                    {ci.product.oldPrice && ci.product.oldPrice > ci.product.price && (
+                                      <span className="text-[11px] text-muted-foreground line-through">
+                                        ₹{ci.product.oldPrice.toLocaleString("en-IN")}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
@@ -1738,26 +1792,54 @@ export function UserDashboard() {
                           ))}
                         </div>
 
-                        {/* Cart Summary */}
-                        <div className="h-fit rounded-xl border border-gold/40 bg-card p-6 space-y-4 shadow-sm">
+                        {/* Cart Summary (Sticky on Desktop) */}
+                        <div className="lg:sticky lg:top-28 h-fit rounded-xl border border-gold/40 bg-card p-6 space-y-4 shadow-sm z-10">
                           <h3 className="font-display text-lg font-bold text-foreground border-b border-border pb-3">
                             Order Summary
                           </h3>
 
-                          <div className="space-y-2 text-xs text-muted-foreground">
+                          <div className="space-y-2.5 text-xs text-muted-foreground">
+                            {/* Original Total Price (MRP) */}
+                            {totalOriginalMRP > totalAmount && (
+                              <div className="flex justify-between">
+                                <span>Original Price (MRP)</span>
+                                <span className="text-muted-foreground line-through font-medium">₹{totalOriginalMRP.toLocaleString("en-IN")}</span>
+                              </div>
+                            )}
+
                             <div className="flex justify-between">
-                              <span>Items ({cartItems.reduce((acc, i) => acc + i.quantity, 0)})</span>
+                              <span>Discounted Price ({totalCartItemsCount})</span>
                               <span className="text-foreground font-semibold">₹{totalAmount.toLocaleString("en-IN")}</span>
                             </div>
+
+                            {/* Offer Savings / Discount */}
+                            {totalOfferDiscount > 0 && (
+                              <div className="flex justify-between text-emerald-600 font-bold">
+                                <span>Offer Savings / Discount</span>
+                                <span>- ₹{totalOfferDiscount.toLocaleString("en-IN")}</span>
+                              </div>
+                            )}
+
+                            {/* Pan-India Express Shipping */}
                             <div className="flex justify-between">
-                              <span>Pan-India Delivery</span>
-                              <span className="text-gold font-bold">FREE</span>
+                              <span>Pan-India Express Shipping</span>
+                              {deliveryCharge > 0 ? (
+                                <span className="text-foreground font-bold text-gold">₹{deliveryCharge}</span>
+                              ) : (
+                                <span className="text-gold font-bold">FREE (₹0)</span>
+                              )}
                             </div>
+
+                            {totalCartItemsCount === 1 && (
+                              <div className="rounded-lg bg-gold/10 border border-gold/30 p-2.5 text-[11px] text-gold font-bold text-center mt-1">
+                                💡 Add 1 more product to get FREE Delivery!
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex justify-between border-t border-border pt-3 font-display text-lg font-bold text-foreground">
                             <span>Total Price</span>
-                            <span className="text-gold">₹{totalAmount.toLocaleString("en-IN")}</span>
+                            <span className="text-gold">₹{finalOrderTotal.toLocaleString("en-IN")}</span>
                           </div>
 
                           <button
@@ -1789,7 +1871,7 @@ export function UserDashboard() {
                   </>
                 )}
 
-                {/* PAGE STEP 1: ADDRESS DETAILS */}
+                {/* PAGE STEP 1: ADDRESS DETAILS & SAVED ADDRESS CARDS */}
                 {cartCheckoutStep === "address" && (
                   <div className="space-y-6 max-w-2xl animate-in fade-in duration-300 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-2">
@@ -1806,110 +1888,187 @@ export function UserDashboard() {
                       </button>
                     </div>
 
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const fullAddr = `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
-                        setShippingAddress(fullAddr);
-                        setCartCheckoutStep("payment");
-                      }}
-                      className="rounded-xl border border-gold/40 bg-card p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5 min-w-0"
-                    >
-                      <div className="border-b border-border pb-3">
-                        <h3 className="font-display text-base font-bold text-foreground">Enter Recipient & Shipping Address</h3>
-                        <p className="text-xs text-muted-foreground">Please enter your complete address details before proceeding to payment.</p>
-                      </div>
+                    {/* Requirement 3: Saved Address Cards + Add New Address Toggle Option */}
+                    {savedAddresses.length > 0 && (
+                      <div className="space-y-3 rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-sm">
+                        <div className="flex items-center justify-between border-b border-border pb-3">
+                          <h3 className="font-display text-sm font-bold text-foreground">Select Saved Delivery Address</h3>
+                          <button
+                            type="button"
+                            onClick={() => setShowAddNewAddressForm(!showAddNewAddressForm)}
+                            className="flex items-center gap-1.5 rounded-md border border-gold/50 bg-gold/10 px-3 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm"
+                          >
+                            <Plus className="size-3.5" /> {showAddNewAddressForm ? "Use Saved Address" : "Add New Address"}
+                          </button>
+                        </div>
 
-                      <div className="grid gap-3.5 sm:grid-cols-2">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Full Name *</label>
-                          <input
-                            required
-                            type="text"
-                            value={shippingName}
-                            onChange={(e) => setShippingName(e.target.value)}
-                            placeholder="Full Name"
-                            className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                          />
+                        {!showAddNewAddressForm && (
+                          <div className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {savedAddresses.map((addr) => {
+                                const isSelected = selectedSavedAddressId === addr.id;
+                                return (
+                                  <div
+                                    key={addr.id}
+                                    onClick={() => {
+                                      setSelectedSavedAddressId(addr.id);
+                                      setShippingName(addr.name || user?.name || "EDUKONDALU");
+                                      setShippingPhone(addr.mobile || "9876543210");
+                                      setShippingStreet(addr.address || "");
+                                      setShippingCity(addr.city || "Bengaluru");
+                                      setShippingState(addr.state || "Karnataka");
+                                      setShippingPincode(addr.pincode || "560038");
+                                      setShippingAddress(`${addr.name} (+91 ${addr.mobile}), ${addr.address}, ${addr.city}, ${addr.state} - ${addr.pincode}`);
+                                    }}
+                                    className={`rounded-xl border p-4 cursor-pointer transition-all ${
+                                      isSelected
+                                        ? "border-gold bg-gold/15 shadow-goldy font-bold"
+                                        : "border-border bg-background hover:border-gold/50"
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2 border-b border-border/40 pb-2">
+                                      <span className="font-bold text-xs text-foreground truncate">{addr.name}</span>
+                                      {addr.isDefault && (
+                                        <span className="rounded-full bg-gold/15 border border-gold/50 px-2 py-0.5 text-[9px] font-bold text-gold uppercase shrink-0">
+                                          Default
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{addr.address}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{addr.city}, {addr.state} - {addr.pincode}</p>
+                                    <p className="text-xs text-gold font-mono font-bold mt-1.5">+91 {addr.mobile}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setCartCheckoutStep("cart")}
+                                className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer w-full sm:w-auto text-center"
+                              >
+                                ← Back to Cart
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCartCheckoutStep("payment")}
+                                className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2 shadow-sm w-full text-center"
+                              >
+                                Proceed to Payment <ArrowRight className="size-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(showAddNewAddressForm || savedAddresses.length === 0) && (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const fullAddr = `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
+                          setShippingAddress(fullAddr);
+                          setCartCheckoutStep("payment");
+                        }}
+                        className="rounded-xl border border-gold/40 bg-card p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5 min-w-0"
+                      >
+                        <div className="border-b border-border pb-3">
+                          <h3 className="font-display text-base font-bold text-foreground">Enter New Shipping Address Details</h3>
+                          <p className="text-xs text-muted-foreground">Please enter complete recipient details before proceeding to payment.</p>
+                        </div>
+
+                        <div className="grid gap-3.5 sm:grid-cols-2">
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Full Name *</label>
+                            <input
+                              required
+                              type="text"
+                              value={shippingName}
+                              onChange={(e) => setShippingName(e.target.value)}
+                              placeholder="Full Name"
+                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Mobile Phone Number *</label>
+                            <input
+                              required
+                              type="tel"
+                              value={shippingPhone}
+                              onChange={(e) => setShippingPhone(e.target.value)}
+                              placeholder="10-digit mobile number"
+                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold font-mono"
+                            />
+                          </div>
                         </div>
 
                         <div>
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Mobile Phone Number *</label>
-                          <input
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">House No / Building / Street Address *</label>
+                          <textarea
                             required
-                            type="tel"
-                            value={shippingPhone}
-                            onChange={(e) => setShippingPhone(e.target.value)}
-                            placeholder="10-digit mobile number"
-                            className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold font-mono"
+                            rows={2}
+                            value={shippingStreet}
+                            onChange={(e) => setShippingStreet(e.target.value)}
+                            placeholder="House No, Building name, Street name, Area"
+                            className="mt-1.5 w-full rounded-sm border border-border bg-background p-3 text-xs text-foreground outline-none focus:border-gold"
                           />
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">House No / Building / Street Address *</label>
-                        <textarea
-                          required
-                          rows={2}
-                          value={shippingStreet}
-                          onChange={(e) => setShippingStreet(e.target.value)}
-                          placeholder="House No, Building name, Street name, Area"
-                          className="mt-1.5 w-full rounded-sm border border-border bg-background p-3 text-xs text-foreground outline-none focus:border-gold"
-                        />
-                      </div>
+                        <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-3">
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">City *</label>
+                            <input
+                              required
+                              type="text"
+                              value={shippingCity}
+                              onChange={(e) => setShippingCity(e.target.value)}
+                              placeholder="Bengaluru"
+                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">State *</label>
+                            <input
+                              required
+                              type="text"
+                              value={shippingState}
+                              onChange={(e) => setShippingState(e.target.value)}
+                              placeholder="Karnataka"
+                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pincode *</label>
+                            <input
+                              required
+                              type="text"
+                              value={shippingPincode}
+                              onChange={(e) => setShippingPincode(e.target.value)}
+                              placeholder="560038"
+                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold font-mono"
+                            />
+                          </div>
+                        </div>
 
-                      <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-3">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">City *</label>
-                          <input
-                            required
-                            type="text"
-                            value={shippingCity}
-                            onChange={(e) => setShippingCity(e.target.value)}
-                            placeholder="Bengaluru"
-                            className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                          />
+                        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setCartCheckoutStep("cart")}
+                            className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer w-full sm:w-auto text-center"
+                          >
+                            ← Back to Cart
+                          </button>
+                          <button
+                            type="submit"
+                            className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2 shadow-sm w-full text-center"
+                          >
+                            Proceed to Payment <ArrowRight className="size-4" />
+                          </button>
                         </div>
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">State *</label>
-                          <input
-                            required
-                            type="text"
-                            value={shippingState}
-                            onChange={(e) => setShippingState(e.target.value)}
-                            placeholder="Karnataka"
-                            className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pincode *</label>
-                          <input
-                            required
-                            type="text"
-                            value={shippingPincode}
-                            onChange={(e) => setShippingPincode(e.target.value)}
-                            placeholder="560038"
-                            className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold font-mono"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setCartCheckoutStep("cart")}
-                          className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer w-full sm:w-auto text-center"
-                        >
-                          ← Back to Cart
-                        </button>
-                        <button
-                          type="submit"
-                          className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2 shadow-sm w-full text-center"
-                        >
-                          Proceed to Payment <ArrowRight className="size-4" />
-                        </button>
-                      </div>
-                    </form>
+                      </form>
+                    )}
                   </div>
                 )}
 
@@ -2017,13 +2176,26 @@ export function UserDashboard() {
                           <span>Subtotal:</span>
                           <span className="text-foreground font-semibold">₹{totalAmount.toLocaleString("en-IN")}</span>
                         </div>
+
+                        {totalOfferDiscount > 0 && (
+                          <div className="flex justify-between text-emerald-600 font-bold">
+                            <span>Total Offer Savings:</span>
+                            <span>- ₹{totalOfferDiscount.toLocaleString("en-IN")}</span>
+                          </div>
+                        )}
+
                         <div className="flex justify-between text-muted-foreground">
-                          <span>Express Pan-India Shipping:</span>
-                          <span className="text-gold font-bold">FREE</span>
+                          <span>Pan-India Express Shipping:</span>
+                          {deliveryCharge > 0 ? (
+                            <span className="text-foreground font-bold text-gold">₹{deliveryCharge}</span>
+                          ) : (
+                            <span className="text-gold font-bold">FREE (₹0)</span>
+                          )}
                         </div>
+
                         <div className="flex justify-between border-t border-gold/30 pt-2 font-bold text-foreground text-base">
                           <span>Total Payable:</span>
-                          <span className="text-gold">₹{totalAmount.toLocaleString("en-IN")}</span>
+                          <span className="text-gold">₹{finalOrderTotal.toLocaleString("en-IN")}</span>
                         </div>
                       </div>
 
@@ -2047,12 +2219,181 @@ export function UserDashboard() {
                             </>
                           ) : (
                             <>
-                              <CheckCircle2 className="size-4" /> Place Order — Total ₹{totalAmount.toLocaleString("en-IN")}
+                              <CheckCircle2 className="size-4" /> Place Order — Total ₹{finalOrderTotal.toLocaleString("en-IN")}
                             </>
                           )}
                         </button>
                       </div>
                     </form>
+                  </div>
+                )}
+
+                {/* Requirement 4: Dedicated Order Successful Page Redirection Screen */}
+                {cartCheckoutStep === "success" && (
+                  <div className="space-y-6 max-w-2xl mx-auto py-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="rounded-2xl border border-gold/40 bg-card p-6 sm:p-10 shadow-goldy space-y-6">
+                      <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-gold/15 border-2 border-gold text-gold shadow-md">
+                        <CheckCircle2 className="size-10 text-gold animate-bounce" />
+                      </div>
+
+                      <div>
+                        <span className="text-xs uppercase tracking-[0.25em] text-gold font-bold">Order Confirmed</span>
+                        <h2 className="mt-1 font-display text-2xl sm:text-3xl font-bold text-foreground">
+                          Order Placed Successfully! 🎉
+                        </h2>
+                        <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                          Thank you for shopping with VEXA. Your order has been placed successfully and is currently being prepared for dispatch.
+                        </p>
+                      </div>
+
+                      {/* Order Receipt Box */}
+                      {lastPlacedOrder && (
+                        <div className="rounded-xl border border-border bg-surface/50 p-4 sm:p-6 text-left space-y-3 text-xs">
+                          <div className="flex justify-between border-b border-border pb-3">
+                            <div>
+                              <span className="text-[10px] uppercase text-muted-foreground font-semibold">Order Reference ID</span>
+                              <p className="font-display font-bold text-foreground text-sm">
+                                #{String(lastPlacedOrder._id || lastPlacedOrder.id).slice(-8).toUpperCase()}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] uppercase text-muted-foreground font-semibold">Total Paid</span>
+                              <p className="font-display font-bold text-gold text-sm">
+                                ₹{(lastPlacedOrder.totalAmount || 0).toLocaleString("en-IN")}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 pt-1">
+                            <p className="text-muted-foreground"><span className="text-gold font-bold">Delivery Address:</span> {lastPlacedOrder.shippingAddress}</p>
+                            <p className="text-muted-foreground"><span className="text-gold font-bold">Payment Method:</span> {lastPlacedOrder.paymentMethod}</p>
+                            <p className="text-muted-foreground"><span className="text-gold font-bold">Estimated Delivery:</span> 2 – 4 Business Days (Pan-India Express)</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCartCheckoutStep("cart");
+                            setActiveTab("orders");
+                          }}
+                          className="btn-gold hover:btn-gold-hover w-full sm:w-auto rounded-lg px-8 py-3.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                        >
+                          <Package className="size-4" /> View My Orders & Track Status
+                        </button>
+
+                        <Link
+                          to="/products"
+                          onClick={() => setCartCheckoutStep("cart")}
+                          className="btn-outline-gold w-full sm:w-auto rounded-lg px-6 py-3.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer text-center"
+                        >
+                          Continue Shopping <ArrowRight className="size-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MY WISHLIST TAB (Full CRUD: View Saved Items, Move to Cart, Delete Item, Clear All) */}
+            {activeTab === "wishlist" && (
+              <div className="space-y-6 pt-3 sm:pt-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-display text-2xl font-bold text-foreground">My Wishlist</h2>
+                    <span className="rounded-full bg-gold/15 border border-gold/40 px-3 py-0.5 text-xs font-bold text-gold">
+                      {wishlistItems.length} Saved {wishlistItems.length === 1 ? "Item" : "Items"}
+                    </span>
+                  </div>
+                  {wishlistItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearWishlist}
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors uppercase tracking-wider font-semibold cursor-pointer w-fit"
+                    >
+                      Clear Wishlist
+                    </button>
+                  )}
+                </div>
+
+                {wishlistItems.length > 0 ? (
+                  <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {wishlistItems.map((p) => {
+                      const off = Math.round((1 - p.price / p.oldPrice) * 100);
+                      return (
+                        <div
+                          key={p.id}
+                          className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all hover:border-gold hover:shadow-goldy"
+                        >
+                          <div className="relative overflow-hidden aspect-[3/4] w-full">
+                            <img
+                              src={p.image}
+                              alt={p.name}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            <span className="absolute left-3 top-3 rounded-full border border-gold/60 bg-[#f4efe6] px-3 py-1 text-[10px] uppercase tracking-widest text-[#1c1917] font-extrabold shadow-md">
+                              {p.category}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeFromWishlist(p.id)}
+                              className="absolute right-3 top-3 z-10 flex size-8 items-center justify-center rounded-full border border-red-500/80 bg-black/90 text-red-500 shadow-md transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                              title="Remove from Wishlist"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+
+                          <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{p.color}</span>
+                                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">{off}% OFF</span>
+                              </div>
+                              <h3 className="font-display text-base font-bold text-foreground mt-1 line-clamp-1">
+                                {p.name}
+                              </h3>
+                              <div className="flex items-baseline gap-2 mt-1.5">
+                                <span className="font-display text-lg font-extrabold text-gold">₹{p.price.toLocaleString("en-IN")}</span>
+                                <span className="text-xs text-muted-foreground line-through">₹{p.oldPrice.toLocaleString("en-IN")}</span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                addToCart(p, "M", 1);
+                                removeFromWishlist(p.id);
+                              }}
+                              className="btn-gold hover:btn-gold-hover w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-extrabold uppercase tracking-wider shadow-goldy cursor-pointer transition-transform active:scale-95"
+                            >
+                              <ShoppingBag className="size-4" /> Move to Cart
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center space-y-4 max-w-md mx-auto my-8">
+                    <div className="mx-auto flex size-16 items-center justify-center rounded-full border border-gold/50 bg-gold/10 text-gold shadow-goldy">
+                      <Heart className="size-8" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-display text-xl font-bold text-foreground">Your Wishlist is Empty</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Explore our luxury collection and click the heart icon on any product card to save your favorite drops.
+                      </p>
+                    </div>
+                    <Link
+                      to="/products"
+                      className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-lg px-6 py-3 text-xs font-bold uppercase tracking-widest shadow-goldy"
+                    >
+                      Explore Products <ArrowRight className="size-4" />
+                    </Link>
                   </div>
                 )}
               </div>

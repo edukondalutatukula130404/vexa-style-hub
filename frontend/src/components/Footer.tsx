@@ -55,7 +55,7 @@ export function Footer() {
           </ul>
         </div>
 
-        <div>
+        <div className="hidden sm:block">
           <h3 className="text-xs uppercase tracking-[0.25em] text-gold">Newsletter</h3>
           <p className="mt-5 text-sm text-muted-foreground">
             Early access to limited drops and 30% off your first order.
@@ -75,8 +75,11 @@ export function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-border py-6 text-center text-xs tracking-[0.15em] text-muted-foreground">
-        © {new Date().getFullYear()} VEXA APPAREL — ALL RIGHTS RESERVED
+      <div className="py-6 text-center text-xs tracking-[0.15em] text-muted-foreground space-y-2">
+        <div className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[0.35em] text-gold-gradient py-1">
+          V E X A
+        </div>
+        <p>© {new Date().getFullYear()} VEXA APPAREL — ALL RIGHTS RESERVED</p>
       </div>
     </footer>
   );

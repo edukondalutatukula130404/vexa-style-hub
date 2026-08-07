@@ -40,6 +40,7 @@ import { Footer } from "@/components/Footer";
 
 type OrderItem = {
   _id: string;
+  id?: string;
   userEmail: string;
   userName: string;
   items: Array<{
@@ -52,6 +53,7 @@ type OrderItem = {
   }>;
   totalAmount: number;
   status: "Processing" | "Shipped" | "Delivered" | "Cancelled";
+  cancelReason?: string;
   paymentMethod: string;
   shippingAddress: string;
   createdAt: string;
@@ -75,11 +77,24 @@ const kpis = [
 const sales = [42, 58, 51, 74, 66, 88, 79, 96, 84, 108, 97, 124];
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+const PRESET_COLOR_SWATCHES = [
+  { name: "Jet Black", hex: "#18181B" },
+  { name: "Ivory White", hex: "#FDFDFD", border: true },
+  { name: "Midnight Navy", hex: "#1E293B" },
+  { name: "Emerald Green", hex: "#064E3B" },
+  { name: "Vintage Rust", hex: "#8B3A2B" },
+  { name: "Desert Sand", hex: "#D4C3A3" },
+  { name: "Charcoal Grey", hex: "#3F3F46" },
+  { name: "Pastel Lavender", hex: "#C084FC" },
+  { name: "Luxury Cream & Gold", hex: "#F5F0E6", border: true },
+  { name: "Olive Green", hex: "#4A5D4E" },
+];
+
 export function Admin() {
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
   const { products: catalogProducts } = useProducts();
-  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "orders" | "add-item" | "categories" | "users" | "home-media">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "orders" | "add-item" | "categories" | "users" | "home-media" | "coupons" | "reviews" | "settings" | string>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -502,13 +517,156 @@ export function Admin() {
 
   // New Collection Form State
   const [newItemName, setNewItemName] = useState("");
-  const [newItemPrice, setNewItemPrice] = useState("");
+  const [newItemMrpPrice, setNewItemMrpPrice] = useState("2499");
+  const [newItemSellingPrice, setNewItemSellingPrice] = useState("1699");
+  const [newItemPrice, setNewItemPrice] = useState("1699");
   const [newItemCategory, setNewItemCategory] = useState("Oversized");
-  const [newItemColor, setNewItemColor] = useState("Black");
+  const [newItemColor, setNewItemColor] = useState("Jet Black");
+  const [newItemColors, setNewItemColors] = useState<string[]>(["Jet Black", "Ivory White"]);
+  const [newItemColorImages, setNewItemColorImages] = useState<Record<string, string>>({});
+  const [customColorInput, setCustomColorInput] = useState("");
   const [newItemCollectionType, setNewItemCollectionType] = useState("Explore Collections");
   const [newItemImage, setNewItemImage] = useState("");
   const [newItemDesc, setNewItemDesc] = useState("");
+  const [newItemStock, setNewItemStock] = useState("25");
   const [itemAddedMsg, setItemAddedMsg] = useState("");
+
+  const handleToggleNewItemColor = (colorName: string) => {
+    setNewItemColors((prev) => {
+      if (prev.includes(colorName)) {
+        if (prev.length === 1) return prev; // Keep at least one color
+        return prev.filter((c) => c !== colorName);
+      } else {
+        return [...prev, colorName];
+      }
+    });
+  };
+
+  const handleAddCustomColor = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!customColorInput.trim()) return;
+    const formatted = customColorInput.trim();
+    if (!newItemColors.includes(formatted)) {
+      setNewItemColors((prev) => [...prev, formatted]);
+    }
+    setCustomColorInput("");
+  };
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemName.trim()) return;
+
+    setItemAddedMsg("");
+    let finalImage = newItemImage.trim();
+
+    // If image is a base64 Data URL, upload it to Cloudinary database first
+    if (finalImage && finalImage.startsWith("data:")) {
+      try {
+        setUploadStatusMsg("Uploading image to Cloudinary database...");
+        const uploadRes = await fetch(`${API_URL}/upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: finalImage, folder: "vexa_items" }),
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadRes.ok && uploadData.success && uploadData.url) {
+          finalImage = uploadData.url;
+        }
+      } catch (err) {
+        console.warn("Base64 Cloudinary upload notice:", err);
+      } finally {
+        setUploadStatusMsg("");
+      }
+    }
+
+    const sellingPriceNum = Number(newItemSellingPrice) || Number(newItemPrice) || 1699;
+    const mrpPriceNum = Number(newItemMrpPrice) || Math.round(sellingPriceNum * 1.35);
+    const stockNum = Math.max(0, Number(newItemStock) || 25);
+    const colorList = newItemColors.length > 0 ? newItemColors : ["Jet Black", "Ivory White"];
+    const newItemId = `local-tee-${Date.now()}`;
+
+    const payload = {
+      id: newItemId,
+      _id: newItemId,
+      name: newItemName.trim(),
+      price: sellingPriceNum,
+      oldPrice: mrpPriceNum,
+      mrpPrice: mrpPriceNum,
+      category: newItemCategory,
+      collectionType: newItemCollectionType,
+      color: colorList[0],
+      colors: colorList,
+      colorImages: newItemColorImages,
+      image: finalImage || heroLuxuryImg,
+      description: newItemDesc.trim() || `${newItemName.trim()} 240 GSM heavy cotton tee.`,
+      stock: stockNum,
+      inStock: stockNum > 0,
+      rating: 5.0,
+      isNewDrop: true,
+    };
+
+    // 1. Post to backend API
+    try {
+      await fetch(`${API_URL}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.warn("POST item API notice:", err);
+    }
+
+    // 2. Save locally and update Inventory Management dynamically
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("vexa_custom_items");
+        const list = stored ? JSON.parse(stored) : [];
+        list.unshift(payload);
+        localStorage.setItem("vexa_custom_items", JSON.stringify(list));
+
+        // 3. AUTOMATICALLY ADD TO INVENTORY MANAGEMENT
+        const currentProductStocks = { ...stockMap, [newItemId]: stockNum };
+        setStockMap(currentProductStocks);
+        localStorage.setItem("vexa_product_stock", JSON.stringify(currentProductStocks));
+
+        const currentInv = { ...inventoryStocks, [newItemName.trim()]: stockNum };
+        setInventoryStocks(currentInv);
+        localStorage.setItem("vexa_inventory_stocks", JSON.stringify(currentInv));
+
+        // 4. Save per-color variant stocks so product page shows stock on color pick!
+        const storedVariants = JSON.parse(localStorage.getItem("vexa_variant_stocks") || "{}");
+        colorList.forEach((col) => {
+          ["XS", "S", "M", "L", "XL", "XXL"].forEach((sz) => {
+            const key = `${newItemId}_${col}_${sz}`.toLowerCase().replace(/[^a-z0-9]/g, "_");
+            storedVariants[key] = stockNum;
+          });
+        });
+        localStorage.setItem("vexa_variant_stocks", JSON.stringify(storedVariants));
+
+        // 5. Save per-color variant photos globally
+        localStorage.setItem(`vexa_color_images_${newItemId}`, JSON.stringify(newItemColorImages));
+
+        // Dispatch Global Events
+        window.dispatchEvent(new Event("vexa_items_updated"));
+        window.dispatchEvent(new Event("vexa_inventory_updated"));
+      } catch (err) {
+        console.warn("Error saving new item locally:", err);
+      }
+    }
+
+    // Reset Form
+    setItemAddedMsg(`✅ Tee "${newItemName.trim()}" created & automatically added to Inventory Management (${stockNum} units in stock)!`);
+    setNewItemName("");
+    setNewItemMrpPrice("2499");
+    setNewItemSellingPrice("1699");
+    setNewItemPrice("1699");
+    setNewItemImage("");
+    setNewItemDesc("");
+    setNewItemStock("25");
+    setNewItemColorImages({});
+    setShowAddForm(false);
+    setTimeout(() => setItemAddedMsg(""), 5000);
+  };
 
   const filteredCatalog = useMemo(() => {
     if (!catalogSearch.trim()) return catalogProducts;
@@ -556,11 +714,21 @@ export function Admin() {
     e.preventDefault();
     if (!editingItem) return;
 
+    const sellingPriceNum = Number(editingItem.price) || 1499;
+    const mrpPriceNum = Number(editingItem.oldPrice) || Math.round(sellingPriceNum * 1.35);
+    const colorList = editingItem.colors && editingItem.colors.length > 0
+      ? editingItem.colors
+      : [editingItem.color || "Jet Black"];
+
     const payload = {
       name: editingItem.name,
-      price: Number(editingItem.price),
+      price: sellingPriceNum,
+      oldPrice: mrpPriceNum,
+      mrpPrice: mrpPriceNum,
       category: editingItem.category,
       collectionType: (editingItem as any).collectionType || "Explore Collections",
+      color: colorList[0],
+      colors: colorList,
       image: editingItem.image,
       description: editingItem.description || `${editingItem.name} heavyweight cotton tee.`,
       inStock: editingItem.stock > 0,
@@ -832,73 +1000,6 @@ export function Admin() {
     }
   };
 
-  const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setItemAddedMsg("");
-
-    let finalImage = newItemImage;
-
-    // If image is a base64 Data URL, upload it to Cloudinary database first
-    if (finalImage && finalImage.startsWith("data:")) {
-      try {
-        setUploadStatusMsg("Uploading image to Cloudinary database...");
-        const uploadRes = await fetch(`${API_URL}/upload`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: finalImage, folder: "vexa_items" }),
-        });
-        const uploadData = await uploadRes.json();
-        if (uploadRes.ok && uploadData.success && uploadData.url) {
-          finalImage = uploadData.url;
-        }
-      } catch (err) {
-        console.warn("Base64 Cloudinary upload notice:", err);
-      }
-    }
-
-    const payload = {
-      name: newItemName,
-      price: Number(newItemPrice),
-      category: newItemCategory,
-      collectionType: newItemCollectionType,
-      image: finalImage || undefined,
-      description: newItemDesc || `${newItemCollectionType} - ${newItemCategory} heavyweight cotton tee in ${newItemColor}.`,
-      inStock: true,
-    };
-
-    // Save to local storage backup immediately
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("vexa_custom_items");
-        const list = stored ? JSON.parse(stored) : [];
-        list.unshift({ ...payload, _id: `local-${Date.now()}` });
-        localStorage.setItem("vexa_custom_items", JSON.stringify(list));
-      } catch (err) {
-        console.warn("Could not save to local custom items:", err);
-      }
-    }
-
-    try {
-      const res = await fetch(`${API_URL}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      await res.json();
-    } catch (err) {
-      console.warn("API item creation notice:", err);
-    }
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("vexa_items_updated"));
-    }
-    setItemAddedMsg(`New Tee "${newItemName}" added under [${newItemCollectionType}] successfully!`);
-    setNewItemName("");
-    setNewItemPrice("");
-    setNewItemDesc("");
-    setNewItemImage("");
-  };
-
   const maxSales = Math.max(...sales);
 
   return (
@@ -921,15 +1022,6 @@ export function Admin() {
                   </span>
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setMobileNavOpen(!mobileNavOpen)}
-                className="flex size-9 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0"
-                title="Toggle Admin Menu"
-              >
-                <Menu className="size-5" />
-              </button>
             </div>
 
             {/* Custom Mobile Dropdown Menu */}
@@ -940,9 +1032,9 @@ export function Admin() {
                 className="flex w-full items-center justify-between rounded-xl border border-gold/50 bg-card py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-foreground shadow-goldy transition-all hover:border-gold cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <Menu className="size-4 text-gold shrink-0" />
+                  <Boxes className="size-4 text-gold shrink-0" />
                   <span>
-                    {adminTabsList.find((t) => t.id === activeTab)?.label || "Admin Menu"}
+                    {adminTabsList.find((t) => t.id === activeTab)?.label || "Admin Navigation"}
                   </span>
                 </div>
                 <ChevronDown className={`size-4 text-gold transition-transform duration-300 ${mobileNavOpen ? "rotate-180" : ""}`} />
@@ -986,50 +1078,22 @@ export function Admin() {
             </div>
           </div>
 
-          {/* LEFT CORNER HOVER TRIGGER ZONE: Triggers floating sidebar when cursor touches left screen edge */}
-          <div
-            onMouseEnter={() => setSidebarHovered(true)}
-            className="hidden lg:block fixed top-6 left-0 bottom-0 w-6 z-40 cursor-pointer"
-            title="Hover left edge to open Admin Navigation Sidebar"
-          />
-
-          {/* DESKTOP ADMIN SIDEBAR (>= lg): Full-Height Viewport Drawer Panel */}
-          <aside
-            onMouseEnter={() => setSidebarHovered(true)}
-            onMouseLeave={() => setSidebarHovered(false)}
-            className={`hidden lg:block fixed top-6 sm:top-8 bottom-6 sm:bottom-8 left-4 sm:left-6 z-50 w-[280px] transition-all duration-300 transform ${
-              isExpanded
-                ? "translate-x-0 opacity-100 pointer-events-auto"
-                : "-translate-x-[340px] opacity-0 pointer-events-none"
-            }`}
-          >
-            <div className="h-full rounded-2xl border border-gold/50 bg-card/95 backdrop-blur-xl p-5 shadow-2xl flex flex-col justify-between transition-all duration-300">
-              {/* Header Logo & Pin Toggle */}
-              <div className="flex items-center justify-between border-b border-border pb-4 gap-3 shrink-0">
-                <div className="flex items-center gap-3 shrink-0 overflow-hidden">
-                  <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
-                    V
-                  </div>
-                  <div className="flex flex-col justify-center overflow-hidden space-y-1">
-                    <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
-                      V E X A
-                    </span>
-                    <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
-                      WEAR CONFIDENCE
-                    </span>
-                  </div>
+          {/* DESKTOP ADMIN SIDEBAR (>= lg): Permanently Fixed Panel (No Auto-Hide, No Hamburger) */}
+          <aside className="hidden lg:block fixed top-6 sm:top-8 bottom-6 sm:bottom-8 left-4 sm:left-6 z-50 w-[280px]">
+            <div className="h-full rounded-2xl border border-gold/50 bg-card/95 backdrop-blur-xl p-5 shadow-2xl flex flex-col justify-between">
+              {/* Header Logo */}
+              <div className="flex items-center gap-3 border-b border-border pb-4 shrink-0">
+                <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
+                  V
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                  className={`flex size-9 items-center justify-center rounded-lg border transition-all cursor-pointer shadow-goldy shrink-0 ${
-                    !sidebarCollapsed ? "border-gold bg-gold text-primary-foreground font-bold" : "border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground"
-                  }`}
-                  title={!sidebarCollapsed ? "Unpin / Auto-Hide Sidebar" : "Pin Admin Sidebar Open"}
-                >
-                  <Menu className="size-4.5" />
-                </button>
+                <div className="flex flex-col justify-center space-y-1 overflow-hidden">
+                  <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
+                    V E X A
+                  </span>
+                  <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
+                    WEAR CONFIDENCE
+                  </span>
+                </div>
               </div>
 
               {/* Middle Scrollable Section Navigation List */}
@@ -1043,13 +1107,13 @@ export function Admin() {
                       type="button"
                       title={t.label}
                       onClick={() => setActiveTab(t.id as any)}
-                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
                         isSelected
                           ? "bg-gold text-primary-foreground shadow-goldy font-extrabold"
                           : "text-muted-foreground hover:bg-surface hover:text-gold"
                       }`}
                     >
-                      <div className="flex items-center gap-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5 whitespace-nowrap">
                         <Icon className="size-4 shrink-0" />
                         <span>{t.label}</span>
                       </div>
@@ -1074,10 +1138,8 @@ export function Admin() {
             </div>
           </aside>
 
-          {/* ADMIN CONTENT & ALIGNED FOOTER COLUMN: Full width when unpinned, offset when pinned */}
-          <div className={`flex-1 min-w-0 flex flex-col w-full transition-all duration-300 ${
-            !sidebarCollapsed ? "lg:ml-[304px]" : "lg:ml-0"
-          }`}>
+          {/* ADMIN CONTENT COLUMN: Fixed left margin keeps content aligned beside fixed sidebar */}
+          <div className="flex-1 min-w-0 flex flex-col w-full lg:ml-[304px]">
             {/* MAIN CONTENT AREA */}
             <main className="w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
             {/* TAB: INVENTORY MANAGEMENT */}
@@ -1831,42 +1893,288 @@ export function Admin() {
                       />
                     </div>
 
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Price (INR)</label>
-                        <input
-                          required
-                          type="number"
-                          value={newItemPrice}
-                          onChange={(e) => setNewItemPrice(e.target.value)}
-                          placeholder="2499"
-                          className="mt-1.5 w-full rounded-sm border border-border bg-background px-4 py-3 text-xs outline-none focus:border-gold"
-                        />
+                    {/* Dynamic MRP Price & Selling Price Fields */}
+                    <div className="space-y-3">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-between">
+                            <span>MRP Price (INR)</span>
+                            <span className="text-[9px] text-muted-foreground/80 font-normal">Original Price</span>
+                          </label>
+                          <input
+                            required
+                            type="number"
+                            value={newItemMrpPrice}
+                            onChange={(e) => setNewItemMrpPrice(e.target.value)}
+                            placeholder="2499"
+                            className="mt-1.5 w-full rounded-sm border border-border bg-background px-4 py-3 text-xs outline-none focus:border-gold font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-gold font-bold flex items-center justify-between">
+                            <span>Selling Price (INR)</span>
+                            <span className="text-[9px] text-gold font-semibold">Special Offer</span>
+                          </label>
+                          <input
+                            required
+                            type="number"
+                            value={newItemSellingPrice}
+                            onChange={(e) => {
+                              setNewItemSellingPrice(e.target.value);
+                              setNewItemPrice(e.target.value);
+                            }}
+                            placeholder="1699"
+                            className="mt-1.5 w-full rounded-sm border border-gold/60 bg-background px-4 py-3 text-xs outline-none focus:border-gold font-bold text-gold"
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category</label>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab("categories")}
-                            className="text-[10px] font-bold text-gold hover:underline uppercase tracking-wider cursor-pointer"
-                          >
-                            + Add Category
-                          </button>
+                      {/* Dynamic Discount & Savings Banner */}
+                      {Number(newItemMrpPrice) > 0 && (
+                        <div className="rounded-lg border border-gold/50 bg-gold/15 p-3 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="size-4 text-gold shrink-0 animate-pulse" />
+                            {Number(newItemSellingPrice) > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-gold text-sm">
+                                  {Number(newItemSellingPrice) < Number(newItemMrpPrice)
+                                    ? `${Math.round(((Number(newItemMrpPrice) - Number(newItemSellingPrice)) / Number(newItemMrpPrice)) * 100)}% OFF`
+                                    : Number(newItemSellingPrice) === Number(newItemMrpPrice)
+                                    ? "No Discount (Full MRP)"
+                                    : "Selling Price > MRP"}
+                                </span>
+                                {Number(newItemMrpPrice) > Number(newItemSellingPrice) && (
+                                  <span className="text-xs text-foreground font-semibold bg-background/80 px-2 py-0.5 rounded border border-gold/30">
+                                    Save ₹{(Number(newItemMrpPrice) - Number(newItemSellingPrice)).toLocaleString("en-IN")}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs font-semibold text-gold">
+                                Select a discount preset below or enter selling price
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Discount Presets with Active Highlighting */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground font-bold mr-0.5">Preset:</span>
+                            {[10, 20, 30, 40, 50].map((pct) => {
+                              const mrp = Number(newItemMrpPrice) || 0;
+                              const selling = Number(newItemSellingPrice) || 0;
+                              const currentPct = mrp > 0 && selling > 0 && selling <= mrp
+                                ? Math.round(((mrp - selling) / mrp) * 100)
+                                : -1;
+                              const isActive = currentPct > 0 && Math.abs(currentPct - pct) <= 1;
+
+                              return (
+                                <button
+                                  key={pct}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (mrp <= 0) return;
+                                    const calc = Math.round(mrp * (1 - pct / 100));
+                                    setNewItemSellingPrice(String(calc));
+                                    setNewItemPrice(String(calc));
+                                  }}
+                                  className={`rounded-md px-2.5 py-1 text-xs font-extrabold transition-all cursor-pointer ${
+                                    isActive
+                                      ? "bg-gold text-primary-foreground border-2 border-gold shadow-md scale-105 ring-2 ring-gold/40"
+                                      : "border border-gold/50 bg-background text-gold hover:bg-gold hover:text-primary-foreground"
+                                  }`}
+                                  title={`Apply ${pct}% discount on ₹${mrp}`}
+                                >
+                                  {pct}%
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <select
-                          value={newItemCategory}
-                          onChange={(e) => setNewItemCategory(e.target.value)}
-                          className="mt-1.5 w-full rounded-sm border border-border bg-background px-4 py-3 text-xs outline-none focus:border-gold"
+                      )}
+                    </div>
+
+                    {/* Category Selection */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category</label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("categories")}
+                          className="text-[10px] font-bold text-gold hover:underline uppercase tracking-wider cursor-pointer"
                         >
-                          {categoriesList.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat}
-                            </option>
-                          ))}
-                        </select>
+                          + Add Category
+                        </button>
                       </div>
+                      <select
+                        value={newItemCategory}
+                        onChange={(e) => setNewItemCategory(e.target.value)}
+                        className="mt-1.5 w-full rounded-sm border border-border bg-background px-4 py-3 text-xs outline-none focus:border-gold"
+                      >
+                        {categoriesList.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Dynamic Color Options Section */}
+                    <div className="space-y-2.5 rounded-lg border border-border bg-surface/50 p-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5">
+                          <span>Color Options & Variants</span>
+                          <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[9px] text-gold font-extrabold">
+                            {newItemColors.length} Selected
+                          </span>
+                        </label>
+                        <span className="text-[10px] text-muted-foreground">Click swatch to add/remove</span>
+                      </div>
+
+                      {/* Color Swatches Grid */}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {PRESET_COLOR_SWATCHES.map((swatch) => {
+                          const isSelected = newItemColors.includes(swatch.name);
+                          return (
+                            <button
+                              key={swatch.name}
+                              type="button"
+                              onClick={() => handleToggleNewItemColor(swatch.name)}
+                              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-gold bg-gold/15 text-gold shadow-xs"
+                                  : "border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-foreground"
+                              }`}
+                            >
+                              <span
+                                className={`size-3 rounded-full border shrink-0 ${
+                                  swatch.border ? "border-gray-400" : "border-transparent"
+                                }`}
+                                style={{ backgroundColor: swatch.hex }}
+                              />
+                              <span>{swatch.name}</span>
+                              {isSelected && <Check className="size-3 text-gold" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Custom Color Input */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                        <input
+                          type="text"
+                          value={customColorInput}
+                          onChange={(e) => setCustomColorInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddCustomColor();
+                            }
+                          }}
+                          placeholder="Or type custom color (e.g. Royal Blue, Crimson)..."
+                          className="flex-1 rounded-sm border border-border bg-background px-3 py-2 text-xs outline-none focus:border-gold"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomColor}
+                          className="rounded-sm border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-bold text-gold transition-colors hover:bg-gold hover:text-primary-foreground cursor-pointer shrink-0"
+                        >
+                          + Add Color
+                        </button>
+                      </div>
+
+                      {/* Selected Color Badges List */}
+                      {newItemColors.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[10px] font-semibold text-muted-foreground">Active Colors:</span>
+                          {newItemColors.map((col) => (
+                            <span
+                              key={col}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-0.5 text-[10px] font-bold text-gold"
+                            >
+                              <span>{col}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleNewItemColor(col)}
+                                className="hover:text-destructive text-gold/70 cursor-pointer"
+                              >
+                                <X className="size-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Per-Color Variant Photos Upload Section */}
+                      {newItemColors.length > 0 && (
+                        <div className="space-y-2 pt-3 border-t border-gold/30 mt-2">
+                          <label className="text-[10px] uppercase tracking-wider text-gold font-bold flex items-center justify-between">
+                            <span>Color Variant Photos (Global Sync)</span>
+                            <span className="text-[9px] text-muted-foreground font-normal">Link specific photo to each colorway</span>
+                          </label>
+                          <div className="grid gap-2.5 sm:grid-cols-2">
+                            {newItemColors.map((col) => (
+                              <div key={col} className="flex flex-col gap-1.5 rounded-lg border border-gold/40 bg-gold/5 p-2.5 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                    <span className="size-2.5 rounded-full bg-gold inline-block" />
+                                    {col} Photo
+                                  </span>
+                                  {newItemColorImages[col] && (
+                                    <span className="text-[9px] text-emerald-400 font-bold">✓ Photo Added</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={newItemColorImages[col] || ""}
+                                    onChange={(e) => setNewItemColorImages({ ...newItemColorImages, [col]: e.target.value })}
+                                    placeholder={`Image URL for ${col}...`}
+                                    className="flex-1 rounded-sm border border-border bg-background px-2.5 py-1.5 text-[11px] outline-none focus:border-gold"
+                                  />
+                                  <label className="cursor-pointer shrink-0 rounded-sm border border-gold/40 bg-gold/10 px-2 py-1.5 text-[10px] font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-colors">
+                                    <Upload className="size-3 inline mr-1" /> File
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => handleFileUpload(e, (url) => setNewItemColorImages((prev) => ({ ...prev, [col]: url })))}
+                                    />
+                                  </label>
+                                </div>
+                                {newItemColorImages[col] && (
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <img src={newItemColorImages[col]} alt={col} className="size-9 rounded-md border border-gold/50 object-cover shadow-xs" />
+                                    <span className="text-[10px] text-muted-foreground truncate">{newItemColorImages[col]}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Initial Warehouse Stock Quantity Input */}
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-gold font-bold flex items-center justify-between">
+                        <span>Initial Stock Quantity (Units)</span>
+                        <span className="text-[9px] text-emerald-400 font-semibold">Auto-Syncs to Inventory Management</span>
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        value={newItemStock}
+                        onChange={(e) => setNewItemStock(e.target.value)}
+                        placeholder="25"
+                        className="mt-1.5 w-full rounded-sm border border-gold/50 bg-background px-4 py-3 text-xs outline-none focus:border-gold font-bold text-foreground"
+                      />
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Creating this tee automatically adds it to Inventory Management with this stock quantity.
+                      </p>
                     </div>
 
                     <div>
@@ -1977,12 +2285,37 @@ export function Admin() {
                                 </span>
                               </div>
 
-                              <p className="text-xs text-muted-foreground">
-                                Price: <span className="font-bold text-gold">₹{prod.price.toLocaleString("en-IN")}</span> • Color: <span className="text-foreground font-semibold">{prod.color || "Standard"}</span> • Rating: ⭐ {prod.rating}
-                              </p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1.5 font-semibold">
+                                  <span>Selling:</span>
+                                  <span className="font-bold text-gold text-sm">₹{prod.price.toLocaleString("en-IN")}</span>
+                                  {prod.oldPrice > prod.price && (
+                                    <span className="text-[11px] text-muted-foreground/70 line-through">
+                                      ₹{prod.oldPrice.toLocaleString("en-IN")}
+                                    </span>
+                                  )}
+                                  {prod.oldPrice > prod.price && (
+                                    <span className="rounded-full bg-gold/15 px-1.5 py-0.5 text-[9px] font-extrabold text-gold border border-gold/30">
+                                      {Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100)}% OFF
+                                    </span>
+                                  )}
+                                </div>
+                                <span>• Rating: ⭐ {prod.rating}</span>
+                              </div>
+
+                              {/* Color Options Pills */}
+                              <div className="flex flex-wrap items-center gap-1 pt-1">
+                                <span className="text-[10px] text-muted-foreground font-semibold">Colors ({ (prod.colors && prod.colors.length > 0 ? prod.colors : [prod.color || "Standard"]).length }):</span>
+                                {(prod.colors && prod.colors.length > 0 ? prod.colors : [prod.color || "Jet Black"]).map((col, i) => (
+                                  <span key={i} className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-bold text-foreground shadow-2xs">
+                                    <span className="size-1.5 rounded-full bg-gold" />
+                                    {col}
+                                  </span>
+                                ))}
+                              </div>
 
                               {prod.description && (
-                                <p className="text-[11px] text-muted-foreground/80 line-clamp-1 truncate">
+                                <p className="text-[11px] text-muted-foreground/80 line-clamp-1 truncate pt-0.5">
                                   {prod.description}
                                 </p>
                               )}
@@ -2049,30 +2382,151 @@ export function Admin() {
                       />
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Price (INR)</label>
-                        <input
-                          required
-                          type="number"
-                          value={editingItem.price}
-                          onChange={(e) => setEditingItem({ ...editingItem, price: Number(e.target.value) })}
-                          className="mt-1 w-full rounded-sm border border-border bg-background px-4 py-2.5 text-xs outline-none focus:border-gold"
-                        />
+                    {/* Dynamic MRP & Selling Price in Edit Modal */}
+                    <div className="space-y-3">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">MRP Price (INR)</label>
+                          <input
+                            required
+                            type="number"
+                            value={editingItem.oldPrice || Math.round(editingItem.price * 1.35)}
+                            onChange={(e) =>
+                              setEditingItem({
+                                ...editingItem,
+                                oldPrice: Number(e.target.value),
+                              })
+                            }
+                            className="mt-1 w-full rounded-sm border border-border bg-background px-4 py-2.5 text-xs outline-none focus:border-gold font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-gold font-bold">Selling Price (INR)</label>
+                          <input
+                            required
+                            type="number"
+                            value={editingItem.price}
+                            onChange={(e) =>
+                              setEditingItem({
+                                ...editingItem,
+                                price: Number(e.target.value),
+                              })
+                            }
+                            className="mt-1 w-full rounded-sm border border-gold/60 bg-background px-4 py-2.5 text-xs outline-none focus:border-gold font-bold text-gold"
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category</label>
-                        <select
-                          value={editingItem.category}
-                          onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value as any })}
-                          className="mt-1 w-full rounded-sm border border-border bg-background px-4 py-2.5 text-xs outline-none focus:border-gold"
-                        >
-                          <option value="Oversized">Oversized Fit</option>
-                          <option value="Classic">Classic Fit</option>
-                          <option value="Limited">Limited Drop</option>
-                          <option value="Graphic">Graphic Edition</option>
-                        </select>
+                      {/* Quick Discount Presets in Edit Modal */}
+                      <div className="flex flex-wrap items-center justify-between rounded-md border border-gold/40 bg-gold/10 p-2.5 text-xs gap-2">
+                        <div className="flex items-center gap-1.5 font-bold text-gold">
+                          <Sparkles className="size-3.5" />
+                          <span>
+                            {(editingItem.oldPrice || Math.round(editingItem.price * 1.35)) > editingItem.price
+                              ? `${Math.round((((editingItem.oldPrice || Math.round(editingItem.price * 1.35)) - editingItem.price) / (editingItem.oldPrice || Math.round(editingItem.price * 1.35))) * 100)}% OFF`
+                              : "No Discount"}
+                          </span>
+                          {(editingItem.oldPrice || Math.round(editingItem.price * 1.35)) > editingItem.price && (
+                            <span className="text-[10px] text-foreground font-semibold">
+                              (Save ₹{(editingItem.oldPrice || Math.round(editingItem.price * 1.35)) - editingItem.price})
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <span className="text-[9px] text-muted-foreground font-bold mr-1">Preset:</span>
+                          {[10, 20, 30, 40, 50].map((pct) => {
+                            const mrp = editingItem.oldPrice || Math.round(editingItem.price * 1.35);
+                            const selling = editingItem.price || 0;
+                            const currentPct = mrp > 0 && selling > 0 && selling <= mrp
+                              ? Math.round(((mrp - selling) / mrp) * 100)
+                              : -1;
+                            const isActive = currentPct > 0 && Math.abs(currentPct - pct) <= 1;
+
+                            return (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (mrp <= 0) return;
+                                  const newSelling = Math.round(mrp * (1 - pct / 100));
+                                  setEditingItem({ ...editingItem, price: newSelling, oldPrice: mrp });
+                                }}
+                                className={`rounded px-2 py-0.5 text-[10px] font-extrabold transition-all cursor-pointer ${
+                                  isActive
+                                    ? "bg-gold text-primary-foreground border-2 border-gold shadow-md scale-105 ring-1 ring-gold/40"
+                                    : "border border-gold/40 bg-background text-gold hover:bg-gold hover:text-primary-foreground"
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Category</label>
+                      <select
+                        value={editingItem.category}
+                        onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value as any })}
+                        className="mt-1 w-full rounded-sm border border-border bg-background px-4 py-2.5 text-xs outline-none focus:border-gold"
+                      >
+                        <option value="Oversized">Oversized Fit</option>
+                        <option value="Classic">Classic Fit</option>
+                        <option value="Limited">Limited Drop</option>
+                        <option value="Graphic">Graphic Edition</option>
+                      </select>
+                    </div>
+
+                    {/* Color Options in Edit Modal */}
+                    <div className="space-y-2 rounded-lg border border-border bg-surface/50 p-3">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                        Color Options & Variants
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PRESET_COLOR_SWATCHES.map((swatch) => {
+                          const activeColors = editingItem.colors && editingItem.colors.length > 0 ? editingItem.colors : [editingItem.color || "Jet Black"];
+                          const isSelected = activeColors.includes(swatch.name);
+                          return (
+                            <button
+                              key={swatch.name}
+                              type="button"
+                              onClick={() => {
+                                let updatedColors: string[];
+                                if (isSelected) {
+                                  if (activeColors.length === 1) return;
+                                  updatedColors = activeColors.filter((c) => c !== swatch.name);
+                                } else {
+                                  updatedColors = [...activeColors, swatch.name];
+                                }
+                                setEditingItem({
+                                  ...editingItem,
+                                  color: updatedColors[0],
+                                  colors: updatedColors,
+                                });
+                              }}
+                              className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-gold bg-gold/15 text-gold"
+                                  : "border-border bg-background text-muted-foreground hover:border-gold/50"
+                              }`}
+                            >
+                              <span
+                                className={`size-2.5 rounded-full border shrink-0 ${
+                                  swatch.border ? "border-gray-400" : "border-transparent"
+                                }`}
+                                style={{ backgroundColor: swatch.hex }}
+                              />
+                              <span>{swatch.name}</span>
+                              {isSelected && <Check className="size-2.5 text-gold" />}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 

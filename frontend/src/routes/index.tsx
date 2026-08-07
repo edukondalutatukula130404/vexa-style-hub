@@ -219,7 +219,7 @@ export function Home() {
   }, [products, newArrivalIds]);
 
   return (
-    <>
+    <div className="home-page-root no-scrollbar w-full overflow-x-hidden">
       {/* HERO */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
@@ -523,6 +523,6 @@ export function Home() {
           </div>
         </Reveal>
       </section>
-    </>
+    </div>
   );
 }

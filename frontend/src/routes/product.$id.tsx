@@ -19,8 +19,10 @@ import {
   Plus,
   RotateCcw,
   Check,
+  AlertCircle,
+  PackageX,
 } from "lucide-react";
-import { useProducts, SIZES, type Product } from "@/lib/products";
+import { useProducts, SIZES, getVariantStock, type Product } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { addToCart } from "@/lib/cart";
@@ -125,7 +127,7 @@ export function ProductDetailPage() {
     if (!products || products.length === 0) return null;
     return (
       products.find((p) => p.id === id) ||
-      products.find((p) => p.id.toLowerCase() === id.toLowerCase()) ||
+      products.find((p) => p.id && id && p.id.toLowerCase() === id.toLowerCase()) ||
       products[0]
     );
   }, [products, id]);
@@ -194,10 +196,20 @@ export function ProductDetailPage() {
     }
   }, [product]);
 
-  // Handle color swatch pick
+  // Handle color swatch pick & global variant photo sync
   const handleSelectColor = (col: ColorOption) => {
     setSelectedColor(col);
-    setSelectedImage(col.image);
+
+    let variantImg = (product as any)?.colorImages?.[col.name];
+
+    if (!variantImg && typeof window !== "undefined" && product) {
+      try {
+        const storedMap = JSON.parse(localStorage.getItem(`vexa_color_images_${product.id}`) || "{}");
+        if (storedMap[col.name]) variantImg = storedMap[col.name];
+      } catch (e) {}
+    }
+
+    setSelectedImage(variantImg || col.image);
   };
 
   // Handle new review submission
@@ -259,6 +271,13 @@ export function ProductDetailPage() {
     );
     return [...sameCat, ...others].slice(0, 4);
   }, [products, product]);
+
+  const currentVariantStock = useMemo(() => {
+    if (!product || !selectedColor) return 0;
+    return getVariantStock(product.id, selectedColor.name || "Standard", selectedSize || "M", product.stock || 25);
+  }, [product, selectedColor, selectedSize]);
+
+  const isVariantInStock = currentVariantStock > 0;
 
   if (loading) {
     return (
@@ -438,19 +457,30 @@ export function ProductDetailPage() {
                 </a>
               </div>
 
-              {/* Price Row */}
-              <div className="flex items-baseline gap-4 pt-3">
-                <span className="font-display text-3xl sm:text-4xl font-bold text-gold">
-                  ₹{product.price.toLocaleString("en-IN")}
-                </span>
-                <span className="text-base text-muted-foreground line-through">
-                  ₹{product.oldPrice.toLocaleString("en-IN")}
-                </span>
-                <span className="rounded-full bg-gold/15 border border-gold/40 px-3 py-1 text-[10px] font-bold text-gold">
-                  Save ₹{(product.oldPrice - product.price).toLocaleString("en-IN")} ({discountOff}%)
-                </span>
+              {/* Dynamic Price Row (Updates live with selected Quantity & MRP) */}
+              <div className="space-y-1.5 pt-3">
+                <div className="flex flex-wrap items-baseline gap-3 sm:gap-4">
+                  <span className="font-display text-3xl sm:text-4xl font-extrabold text-gold">
+                    ₹{(product.price * quantity).toLocaleString("en-IN")}
+                  </span>
+                  {product.oldPrice > product.price && (
+                    <span className="text-base sm:text-lg text-muted-foreground/75 line-through">
+                      ₹{(product.oldPrice * quantity).toLocaleString("en-IN")}
+                    </span>
+                  )}
+                  {product.oldPrice > product.price && (
+                    <span className="rounded-full bg-gold/15 border border-gold/40 px-3 py-1 text-[10px] font-bold text-gold shadow-xs">
+                      Save ₹{((product.oldPrice - product.price) * quantity).toLocaleString("en-IN")} ({discountOff}%)
+                    </span>
+                  )}
+                </div>
+                {quantity > 1 && (
+                  <p className="text-[11px] text-gold/80 font-bold tracking-wide">
+                    ₹{product.price.toLocaleString("en-IN")} per piece × {quantity} items
+                  </p>
+                )}
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground pt-1">
                 Inclusive of all taxes. Free express shipping nationwide.
               </p>
             </div>
@@ -533,20 +563,72 @@ export function ProductDetailPage() {
                 </button>
               </div>
               <div className="grid grid-cols-6 gap-2">
-                {SIZES.map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => setSelectedSize(sz)}
-                    className={`rounded-md border py-3 text-xs font-bold transition-all cursor-pointer ${
-                      selectedSize === sz
-                        ? "border-gold bg-gold text-primary-foreground shadow-goldy font-extrabold"
-                        : "border-border bg-card text-foreground hover:border-gold/60"
-                    }`}
-                  >
-                    {sz}
-                  </button>
-                ))}
+                {SIZES.map((sz) => {
+                  const szStock = product ? getVariantStock(product.id, selectedColor.name, sz, product.stock) : 0;
+                  const isSzOut = szStock === 0;
+                  const isSelected = selectedSize === sz;
+
+                  return (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => setSelectedSize(sz)}
+                      className={`relative rounded-md border py-3 text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? isSzOut
+                            ? "border-red-500 bg-red-500/20 text-red-300 font-extrabold shadow-md ring-2 ring-red-500/50"
+                            : "border-gold bg-gold text-primary-foreground shadow-goldy font-extrabold scale-105"
+                          : isSzOut
+                          ? "border-red-500/30 bg-surface/50 text-muted-foreground/60 line-through hover:border-red-500/60 hover:text-foreground"
+                          : "border-border bg-card text-foreground hover:border-gold/60"
+                      }`}
+                    >
+                      <span>{sz}</span>
+                      {isSzOut && (
+                        <span className="absolute -top-1.5 -right-1 flex size-2.5 items-center justify-center">
+                          <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
+                          <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+
+            {/* Dynamic Variant Stock Status Indicator */}
+            <div className="mt-6">
+              {isVariantInStock ? (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-400 font-bold shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <span className="relative flex size-2.5 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+                    </span>
+                    <span>
+                      IN STOCK: <strong className="text-emerald-300 font-extrabold">{currentVariantStock} units</strong> available in {selectedColor.name} (Size {selectedSize})
+                    </span>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-emerald-300 border border-emerald-500/30">
+                    Ready to Ship
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-1.5 rounded-xl border border-red-500/60 bg-red-500/10 p-4 text-xs text-red-300 shadow-md animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-red-400 font-extrabold">
+                      <PackageX className="size-4 shrink-0 text-red-400" />
+                      <span className="uppercase tracking-wider">OUT OF STOCK</span>
+                    </div>
+                    <span className="rounded-full bg-red-500/20 px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-red-400 border border-red-500/40">
+                      Unavailable
+                    </span>
+                  </div>
+                  <p className="text-xs text-red-200/90 font-medium leading-relaxed pl-6">
+                    The selected colorway <strong>{selectedColor.name}</strong> in Size <strong>{selectedSize}</strong> is currently out of stock. Please select another size or colorway.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Quantity Selector */}
@@ -557,8 +639,9 @@ export function ProductDetailPage() {
               <div className="flex items-center gap-3 w-fit rounded-lg border border-border bg-card p-1">
                 <button
                   type="button"
+                  disabled={!isVariantInStock}
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-gold hover:bg-surface cursor-pointer"
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-gold hover:bg-surface cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Minus className="size-3.5" />
                 </button>
@@ -567,8 +650,9 @@ export function ProductDetailPage() {
                 </span>
                 <button
                   type="button"
+                  disabled={!isVariantInStock}
                   onClick={() => setQuantity((q) => q + 1)}
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-gold hover:bg-surface cursor-pointer"
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-gold hover:bg-surface cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus className="size-3.5" />
                 </button>
@@ -578,16 +662,27 @@ export function ProductDetailPage() {
             {/* CTA Action Buttons */}
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
+                disabled={!isVariantInStock}
                 onClick={handleAddToCart}
-                className="btn-gold hover:btn-gold-hover flex items-center justify-center gap-2 rounded-sm py-4 text-xs font-bold uppercase tracking-widest cursor-pointer shadow-goldy"
+                className={`flex items-center justify-center gap-2 rounded-sm py-4 text-xs font-bold uppercase tracking-widest transition-all ${
+                  isVariantInStock
+                    ? "btn-gold hover:btn-gold-hover cursor-pointer shadow-goldy active:scale-98"
+                    : "border border-border bg-muted/40 text-muted-foreground cursor-not-allowed opacity-60"
+                }`}
               >
-                <ShoppingBag className="size-4" /> Add to Cart
+                <ShoppingBag className="size-4" />
+                {isVariantInStock ? "Add to Cart" : "Out of Stock"}
               </button>
               <button
+                disabled={!isVariantInStock}
                 onClick={handleBuyNow}
-                className="btn-outline-gold flex items-center justify-center gap-2 rounded-sm py-4 text-xs font-bold uppercase tracking-widest hover:bg-gold hover:text-primary-foreground cursor-pointer shadow-sm"
+                className={`flex items-center justify-center gap-2 rounded-sm py-4 text-xs font-bold uppercase tracking-widest transition-all ${
+                  isVariantInStock
+                    ? "btn-outline-gold hover:bg-gold hover:text-primary-foreground cursor-pointer shadow-sm active:scale-98"
+                    : "border border-border bg-card/20 text-muted-foreground cursor-not-allowed opacity-60"
+                }`}
               >
-                Buy Now
+                {isVariantInStock ? "Buy Now" : "Variant Unavailable"}
               </button>
             </div>
 

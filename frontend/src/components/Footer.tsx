@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Instagram, Twitter, Facebook, Mail } from "lucide-react";
+import { Instagram, Twitter, Facebook, Mail, Phone } from "lucide-react";
 
 export function Footer() {
   const location = useLocation();
@@ -55,23 +55,46 @@ export function Footer() {
           </ul>
         </div>
 
-        <div className="hidden sm:block">
-          <h3 className="text-xs uppercase tracking-[0.25em] text-gold">Newsletter</h3>
-          <p className="mt-5 text-sm text-muted-foreground">
-            Early access to limited drops and 30% off your first order.
+        <div>
+          <h3 className="text-xs uppercase tracking-[0.25em] text-gold font-bold">Contact & Support</h3>
+          <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
+            Have questions or need order assistance? Reach out to our support team.
           </p>
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="mt-4 flex overflow-hidden rounded-sm border border-border"
-          >
-            <input
-              type="email"
-              required
-              placeholder="your@email.com"
-              className="w-full bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-gold"
-            />
-            <button className="btn-gold hover:btn-gold-hover px-4 text-[10px]">Join</button>
-          </form>
+          <ul className="mt-4 space-y-2.5 text-xs">
+            <li>
+              <a
+                href="mailto:support@vexa.store"
+                className="group flex items-center gap-3 rounded-lg border border-border bg-card/60 p-2.5 transition-all hover:border-gold hover:bg-gold/10 shadow-xs"
+              >
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-gold/40 bg-gold/15 text-gold">
+                  <Mail className="size-4" />
+                </div>
+                <div className="overflow-hidden">
+                  <span className="block text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Email Us</span>
+                  <span className="font-bold text-foreground group-hover:text-gold transition-colors truncate block">
+                    support@vexa.store
+                  </span>
+                </div>
+              </a>
+            </li>
+
+            <li>
+              <a
+                href="tel:+919876543210"
+                className="group flex items-center gap-3 rounded-lg border border-border bg-card/60 p-2.5 transition-all hover:border-gold hover:bg-gold/10 shadow-xs"
+              >
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-gold/40 bg-gold/15 text-gold">
+                  <Phone className="size-4" />
+                </div>
+                <div>
+                  <span className="block text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Call / WhatsApp</span>
+                  <span className="font-bold text-foreground group-hover:text-gold transition-colors">
+                    +91 98765 43210
+                  </span>
+                </div>
+              </a>
+            </li>
+          </ul>
         </div>
       </div>
 

@@ -96,8 +96,9 @@ export function Login() {
   };
 
   return (
-    <section className="mx-auto grid max-w-md px-5 pt-24 sm:pt-28 pb-16">
-      <div className="rounded-2xl border border-gold/40 bg-card p-6 sm:p-9 shadow-goldy">
+    <div className="login-page-root no-scrollbar w-full overflow-x-hidden">
+      <section className="mx-auto grid max-w-md px-5 pt-24 sm:pt-28 pb-16">
+        <div className="rounded-2xl border border-gold/40 bg-card p-6 sm:p-9 shadow-goldy">
         <div className="text-center">
           <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
             VEXA
@@ -311,7 +312,7 @@ export function Login() {
           </div>
         </div>
       )}
-    </section>
+      </section>
+    </div>
   );
 }
-

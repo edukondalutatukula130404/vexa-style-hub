@@ -17,12 +17,56 @@ export type Product = {
   image: string;
   category: "Oversized" | "Classic" | "Limited";
   color: string;
+  colors?: string[];
+  description?: string;
   rating: number;
   stock: number;
   isNewDrop?: boolean;
 };
 
 export const SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
+
+export function getVariantStock(
+  productId: string,
+  color: string,
+  size: string,
+  baseStock: number = 25
+): number {
+  if (baseStock === 0) return 0;
+
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("vexa_variant_stocks");
+      if (stored) {
+        const stocksMap = JSON.parse(stored);
+        const key = `${productId}_${color}_${size}`.toLowerCase().replace(/[^a-z0-9]/g, "_");
+        if (typeof stocksMap[key] === "number") {
+          return stocksMap[key];
+        }
+      }
+    } catch (e) {
+      console.warn("Failed reading variant stocks:", e);
+    }
+  }
+
+  // Deterministic calculation based on product ID, color name, and size
+  const str = `${productId}-${color}-${size}`.toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const absHash = Math.abs(hash);
+
+  // Specific combinations marked as out of stock (0) for demonstration & realistic inventory
+  if (size === "XXL" && absHash % 3 === 0) return 0;
+  if (size === "XS" && absHash % 4 === 0) return 0;
+  if (color.toLowerCase().includes("gold") && size === "S") return 0;
+  if (color.toLowerCase().includes("rust") && size === "L") return 0;
+  if (absHash % 9 === 0) return 0;
+
+  return Math.max(1, (absHash % (baseStock || 20)) + 3);
+}
 
 export const products: Product[] = [
   {
@@ -148,14 +192,24 @@ export function mapDbItemToProduct(item: any): Product {
   else if (cat.toLowerCase().includes("class")) cat = "Classic";
   else if (cat.toLowerCase().includes("limit")) cat = "Limited";
 
+  const sellingPrice = Number(item.price) || 1499;
+  const mrpPrice = Number(item.oldPrice || item.mrpPrice || item.mrp) || Math.round(sellingPrice * 1.35);
+  const colorList = Array.isArray(item.colors) && item.colors.length > 0
+    ? item.colors
+    : item.color
+    ? [item.color]
+    : ["Signature Drop"];
+
   return {
     id: item._id || item.id || `db-${Math.random()}`,
     name: item.name || "Custom Tee",
-    price: Number(item.price) || 1499,
-    oldPrice: Number(item.oldPrice) || Math.round((Number(item.price) || 1499) * 1.35),
+    price: sellingPrice,
+    oldPrice: mrpPrice,
     image: item.image && item.image.trim() ? item.image : luxuryGold,
     category: cat as any,
-    color: item.color || "Signature Drop",
+    color: item.color || colorList[0] || "Signature Drop",
+    colors: colorList,
+    description: item.description || "",
     rating: Number(item.rating) || 5.0,
     stock: item.inStock !== false ? 25 : 0,
   };

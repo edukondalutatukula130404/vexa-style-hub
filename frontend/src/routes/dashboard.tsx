@@ -43,6 +43,8 @@ import { Footer } from "@/components/Footer";
 
 type OrderItem = {
   _id: string;
+  id?: string;
+  cancelReason?: string;
   userEmail: string;
   userName: string;
   items: Array<{
@@ -67,7 +69,7 @@ export function UserDashboard() {
   const { user, isLoggedIn, logout } = useAuth();
   const { cartItems, totalAmount } = useCart();
   const { wishlistItems } = useWishlist();
-  const { allProducts } = useProducts();
+  const { products: allProducts } = useProducts();
 
   const [bookingCategoryFilter, setBookingCategoryFilter] = useState<string>("All");
   const [bookingSearchQuery, setBookingSearchQuery] = useState<string>("");
@@ -323,7 +325,7 @@ export function UserDashboard() {
     e.preventDefault();
     if (!editingAddressId) return;
 
-    const updated = savedAddresses.map((addr) =>
+    const updated = savedAddresses.map((addr: any) =>
       addr.id === editingAddressId
         ? {
             ...addr,
@@ -345,7 +347,7 @@ export function UserDashboard() {
   };
 
   const handleDeleteAddress = (id: string) => {
-    const updated = savedAddresses.filter((a) => a.id !== id);
+    const updated = savedAddresses.filter((a: any) => a.id !== id);
     setSavedAddresses(updated);
     if (typeof window !== "undefined") {
       localStorage.setItem("vexa_saved_addresses", JSON.stringify(updated));
@@ -353,7 +355,7 @@ export function UserDashboard() {
   };
 
   const handleSetDefaultAddress = (id: string) => {
-    const updated = savedAddresses.map((a) => ({
+    const updated = savedAddresses.map((a: any) => ({
       ...a,
       isDefault: a.id === id,
     }));
@@ -682,7 +684,7 @@ export function UserDashboard() {
         const oShort = oId.slice(-8).toUpperCase();
         return (
           !allIds.includes(o._id) &&
-          !allIds.includes(o.id) &&
+          !allIds.includes(o.id || "") &&
           !allIds.includes(oId) &&
           !allIds.includes(oShort)
         );
@@ -934,8 +936,8 @@ export function UserDashboard() {
                 <div className="rounded-xl border border-gold/50 bg-card p-2 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-2 duration-300 space-y-1 mb-4 z-40">
                   {navItems.filter((item) => item.id !== "logout").map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-                    const isLogout = item.id === "logout";
+                    const isActive = (activeTab as string) === item.id;
+                    const isLogout = false;
                     return (
                       <button
                         key={item.id}
@@ -968,71 +970,23 @@ export function UserDashboard() {
             </div>
           </div>
 
-          {/* LEFT CORNER HOVER TRIGGER ZONE: Triggers floating sidebar when cursor touches left screen edge */}
-          <div
-            onMouseEnter={() => setSidebarHovered(true)}
-            className="hidden lg:block fixed top-[112px] left-0 bottom-0 w-6 z-40 cursor-pointer"
-            title="Hover left edge to open Navigation Sidebar"
-          />
-
-          {/* DESKTOP SIDEBAR (>= lg): Fixed Viewport Position on Left with Smooth Hover Expand */}
-          <aside
-            onMouseEnter={() => setSidebarHovered(true)}
-            onMouseLeave={() => setSidebarHovered(false)}
-            className={`hidden lg:block fixed top-[112px] z-30 transition-all duration-300 overflow-hidden ${
-              isExpanded ? "w-[280px]" : "w-[84px]"
-            }`}
-          >
-            <div className={`rounded-xl border border-gold/40 bg-card p-4 sm:p-5 transition-all duration-300 ${
-              isExpanded ? "w-[280px] shadow-2xl border-gold/60" : "w-[84px] shadow-goldy"
-            }`}>
-              <div className={`flex items-center border-b border-border pb-4 gap-3 ${!isExpanded ? "justify-center" : "justify-between"}`}>
-                {isExpanded ? (
-                  <>
-                    <div className="flex items-center gap-3 shrink-0 overflow-hidden">
-                      {profilePic ? (
-                        <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
-                      ) : (
-                        <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
-                          {(profileName || user?.name || "U")[0].toUpperCase()}
-                        </div>
-                      )}
-                      <div className="flex flex-col justify-center overflow-hidden">
-                        <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
-                        <p className="text-[11px] text-muted-foreground truncate">{profileEmail}</p>
-                      </div>
+          {/* DESKTOP SIDEBAR (>= lg): Permanently Fixed Navigation Panel (No Auto-Hide, No Hamburger) */}
+          <aside className="hidden lg:block fixed top-[112px] z-30 w-[280px]">
+            <div className="w-[280px] rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-border pb-4 gap-3">
+                <div className="flex items-center gap-3 shrink-0 overflow-hidden">
+                  {profilePic ? (
+                    <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+                  ) : (
+                    <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
+                      {(profileName || user?.name || "U")[0].toUpperCase()}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className={`flex size-9 items-center justify-center rounded-lg border transition-all cursor-pointer shadow-goldy shrink-0 ${
-                        sidebarCollapsed ? "border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground" : "border-gold bg-gold text-primary-foreground font-bold"
-                      }`}
-                      title={sidebarCollapsed ? "Pin Sidebar Expanded" : "Collapse Sidebar"}
-                    >
-                      <Menu className="size-4.5" />
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    {profilePic ? (
-                      <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
-                    ) : (
-                      <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
-                        {(profileName || user?.name || "U")[0].toUpperCase()}
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="flex size-8 items-center justify-center rounded-lg border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-goldy shrink-0 mt-1"
-                      title="Expand & Pin Navigation Sidebar"
-                    >
-                      <Menu className="size-4" />
-                    </button>
+                  )}
+                  <div className="flex flex-col justify-center overflow-hidden">
+                    <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
+                    <p className="text-[11px] text-muted-foreground truncate">{profileEmail}</p>
                   </div>
-                )}
+                </div>
               </div>
 
               <nav className="mt-4 space-y-1.5">
@@ -1052,9 +1006,7 @@ export function UserDashboard() {
                           setActiveTab(item.id as TabType);
                         }
                       }}
-                      className={`flex w-full items-center rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-                        !isExpanded ? "justify-center px-0" : "justify-between px-3.5"
-                      } ${
+                      className={`flex w-full items-center justify-between rounded-lg px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
                         isLogout
                           ? "text-muted-foreground hover:bg-destructive/15 hover:text-destructive mt-3 pt-3 border-t border-border/60"
                           : isActive
@@ -1064,7 +1016,7 @@ export function UserDashboard() {
                     >
                       <div className="flex items-center gap-3 whitespace-nowrap">
                         <Icon className="size-4.5 shrink-0" />
-                        {isExpanded && <span>{item.label}</span>}
+                        <span>{item.label}</span>
                       </div>
                     </button>
                   );
@@ -1073,10 +1025,8 @@ export function UserDashboard() {
             </div>
           </aside>
 
-          {/* DASHBOARD CONTENT & ALIGNED FOOTER COLUMN: Margin offset keeps content & footer beside fixed sidebar */}
-          <div className={`flex-1 min-w-0 flex flex-col w-full transition-all duration-300 ${
-            sidebarCollapsed ? "lg:ml-[104px]" : "lg:ml-[304px]"
-          }`}>
+          {/* DASHBOARD CONTENT COLUMN: Fixed left margin keeps content aligned beside fixed sidebar */}
+          <div className="flex-1 min-w-0 flex flex-col w-full lg:ml-[304px]">
             {/* MAIN TAB CONTENT AREA */}
             <main className="w-full flex-1 min-w-0 rounded-xl border-0 bg-transparent p-0 shadow-none lg:border lg:border-border lg:bg-card lg:p-8 lg:shadow-sm">
             {/* 1. MY PROFILE TAB */}
@@ -1372,7 +1322,7 @@ export function UserDashboard() {
                                 type="button"
                                 onClick={() =>
                                   setCancellingOrderUser({
-                                    id: ord._id || ord.id,
+                                    id: ord._id || ord.id || "",
                                     bookingIdStr: String(ord._id || ord.id || "ORD").slice(-8).toUpperCase(),
                                   })
                                 }
@@ -1389,7 +1339,7 @@ export function UserDashboard() {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   handleDeleteOrder(
-                                    ord._id || ord.id,
+                                    ord._id || ord.id || "",
                                     String(ord._id || ord.id || "ORD").slice(-8).toUpperCase()
                                   );
                                 }}
@@ -1548,7 +1498,7 @@ export function UserDashboard() {
                 )}
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  {savedAddresses.map((addr) => (
+                  {savedAddresses.map((addr: any) => (
                     <div key={addr.id} className="rounded-xl border border-gold/30 bg-card p-4 sm:p-5 space-y-3 shadow-sm transition-all hover:border-gold/60 relative min-w-0 overflow-hidden">
                       {editingAddressId === addr.id ? (
                         <form onSubmit={handleSaveEditAddress} className="space-y-3">
@@ -1905,7 +1855,7 @@ export function UserDashboard() {
                         {!showAddNewAddressForm && (
                           <div className="space-y-4">
                             <div className="grid gap-3 sm:grid-cols-2">
-                              {savedAddresses.map((addr) => {
+                              {savedAddresses.map((addr: any) => {
                                 const isSelected = selectedSavedAddressId === addr.id;
                                 return (
                                   <div

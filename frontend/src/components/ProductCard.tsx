@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Star, ShoppingBag, Eye, X, Check, ArrowRight, Minus, Plus, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { SIZES, type Product } from "@/lib/products";
+import { SIZES, getVariantStock, type Product } from "@/lib/products";
 import { useAuth } from "@/lib/auth";
 import { addToCart } from "@/lib/cart";
 import { useWishlist, toggleWishlist } from "@/lib/wishlist";
@@ -216,25 +216,59 @@ export function ProductCard({ product }: { product: Product }) {
                     <div className="space-y-2 pt-2">
                       <span className="text-[10px] uppercase tracking-wider text-gold font-bold block">Select Size</span>
                       <div className="flex flex-wrap gap-2">
-                        {SIZES.map((sz) => (
-                          <button
-                            key={sz}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedSize(sz);
-                            }}
-                            className={`min-w-[42px] rounded-md px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
-                              selectedSize === sz
-                                ? "bg-gold text-primary-foreground shadow-goldy border border-gold font-extrabold scale-105"
-                                : "border border-border bg-surface text-muted-foreground hover:border-gold hover:text-gold"
-                            }`}
-                          >
-                            {sz}
-                          </button>
-                        ))}
+                        {SIZES.map((sz) => {
+                          const szStock = getVariantStock(product.id, product.color, sz, product.stock);
+                          const isSzOut = szStock === 0;
+                          const isSelected = selectedSize === sz;
+
+                          return (
+                            <button
+                              key={sz}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSize(sz);
+                              }}
+                              className={`relative min-w-[42px] rounded-md px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? isSzOut
+                                    ? "bg-red-500/20 text-red-300 border border-red-500/60 font-extrabold"
+                                    : "bg-gold text-primary-foreground shadow-goldy border border-gold font-extrabold scale-105"
+                                  : isSzOut
+                                  ? "border border-red-500/30 bg-surface/50 text-muted-foreground/60 line-through hover:border-red-500/60"
+                                  : "border border-border bg-surface text-muted-foreground hover:border-gold hover:text-gold"
+                              }`}
+                            >
+                              {sz}
+                              {isSzOut && (
+                                <span className="absolute -top-1 -right-1 flex size-2 items-center justify-center rounded-full bg-red-500" />
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
+
+                    {/* Stock Status Indicator */}
+                    {(() => {
+                      const vStock = getVariantStock(product.id, product.color, selectedSize, product.stock);
+                      const isInStock = vStock > 0;
+                      return (
+                        <div className="pt-1">
+                          {isInStock ? (
+                            <p className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+                              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                              IN STOCK: {vStock} units available ({selectedSize})
+                            </p>
+                          ) : (
+                            <p className="text-[11px] font-bold text-red-400 flex items-center gap-1.5">
+                              <span className="size-2 rounded-full bg-red-500" />
+                              OUT OF STOCK for Size {selectedSize}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Quantity Selector */}
                     <div className="flex items-center gap-4 pt-2">
@@ -242,11 +276,12 @@ export function ProductCard({ product }: { product: Product }) {
                       <div className="flex items-center rounded-md border border-gold/40 bg-surface shadow-sm">
                         <button
                           type="button"
+                          disabled={getVariantStock(product.id, product.color, selectedSize, product.stock) === 0}
                           onClick={(e) => {
                             e.stopPropagation();
                             setQuantity((q) => Math.max(1, q - 1));
                           }}
-                          className="p-2.5 text-gold hover:bg-gold hover:text-primary-foreground transition-colors cursor-pointer rounded-l-md"
+                          className="p-2.5 text-gold hover:bg-gold hover:text-primary-foreground transition-colors cursor-pointer rounded-l-md disabled:opacity-40 disabled:cursor-not-allowed"
                           title="Decrease quantity"
                         >
                           <Minus className="size-3.5" />
@@ -254,11 +289,12 @@ export function ProductCard({ product }: { product: Product }) {
                         <span className="w-10 text-center text-xs font-bold text-foreground font-mono">{quantity}</span>
                         <button
                           type="button"
+                          disabled={getVariantStock(product.id, product.color, selectedSize, product.stock) === 0}
                           onClick={(e) => {
                             e.stopPropagation();
                             setQuantity((q) => q + 1);
                           }}
-                          className="p-2.5 text-gold hover:bg-gold hover:text-primary-foreground transition-colors cursor-pointer rounded-r-md"
+                          className="p-2.5 text-gold hover:bg-gold hover:text-primary-foreground transition-colors cursor-pointer rounded-r-md disabled:opacity-40 disabled:cursor-not-allowed"
                           title="Increase quantity"
                         >
                           <Plus className="size-3.5" />
@@ -276,17 +312,29 @@ export function ProductCard({ product }: { product: Product }) {
 
                   {/* QuickView Action Buttons */}
                   <div className="space-y-2 pt-4 border-t border-border">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowQuickView(false);
-                        handleAddToCart(e);
-                      }}
-                      className="btn-gold hover:btn-gold-hover w-full rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-goldy active:scale-98 transition-transform"
-                    >
-                      <ShoppingBag className="size-4" /> Add to Cart & Checkout
-                    </button>
+                    {(() => {
+                      const isInStock = getVariantStock(product.id, product.color, selectedSize, product.stock) > 0;
+                      return (
+                        <button
+                          type="button"
+                          disabled={!isInStock}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isInStock) return;
+                            setShowQuickView(false);
+                            handleAddToCart(e);
+                          }}
+                          className={`w-full rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-goldy transition-all ${
+                            isInStock
+                              ? "btn-gold hover:btn-gold-hover cursor-pointer active:scale-98"
+                              : "bg-muted/40 border border-border text-muted-foreground cursor-not-allowed opacity-60"
+                          }`}
+                        >
+                          <ShoppingBag className="size-4" />
+                          {isInStock ? "Add to Cart & Checkout" : "Out of Stock"}
+                        </button>
+                      );
+                    })()}
 
                     <button
                       type="button"

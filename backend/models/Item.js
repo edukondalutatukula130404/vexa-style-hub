@@ -16,6 +16,18 @@ const itemSchema = new mongoose.Schema(
       required: [true, 'Please add a price'],
       default: 0
     },
+    oldPrice: {
+      type: Number,
+      default: 0
+    },
+    color: {
+      type: String,
+      default: 'Black'
+    },
+    colors: {
+      type: [String],
+      default: []
+    },
     category: {
       type: String,
       default: 'General'

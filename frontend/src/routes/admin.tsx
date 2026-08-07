@@ -87,7 +87,6 @@ const PRESET_COLOR_SWATCHES = [
   { name: "Charcoal Grey", hex: "#3F3F46" },
   { name: "Pastel Lavender", hex: "#C084FC" },
   { name: "Luxury Cream & Gold", hex: "#F5F0E6", border: true },
-  { name: "Olive Green", hex: "#4A5D4E" },
 ];
 
 export function Admin() {

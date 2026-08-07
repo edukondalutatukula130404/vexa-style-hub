@@ -177,7 +177,7 @@ export const products: Product[] = [
     oldPrice: 2399,
     image: olive,
     category: "Limited",
-    color: "Olive Green",
+    color: "Emerald Green",
     rating: 4.9,
     stock: 6,
   },

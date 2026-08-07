@@ -35,6 +35,9 @@ import beige from "@/assets/tee-beige.jpg";
 import charcoal from "@/assets/tee-charcoal.jpg";
 import olive from "@/assets/tee-olive.jpg";
 import luxuryGold from "@/assets/hero_luxury_tshirt.png";
+import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
+import promoBanner1 from "@/assets/promo_banner_1.png";
+import promoBanner2 from "@/assets/promo_banner_2.png";
 import rust from "@/assets/tee-rust.png";
 
 export type ColorOption = {
@@ -52,7 +55,6 @@ export const COLOR_OPTIONS: ColorOption[] = [
   { name: "Desert Sand", hex: "#D4C3A3", image: beige, borderColor: "#A89878" },
   { name: "Vintage Rust", hex: "#8B3A2B", image: rust, borderColor: "#65281B" },
   { name: "Charcoal Gray", hex: "#3F3F46", image: charcoal, borderColor: "#52525B" },
-  { name: "Olive Green", hex: "#4A5D4E", image: olive, borderColor: "#38473B" },
 ];
 
 export type Review = {
@@ -120,7 +122,7 @@ export function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { products, loading } = useProducts();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
 
   // Find product by id
   const product = useMemo(() => {
@@ -152,35 +154,60 @@ export function ProductDetailPage() {
   const [newComment, setNewComment] = useState("");
   const [helpfulClicked, setHelpfulClicked] = useState<Record<string, boolean>>({});
 
+  // Compute active colors and variant images for the current product (1-to-1 swatch & thumbnail sync)
+  const availableColorsForProduct = useMemo(() => {
+    if (!product) return COLOR_OPTIONS;
+
+    let customColorMap: Record<string, string> = {};
+    if (typeof window !== "undefined") {
+      try {
+        customColorMap = JSON.parse(localStorage.getItem(`vexa_color_images_${product.id}`) || "{}");
+      } catch (e) {}
+    }
+
+    return COLOR_OPTIONS.map((c) => {
+      const customImg = (product as any)?.colorImages?.[c.name] || customColorMap[c.name];
+
+      // If this color matches the product's primary color, use product.image as default unless customImg is set
+      const isPrimaryColor =
+        product.color &&
+        (c.name.toLowerCase().includes(product.color.toLowerCase()) ||
+          product.color.toLowerCase().includes(c.name.toLowerCase()));
+
+      const finalImg = customImg || (isPrimaryColor && product.image ? product.image : c.image);
+
+      return {
+        ...c,
+        image: finalImg,
+      };
+    });
+  }, [product]);
+
   // Sync color & image whenever current product changes
   useEffect(() => {
-    if (product) {
-      const match = COLOR_OPTIONS.find((c) =>
-        c.name.toLowerCase().includes(product.color.toLowerCase()) ||
-        product.color.toLowerCase().includes(c.name.toLowerCase())
+    if (product && availableColorsForProduct.length > 0) {
+      const match = availableColorsForProduct.find(
+        (c) =>
+          product.color &&
+          (c.name.toLowerCase().includes(product.color.toLowerCase()) ||
+            product.color.toLowerCase().includes(c.name.toLowerCase()))
       );
-      if (match) {
-        setSelectedColor(match);
-        setSelectedImage(match.image);
-      } else {
-        const fallbackCol: ColorOption = {
-          name: product.color || "Signature Drop",
-          hex: "#C5A880",
-          image: product.image || luxuryGold,
-          borderColor: "#D4AF37",
-        };
-        setSelectedColor(fallbackCol);
-        setSelectedImage(product.image || luxuryGold);
-      }
+      const initialCol = match || availableColorsForProduct[0];
+      setSelectedColor(initialCol);
+      setSelectedImage(initialCol.image || product.image || luxuryGold);
     }
-  }, [product]);
+  }, [product, availableColorsForProduct]);
 
   // Scroll to top on ID change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [id]);
 
-  // Load reviews from localStorage or defaults
+  // Dynamic Review Filter & Sort state
+  const [reviewFilter, setReviewFilter] = useState<"all" | "5" | "4" | "verified">("all");
+  const [reviewSort, setReviewSort] = useState<"recent" | "rating" | "helpful">("recent");
+
+  // Load reviews from localStorage, product data, or default seed reviews
   useEffect(() => {
     if (!product) return;
     const storageKey = `vexa_reviews_${product.id}`;
@@ -188,19 +215,115 @@ export function ProductDetailPage() {
     if (saved) {
       try {
         setReviews(JSON.parse(saved));
-      } catch {
-        setReviews(defaultReviewsMap.default);
-      }
+        return;
+      } catch {}
+    }
+    if ((product as any)?.reviews && Array.isArray((product as any).reviews) && (product as any).reviews.length > 0) {
+      setReviews((product as any).reviews);
     } else {
       setReviews(defaultReviewsMap.default);
     }
   }, [product]);
 
+  // Dynamic Filtered & Sorted Reviews list
+  const filteredReviews = useMemo(() => {
+    let result = [...reviews];
+
+    if (reviewFilter === "5") {
+      result = result.filter((r) => r.rating === 5);
+    } else if (reviewFilter === "4") {
+      result = result.filter((r) => r.rating === 4);
+    } else if (reviewFilter === "verified") {
+      result = result.filter((r) => r.verified);
+    }
+
+    if (reviewSort === "recent") {
+      result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } else if (reviewSort === "rating") {
+      result.sort((a, b) => b.rating - a.rating);
+    } else if (reviewSort === "helpful") {
+      result.sort((a, b) => b.helpfulCount - a.helpfulCount);
+    }
+
+    return result;
+  }, [reviews, reviewFilter, reviewSort]);
+
+  // Per-color 4-angle views (Front Side, Back Side, Right Side, Left Side)
+  const COLOR_ANGLE_VIEWS: Record<string, { label: string; image: string }[]> = useMemo(() => ({
+    "Luxury Cream & Gold": [
+      { label: "Front Side", image: luxuryGold },
+      { label: "Back Side", image: white },
+      { label: "Right Side", image: beige },
+      { label: "Left Side", image: heroLuxuryImg },
+    ],
+    "Jet Black": [
+      { label: "Front Side", image: black },
+      { label: "Back Side", image: charcoal },
+      { label: "Right Side", image: navy },
+      { label: "Left Side", image: black },
+    ],
+    "Ivory White": [
+      { label: "Front Side", image: white },
+      { label: "Back Side", image: luxuryGold },
+      { label: "Right Side", image: beige },
+      { label: "Left Side", image: white },
+    ],
+    "Midnight Navy": [
+      { label: "Front Side", image: navy },
+      { label: "Back Side", image: charcoal },
+      { label: "Right Side", image: black },
+      { label: "Left Side", image: navy },
+    ],
+    "Desert Sand": [
+      { label: "Front Side", image: beige },
+      { label: "Back Side", image: luxuryGold },
+      { label: "Right Side", image: rust },
+      { label: "Left Side", image: beige },
+    ],
+    "Vintage Rust": [
+      { label: "Front Side", image: rust },
+      { label: "Back Side", image: beige },
+      { label: "Right Side", image: charcoal },
+      { label: "Left Side", image: rust },
+    ],
+    "Charcoal Gray": [
+      { label: "Front Side", image: charcoal },
+      { label: "Back Side", image: black },
+      { label: "Right Side", image: navy },
+      { label: "Left Side", image: charcoal },
+    ],
+  }), []);
+
+  // Compute 4-angle preview photos (Front, Back, Right, Left) for selected colorway
+  const colorGalleryAngles = useMemo(() => {
+    if (!selectedColor) return [];
+
+    let customImg = (product as any)?.colorImages?.[selectedColor.name];
+    if (!customImg && typeof window !== "undefined" && product) {
+      try {
+        const storedMap = JSON.parse(localStorage.getItem(`vexa_color_images_${product.id}`) || "{}");
+        if (storedMap[selectedColor.name]) customImg = storedMap[selectedColor.name];
+      } catch (e) {}
+    }
+
+    const mainColorImg = customImg || selectedColor.image || product?.image || luxuryGold;
+    const defaultAngles = COLOR_ANGLE_VIEWS[selectedColor.name] || [
+      { label: "Front Side", image: mainColorImg },
+      { label: "Back Side", image: mainColorImg },
+      { label: "Right Side", image: mainColorImg },
+      { label: "Left Side", image: mainColorImg },
+    ];
+
+    return defaultAngles.map((item, idx) =>
+      idx === 0 ? { ...item, image: mainColorImg } : item
+    );
+  }, [selectedColor, product, COLOR_ANGLE_VIEWS]);
+
   // Handle color swatch pick & global variant photo sync
   const handleSelectColor = (col: ColorOption) => {
     setSelectedColor(col);
 
-    let variantImg = (product as any)?.colorImages?.[col.name];
+    let variantImg = col.image || (product as any)?.colorImages?.[col.name];
 
     if (!variantImg && typeof window !== "undefined" && product) {
       try {
@@ -209,7 +332,34 @@ export function ProductDetailPage() {
       } catch (e) {}
     }
 
-    setSelectedImage(variantImg || col.image);
+    const finalImage = variantImg || product?.image || luxuryGold;
+    setSelectedImage(finalImage);
+
+    // Auto-select first available size for newly selected color if current size is out of stock
+    if (product) {
+      const currentStock = getVariantStock(product.id, col.name, selectedSize, product.stock);
+      if (currentStock <= 0) {
+        const firstAvail = SIZES.find(
+          (sz) => getVariantStock(product.id, col.name, sz, product.stock) > 0
+        );
+        if (firstAvail) setSelectedSize(firstAvail);
+      }
+    }
+  };
+
+  // Open Write Review Modal (Requires Login)
+  const handleOpenReviewModal = () => {
+    if (!isLoggedIn) {
+      if (typeof window !== "undefined" && product) {
+        localStorage.setItem("vexa_redirect_after_login", `/product/${product.id}`);
+      }
+      navigate("/login");
+      return;
+    }
+    if (user?.name && !newName) {
+      setNewName(user.name);
+    }
+    setShowReviewModal(true);
   };
 
   // Handle new review submission
@@ -375,57 +525,55 @@ export function ProductDetailPage() {
         {/* Left Column: Product Image Gallery */}
         <div className="lg:col-span-7 space-y-4">
           <Reveal>
-            <div className="group relative overflow-hidden rounded-2xl border border-gold/40 bg-card shadow-goldy transition-all duration-500">
+            <div className="group relative overflow-hidden rounded-2xl border border-gold/40 bg-card/40 shadow-goldy transition-all duration-500">
               <img
                 key={selectedImage}
                 src={selectedImage}
                 alt={`${product.name} in ${selectedColor.name}`}
-                className="h-[480px] sm:h-[580px] w-full object-cover object-center transition-all duration-700 group-hover:scale-105 animate-in fade-in duration-300"
+                className="h-[480px] sm:h-[580px] w-full object-cover object-top transition-all duration-700 group-hover:scale-105 animate-in fade-in duration-300"
               />
-              <span className="absolute left-5 top-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-md">
+              <span className="absolute left-5 top-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-md z-10">
                 {product.category} Collection
               </span>
-              <span className="btn-gold absolute right-5 top-5 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider">
+              <span className="btn-gold absolute right-5 top-5 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider z-10">
                 {discountOff}% OFF
               </span>
-              <span className="absolute bottom-5 left-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold text-[#1c1917] shadow-md">
+              <span className="absolute bottom-5 left-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold text-[#1c1917] shadow-md z-10">
                 240 GSM Heavyweight Cotton
               </span>
             </div>
           </Reveal>
 
-          {/* Colorway Image Thumbnails (Hidden on mobile responsive) */}
-          <div className="hidden sm:block pt-2 space-y-2">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-              Available Color Previews
-            </p>
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2.5">
-              {COLOR_OPTIONS.map((col) => (
-                <button
-                  key={col.name}
-                  onClick={() => handleSelectColor(col)}
-                  className={`group relative overflow-hidden rounded-xl border transition-all duration-300 cursor-pointer ${
-                    selectedColor.name === col.name
-                      ? "border-gold ring-2 ring-gold/60 scale-105 shadow-goldy"
-                      : "border-border opacity-70 hover:opacity-100 hover:border-gold/50"
-                  }`}
-                  title={col.name}
-                >
-                  <img
-                    src={col.image}
-                    alt={col.name}
-                    className="h-16 w-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-                  {selectedColor.name === col.name && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gold/20 backdrop-blur-[1px]">
-                      <Check className="size-4 text-gold drop-shadow-md stroke-[3]" />
-                    </div>
-                  )}
-                </button>
-              ))}
+          {/* 4-Angle Gallery Previews */}
+          {colorGalleryAngles.length > 0 && (
+            <div className="pt-2">
+              <div className="grid grid-cols-4 gap-2.5">
+                {colorGalleryAngles.map((angle, idx) => {
+                  const isActive = selectedImage === angle.image;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedImage(angle.image)}
+                      className={`group relative overflow-hidden rounded-xl border transition-all duration-300 h-20 sm:h-24 cursor-pointer bg-card ${
+                        isActive
+                          ? "border-gold ring-2 ring-gold/60 scale-105 shadow-goldy"
+                          : "border-border opacity-70 hover:opacity-100 hover:border-gold/50"
+                      }`}
+                      title={`${selectedColor.name} - ${angle.label}`}
+                    >
+                      <img
+                        src={angle.image}
+                        alt={`${selectedColor.name} ${angle.label}`}
+                        className="h-full w-full object-cover object-top"
+                      />
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right Column: Product Details & Purchase Form */}
@@ -511,8 +659,8 @@ export function ProductDetailPage() {
 
               {/* Color Swatch Circles (Single Line Row Layout) */}
               <div className="grid grid-cols-8 gap-1 sm:gap-2.5 pt-1 items-center justify-items-center">
-                {COLOR_OPTIONS.map((col) => {
-                  const isActive = selectedColor.name === col.name;
+                {availableColorsForProduct.map((col) => {
+                  const isActive = selectedColor.name.toLowerCase().trim() === col.name.toLowerCase().trim();
                   return (
                     <button
                       key={col.name}
@@ -565,70 +713,34 @@ export function ProductDetailPage() {
               <div className="grid grid-cols-6 gap-2">
                 {SIZES.map((sz) => {
                   const szStock = product ? getVariantStock(product.id, selectedColor.name, sz, product.stock) : 0;
-                  const isSzOut = szStock === 0;
+                  const isSzOut = szStock <= 0;
                   const isSelected = selectedSize === sz;
 
                   return (
                     <button
                       key={sz}
                       type="button"
-                      onClick={() => setSelectedSize(sz)}
-                      className={`relative rounded-md border py-3 text-xs font-bold transition-all cursor-pointer ${
-                        isSelected
-                          ? isSzOut
-                            ? "border-red-500 bg-red-500/20 text-red-300 font-extrabold shadow-md ring-2 ring-red-500/50"
-                            : "border-gold bg-gold text-primary-foreground shadow-goldy font-extrabold scale-105"
-                          : isSzOut
-                          ? "border-red-500/30 bg-surface/50 text-muted-foreground/60 line-through hover:border-red-500/60 hover:text-foreground"
-                          : "border-border bg-card text-foreground hover:border-gold/60"
+                      disabled={isSzOut}
+                      onClick={() => !isSzOut && setSelectedSize(sz)}
+                      className={`relative overflow-hidden rounded-md border py-3 text-xs font-bold transition-all ${
+                        isSzOut
+                          ? "opacity-50 cursor-not-allowed border-border/60 bg-muted/20 text-muted-foreground select-none"
+                          : isSelected
+                          ? "border-gold bg-gold text-primary-foreground shadow-goldy font-extrabold scale-105 cursor-pointer"
+                          : "border-border bg-card text-foreground hover:border-gold/60 cursor-pointer"
                       }`}
                     >
                       <span>{sz}</span>
+                      {/* Diagonal strike-through cross line for unavailable sizes */}
                       {isSzOut && (
-                        <span className="absolute -top-1.5 -right-1 flex size-2.5 items-center justify-center">
-                          <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
-                          <span className="relative inline-flex size-2 rounded-full bg-red-500" />
-                        </span>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden rounded-md">
+                          <div className="w-[140%] h-[1.5px] bg-foreground/60 transform -rotate-45" />
+                        </div>
                       )}
                     </button>
                   );
                 })}
               </div>
-            </div>
-
-            {/* Dynamic Variant Stock Status Indicator */}
-            <div className="mt-6">
-              {isVariantInStock ? (
-                <div className="flex items-center justify-between rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-400 font-bold shadow-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="relative flex size-2.5 shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
-                    </span>
-                    <span>
-                      IN STOCK: <strong className="text-emerald-300 font-extrabold">{currentVariantStock} units</strong> available in {selectedColor.name} (Size {selectedSize})
-                    </span>
-                  </div>
-                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-emerald-300 border border-emerald-500/30">
-                    Ready to Ship
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-1.5 rounded-xl border border-red-500/60 bg-red-500/10 p-4 text-xs text-red-300 shadow-md animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-red-400 font-extrabold">
-                      <PackageX className="size-4 shrink-0 text-red-400" />
-                      <span className="uppercase tracking-wider">OUT OF STOCK</span>
-                    </div>
-                    <span className="rounded-full bg-red-500/20 px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-red-400 border border-red-500/40">
-                      Unavailable
-                    </span>
-                  </div>
-                  <p className="text-xs text-red-200/90 font-medium leading-relaxed pl-6">
-                    The selected colorway <strong>{selectedColor.name}</strong> in Size <strong>{selectedSize}</strong> is currently out of stock. Please select another size or colorway.
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Quantity Selector */}
@@ -782,7 +894,7 @@ export function ProductDetailPage() {
             </h2>
           </div>
           <button
-            onClick={() => setShowReviewModal(true)}
+            onClick={handleOpenReviewModal}
             className="btn-gold hover:btn-gold-hover flex items-center justify-center gap-2 rounded-sm px-6 py-3 text-xs font-bold uppercase tracking-wider cursor-pointer"
           >
             <MessageSquare className="size-4" /> Write a Review
@@ -823,58 +935,139 @@ export function ProductDetailPage() {
           </div>
         </div>
 
-        {/* Reviews List */}
-        <div className="space-y-6">
-          {reviews.map((rev) => (
-            <div
-              key={rev.id}
-              className="rounded-xl border border-border bg-card p-6 space-y-3 transition-all hover:border-gold/50"
+        {/* Dynamic Interactive Filter & Sort Toolbar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mr-1">
+              Filter:
+            </span>
+            <button
+              type="button"
+              onClick={() => setReviewFilter("all")}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                reviewFilter === "all"
+                  ? "bg-gold text-primary-foreground shadow-xs"
+                  : "bg-surface text-muted-foreground hover:text-foreground border border-border"
+              }`}
             >
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-gold/20 font-bold text-gold text-sm border border-gold/40">
-                    {rev.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-foreground text-sm">{rev.name}</h4>
-                      {rev.verified && (
-                        <span className="flex items-center gap-1 rounded-full bg-gold/10 px-2 py-0.5 text-[9px] font-bold text-gold border border-gold/30">
-                          <CheckCircle2 className="size-3 text-gold" /> Verified Buyer
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">{rev.date}</p>
-                  </div>
-                </div>
+              All ({reviews.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setReviewFilter("5")}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                reviewFilter === "5"
+                  ? "bg-gold text-primary-foreground shadow-xs"
+                  : "bg-surface text-muted-foreground hover:text-foreground border border-border"
+              }`}
+            >
+              ★ 5 Stars ({reviews.filter((r) => r.rating === 5).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setReviewFilter("4")}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                reviewFilter === "4"
+                  ? "bg-gold text-primary-foreground shadow-xs"
+                  : "bg-surface text-muted-foreground hover:text-foreground border border-border"
+              }`}
+            >
+              ★ 4 Stars ({reviews.filter((r) => r.rating === 4).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setReviewFilter("verified")}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                reviewFilter === "verified"
+                  ? "bg-gold text-primary-foreground shadow-xs"
+                  : "bg-surface text-muted-foreground hover:text-foreground border border-border"
+              }`}
+            >
+              Verified Buyers ({reviews.filter((r) => r.verified).length})
+            </button>
+          </div>
 
-                <div className="flex text-gold">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`size-4 ${i < rev.rating ? "fill-current" : "text-border"}`}
-                    />
-                  ))}
-                </div>
-              </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+              Sort By:
+            </span>
+            <select
+              value={reviewSort}
+              onChange={(e) => setReviewSort(e.target.value as any)}
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground font-semibold outline-none focus:border-gold cursor-pointer"
+            >
+              <option value="recent">Most Recent</option>
+              <option value="rating">Highest Rating</option>
+              <option value="helpful">Most Helpful</option>
+            </select>
+          </div>
+        </div>
 
-              <h5 className="font-bold text-foreground text-sm">{rev.title}</h5>
-              <p className="text-xs text-muted-foreground leading-relaxed">{rev.comment}</p>
-
-              <div className="pt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50">
-                <button
-                  onClick={() => handleHelpfulClick(rev.id)}
-                  disabled={helpfulClicked[rev.id]}
-                  className={`flex items-center gap-1.5 hover:text-gold transition-colors ${
-                    helpfulClicked[rev.id] ? "text-gold font-bold" : ""
-                  }`}
-                >
-                  <ThumbsUp className="size-3.5" /> Helpful ({rev.helpfulCount})
-                </button>
-                <span>VEXA Verified Review</span>
-              </div>
+        {/* Dynamic Reviews List */}
+        <div className="space-y-6">
+          {filteredReviews.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-8 text-center space-y-2">
+              <p className="text-sm font-bold text-foreground">No customer reviews match the selected filter.</p>
+              <button
+                type="button"
+                onClick={() => setReviewFilter("all")}
+                className="text-xs text-gold underline font-semibold cursor-pointer"
+              >
+                Clear filters to view all {reviews.length} customer reviews
+              </button>
             </div>
-          ))}
+          ) : (
+            filteredReviews.map((rev) => (
+              <div
+                key={rev.id}
+                className="rounded-xl border border-border bg-card p-6 space-y-3 transition-all hover:border-gold/50"
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-full bg-gold/20 font-bold text-gold text-sm border border-gold/40">
+                      {rev.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-foreground text-sm">{rev.name}</h4>
+                        {rev.verified && (
+                          <span className="flex items-center gap-1 rounded-full bg-gold/10 px-2 py-0.5 text-[9px] font-bold text-gold border border-gold/30">
+                            <CheckCircle2 className="size-3 text-gold" /> Verified Buyer
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{rev.date}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex text-gold">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`size-4 ${i < rev.rating ? "fill-current" : "text-border"}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <h5 className="font-bold text-foreground text-sm">{rev.title}</h5>
+                <p className="text-xs text-muted-foreground leading-relaxed">{rev.comment}</p>
+
+                <div className="pt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50">
+                  <button
+                    onClick={() => handleHelpfulClick(rev.id)}
+                    disabled={helpfulClicked[rev.id]}
+                    className={`flex items-center gap-1.5 hover:text-gold transition-colors cursor-pointer ${
+                      helpfulClicked[rev.id] ? "text-gold font-bold" : ""
+                    }`}
+                  >
+                    <ThumbsUp className="size-3.5" /> Helpful ({rev.helpfulCount})
+                  </button>
+                  <span>VEXA Verified Review</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

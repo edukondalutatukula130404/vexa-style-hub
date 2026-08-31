@@ -1,9 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
+  resolve: {
+    tsconfigPaths: true,
+  },
   server: {
     port: 8080,
     host: true,
@@ -13,7 +15,6 @@ export default defineConfig({
     emptyOutDir: true,
   },
   plugins: [
-    tsconfigPaths(),
     tailwindcss(),
     react(),
   ],

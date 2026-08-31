@@ -282,14 +282,6 @@ export function Home() {
                   <span className="absolute left-3.5 top-3.5 sm:left-5 sm:top-5 rounded-full border border-gold/60 bg-[#f4efe6] px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#1c1917] shadow-md">
                     {heroBanners[heroIndex]?.badgeText || "Signature Drop"}
                   </span>
-
-                  <div className="animate-float absolute right-5 top-5 flex size-18 items-center justify-center rounded-full border-2 border-gold/70 bg-black/90 shadow-goldy">
-                    <div className="text-center">
-                      <p className="font-display text-base sm:text-lg font-bold text-gold-gradient leading-tight">
-                        {heroBanners[heroIndex]?.discount || "30% Off"}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

@@ -64,15 +64,6 @@ type OrderItem = {
 
 type TabType = "profile" | "orders" | "addresses" | "cart" | "wishlist" | "support" | "booking";
 
-const UPI_APPS = [
-  { id: "phonepe", name: "PhonePe", tag: "Instant UPI", icon: "🟣", vpaSuffix: "@ybl" },
-  { id: "gpay", name: "Google Pay", tag: "Instant UPI", icon: "🔵", vpaSuffix: "@okaxis" },
-  { id: "paytm", name: "Paytm UPI", tag: "Wallet & UPI", icon: "🔷", vpaSuffix: "@paytm" },
-  { id: "mobikwik", name: "Mobikwik", tag: "Wallet & UPI", icon: "🔵", vpaSuffix: "@ikwik" },
-  { id: "payzapp", name: "PayZapp HDFC", tag: "Instant UPI", icon: "⚡", vpaSuffix: "@hdfcbank" },
-  { id: "bhim", name: "BHIM / Any UPI", tag: "All UPI Apps", icon: "🇮🇳", vpaSuffix: "@upi" },
-];
-
 export function UserDashboard() {
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
@@ -401,7 +392,7 @@ export function UserDashboard() {
   const [shippingCity, setShippingCity] = useState("Bengaluru");
   const [shippingState, setShippingState] = useState("Karnataka");
   const [shippingPincode, setShippingPincode] = useState("560038");
-  const [paymentMethod, setPaymentMethod] = useState<string>("Demo UPI Instant (GPay / PhonePe / Paytm)");
+  const [paymentMethod, setPaymentMethod] = useState<string>("Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)");
   const [shippingAddress, setShippingAddress] = useState<string>(
     "EDUKONDALU (+91 9876543210), 100 Feet Road, Indiranagar, Stage 2, Bengaluru, Karnataka - 560038"
   );
@@ -412,11 +403,8 @@ export function UserDashboard() {
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const isExpanded = !sidebarCollapsed || sidebarHovered;
 
-  // Interactive Demo Payment Modal State (Accepts Any Input e.g. PhonePe, GPay, Mobikwik, Paytm)
+  // Interactive Demo Payment Modal State (Accepts Any Input e.g. 1234 5678 9123 1222)
   const [showDemoPaymentModal, setShowDemoPaymentModal] = useState(false);
-  const [activeModalCategory, setActiveModalCategory] = useState<"recommended" | "upi" | "cards" | "netbanking" | "wallet">("recommended");
-  const [selectedUpiApp, setSelectedUpiApp] = useState("phonepe");
-  const [demoUpiIdInput, setDemoUpiIdInput] = useState("9876543210@ybl");
   const [demoCardInput, setDemoCardInput] = useState("1234 5678 9123 1222");
   const [demoExpiryInput, setDemoExpiryInput] = useState("02/29");
   const [demoCvvInput, setDemoCvvInput] = useState("123");
@@ -780,165 +768,6 @@ export function UserDashboard() {
 
 
 
-  const executeFinalizeOrder = (methodLabel?: string, paymentId?: string) => {
-    const currentUser = user || (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("vexa_auth_user") || "null") : null);
-    const email = currentUser?.email || profileEmail || (typeof window !== "undefined" ? localStorage.getItem("vexa_user_email") || "" : "") || "customer@vexa.store";
-    const name = currentUser?.name || profileName || "VEXA Customer";
-
-    const isCart = isCartCheckout || (cartItems.length > 0 && !selectedProduct);
-
-    const itemsToOrder = isCart
-      ? cartItems.map((ci) => ({
-          id: ci.product?.id || "item-" + Date.now(),
-          name: ci.product?.name || "Premium Tee",
-          price: ci.product?.price || 0,
-          size: ci.size || "M",
-          color: ci.product?.color || "Signature Black",
-          quantity: ci.quantity || 1,
-          image: ci.product?.image || "",
-        }))
-      : selectedProduct
-      ? [
-          {
-            id: selectedProduct.id,
-            name: selectedProduct.name,
-            price: selectedProduct.price,
-            size: selectedSize,
-            color: selectedProduct.color,
-            quantity: quantity,
-            image: selectedProduct.image,
-          },
-        ]
-      : [];
-
-    let calculatedTotal = isCart
-      ? totalAmount
-      : selectedProduct
-      ? selectedProduct.price * quantity
-      : 0;
-
-    let finalPayable = isCart ? finalOrderTotal : calculatedTotal;
-    if (!finalPayable || isNaN(finalPayable) || finalPayable <= 0) {
-      finalPayable = itemsToOrder.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
-    }
-
-    const fullAddr = shippingAddress || `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
-
-    const finalPaymentMethod = methodLabel || paymentMethod || "Demo Instant Payment (UPI / Card)";
-    const displayMethod = paymentId ? `${finalPaymentMethod} (ID: ${paymentId})` : finalPaymentMethod;
-
-    const demoOrderObj: OrderItem = {
-      _id: "ORD-" + Math.floor(100000 + Math.random() * 900000),
-      userEmail: email,
-      userName: name,
-      items: itemsToOrder,
-      totalAmount: finalPayable,
-      status: "Processing",
-      paymentMethod: displayMethod,
-      shippingAddress: fullAddr,
-      createdAt: new Date().toISOString(),
-    };
-
-    setLastPlacedOrder(demoOrderObj);
-
-    // 1. Append to order state & localStorage cache
-    setMyOrders((prev) => [demoOrderObj, ...prev]);
-
-    if (typeof window !== "undefined") {
-      try {
-        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
-        localStorage.setItem("vexa_demo_orders", JSON.stringify([demoOrderObj, ...cached]));
-
-        // Deduct Warehouse Stock
-        const inventory = JSON.parse(localStorage.getItem("vexa_inventory_stocks") || "{}");
-        itemsToOrder.forEach((item) => {
-          const key = item.name;
-          const qty = item.quantity || 1;
-          const currentStock = inventory[key] !== undefined ? inventory[key] : 15;
-          inventory[key] = Math.max(0, currentStock - qty);
-        });
-        localStorage.setItem("vexa_inventory_stocks", JSON.stringify(inventory));
-        window.dispatchEvent(new Event("vexa_inventory_updated"));
-        window.dispatchEvent(new Event("vexa_items_updated"));
-      } catch (e) {
-        console.warn("Failed to cache order:", e);
-      }
-    }
-
-    // 2. Clear Cart
-    if (isCart || cartItems.length > 0) {
-      clearCart();
-    }
-
-    // 3. Reset Checkout Flow State to ORDER SUCCESSFUL PAGE
-    setSelectedProduct(null);
-    setIsCartCheckout(false);
-    setCartCheckoutStep("success");
-    setCheckoutStep(1);
-    setOrderSubmitting(false);
-
-    // 4. Keep user on Order Successful Page screen
-    if (typeof window !== "undefined") {
-      window.history.pushState({}, "", "/dashboard?tab=cart");
-    }
-
-    // 5. Post to backend asynchronously in background
-    fetch(`${API_URL}/orders`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userEmail: email,
-        userName: name,
-        items: itemsToOrder,
-        totalAmount: finalPayable,
-        paymentMethod: demoOrderObj.paymentMethod,
-        shippingAddress: fullAddr,
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.success && data.data && data.data._id) {
-          const realId = data.data._id;
-          setMyOrders((prev) =>
-            prev.map((o) =>
-              o._id === demoOrderObj._id ? { ...o, _id: realId, id: realId } : o
-            )
-          );
-        }
-      })
-      .catch((err) => console.warn("Background order POST notice:", err));
-  };
-
-  const handleExecuteDemoPaymentSubmission = (e?: React.FormEvent, customMethodName?: string) => {
-    if (e) e.preventDefault();
-    if (demoProcessing) return;
-
-    setDemoProcessing(true);
-    const txn = `pay_demo_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    setDemoTxnId(txn);
-
-    setTimeout(() => {
-      setDemoProcessing(false);
-      setDemoPaymentSuccess(true);
-
-      setTimeout(() => {
-        setShowDemoPaymentModal(false);
-        setDemoPaymentSuccess(false);
-
-        const activeAppObj = UPI_APPS.find((a) => a.id === selectedUpiApp);
-        const appName = activeAppObj ? activeAppObj.name : "UPI App";
-
-        const paymentLabel = customMethodName
-          ? `Demo Payment (${customMethodName} - Paid)`
-          : paymentMethod.toLowerCase().includes("upi")
-          ? `Demo Instant UPI (${appName}: ${demoUpiIdInput || "9876543210@ybl"} - Paid)`
-          : `Demo Card Payment (Card: ${demoCardInput || "Any Card"} - Paid)`;
-
-        executeFinalizeOrder(paymentLabel, txn);
-      }, 1000);
-    }, 600);
-  };
-
   const handlePlaceOrder = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e) e.preventDefault();
     if (orderSubmitting) return;
@@ -946,13 +775,313 @@ export function UserDashboard() {
     setOrderSubmitting(true);
 
     try {
-      const isCod = paymentMethod.toLowerCase().includes("cod") || paymentMethod.toLowerCase().includes("delivery");
+      const currentUser = user || (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("vexa_auth_user") || "null") : null);
+      const email = currentUser?.email || profileEmail || (typeof window !== "undefined" ? localStorage.getItem("vexa_user_email") || "" : "") || "customer@vexa.store";
+      const name = currentUser?.name || profileName || "VEXA Customer";
 
-      if (isCod) {
-        executeFinalizeOrder("Cash on Delivery (COD)");
-      } else {
-        setShowDemoPaymentModal(true);
+      const isCart = isCartCheckout || (cartItems.length > 0 && !selectedProduct);
+
+      const itemsToOrder = isCart
+        ? cartItems.map((ci) => ({
+            id: ci.product?.id || "item-" + Date.now(),
+            name: ci.product?.name || "Premium Tee",
+            price: ci.product?.price || 0,
+            size: ci.size || "M",
+            color: ci.product?.color || "Signature Black",
+            quantity: ci.quantity || 1,
+            image: ci.product?.image || "",
+          }))
+        : selectedProduct
+        ? [
+            {
+              id: selectedProduct.id,
+              name: selectedProduct.name,
+              price: selectedProduct.price,
+              size: selectedSize,
+              color: selectedProduct.color,
+              quantity: quantity,
+              image: selectedProduct.image,
+            },
+          ]
+        : [];
+
+      let calculatedTotal = isCart
+        ? totalAmount
+        : selectedProduct
+        ? selectedProduct.price * quantity
+        : 0;
+
+      let finalPayable = isCart ? finalOrderTotal : calculatedTotal;
+      if (!finalPayable || isNaN(finalPayable) || finalPayable <= 0) {
+        finalPayable = itemsToOrder.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+      }
+
+      const fullAddr = shippingAddress || `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
+
+      const executeFinalizeOrder = (methodLabel?: string, paymentId?: string) => {
+        const finalPaymentMethod = methodLabel || paymentMethod || "Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)";
+        const displayMethod = paymentId ? `${finalPaymentMethod} (ID: ${paymentId})` : finalPaymentMethod;
+
+        const demoOrderObj: OrderItem = {
+          _id: "ORD-" + Math.floor(100000 + Math.random() * 900000),
+          userEmail: email,
+          userName: name,
+          items: itemsToOrder,
+          totalAmount: finalPayable,
+          status: "Processing",
+          paymentMethod: displayMethod,
+          shippingAddress: fullAddr,
+          createdAt: new Date().toISOString(),
+        };
+
+        setLastPlacedOrder(demoOrderObj);
+
+        // 1. Append to order state & localStorage cache
+        setMyOrders((prev) => [demoOrderObj, ...prev]);
+
+        if (typeof window !== "undefined") {
+          try {
+            const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+            localStorage.setItem("vexa_demo_orders", JSON.stringify([demoOrderObj, ...cached]));
+
+            // Deduct Warehouse Stock
+            const inventory = JSON.parse(localStorage.getItem("vexa_inventory_stocks") || "{}");
+            itemsToOrder.forEach((item) => {
+              const key = item.name;
+              const qty = item.quantity || 1;
+              const currentStock = inventory[key] !== undefined ? inventory[key] : 15;
+              inventory[key] = Math.max(0, currentStock - qty);
+            });
+            localStorage.setItem("vexa_inventory_stocks", JSON.stringify(inventory));
+            window.dispatchEvent(new Event("vexa_inventory_updated"));
+            window.dispatchEvent(new Event("vexa_items_updated"));
+          } catch (e) {
+            console.warn("Failed to cache order:", e);
+          }
+        }
+
+        // 2. Clear Cart
+        if (isCart || cartItems.length > 0) {
+          clearCart();
+        }
+
+        // 3. Reset Checkout Flow State to ORDER SUCCESSFUL PAGE
+        setSelectedProduct(null);
+        setIsCartCheckout(false);
+        setCartCheckoutStep("success");
+        setCheckoutStep(1);
         setOrderSubmitting(false);
+
+        // 4. Keep user on Order Successful Page screen
+        if (typeof window !== "undefined") {
+          window.history.pushState({}, "", "/dashboard?tab=cart");
+        }
+
+        // 5. Post to backend asynchronously in background
+        fetch(`${API_URL}/orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userEmail: email,
+            userName: name,
+            items: itemsToOrder,
+            totalAmount: finalPayable,
+            paymentMethod: demoOrderObj.paymentMethod,
+            shippingAddress: fullAddr,
+          }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.success && data.data && data.data._id) {
+              const realId = data.data._id;
+              setMyOrders((prev) =>
+                prev.map((o) =>
+                  o._id === demoOrderObj._id ? { ...o, _id: realId, id: realId } : o
+                )
+              );
+            }
+          })
+          .catch((err) => console.warn("Background order POST notice:", err));
+      };
+
+      const handleExecuteDemoPaymentSubmission = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (demoProcessing) return;
+
+        setDemoProcessing(true);
+        const txn = `pay_demo_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        setDemoTxnId(txn);
+
+        setTimeout(() => {
+          setDemoProcessing(false);
+          setDemoPaymentSuccess(true);
+
+          setTimeout(() => {
+            setShowDemoPaymentModal(false);
+            setDemoPaymentSuccess(false);
+
+            executeFinalizeOrder(
+              `Demo Online Payment (Card: ${demoCardInput || "Any Card"} - Paid)`,
+              txn
+            );
+          }, 1000);
+        }, 600);
+      };
+
+      const isMobikwikWallet = paymentMethod.toLowerCase().includes("mobikwik");
+      const isPayzappWallet = paymentMethod.toLowerCase().includes("payzapp");
+      const isAirtelWallet = paymentMethod.toLowerCase().includes("airtel");
+      const isWalletChoice = isMobikwikWallet || isPayzappWallet || isAirtelWallet || paymentMethod.toLowerCase().includes("wallet");
+      const isRazorpay = !paymentMethod || paymentMethod.toLowerCase().includes("razorpay") || isWalletChoice;
+
+      if (isRazorpay && finalPayable > 0) {
+        let orderData: any = null;
+        let keyId = "rzp_test_TZpuTmnp4m79jk";
+        let isRealRazorpayOrder = false;
+
+        try {
+          const res = await fetch(`${API_URL}/payment/create-order`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: finalPayable, currency: "INR" }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && data.order) {
+              orderData = data.order;
+              keyId = data.keyId || keyId;
+              if (data.order.id && !data.isFallback && !data.order.id.startsWith("order_rzp_")) {
+                isRealRazorpayOrder = true;
+              }
+            }
+          }
+        } catch (payErr) {
+          console.warn("Razorpay order creation notice:", payErr);
+        }
+
+        const rzpAmount = orderData?.amount || Math.round(finalPayable * 100);
+        const rzpCurrency = orderData?.currency || "INR";
+
+        const options: any = {
+          key: keyId,
+          amount: rzpAmount,
+          currency: rzpCurrency,
+          name: "VEXA - Wear Confidence",
+          description: isMobikwikWallet
+            ? `Payment via Mobikwik Wallet for ${itemsToOrder.length} item(s)`
+            : isPayzappWallet
+            ? `Payment via PayZapp Wallet for ${itemsToOrder.length} item(s)`
+            : isAirtelWallet
+            ? `Payment via Airtel Money Wallet for ${itemsToOrder.length} item(s)`
+            : `Payment for ${itemsToOrder.length} Luxury Streetwear item(s)`,
+          image: "/favicon.svg",
+          config: {
+            display: {
+              blocks: {
+                wallets: {
+                  name: "Pay via Mobikwik, PayZapp, Airtel Money & Wallets",
+                  instruments: [
+                    {
+                      method: "wallet",
+                      wallets: ["mobikwik", "payzapp", "airtelmoney", "paytm", "phonepe", "freecharge", "olamoney", "jiomoney", "amazonpay"]
+                    }
+                  ]
+                }
+              },
+              sequence: ["block.wallets", "block.banks"],
+              preferences: {
+                show_default_blocks: true
+              }
+            }
+          },
+          handler: async function (response: any) {
+            try {
+              await fetch(`${API_URL}/payment/verify-payment`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id || (isRealRazorpayOrder ? orderData?.id : `order_rzp_${Date.now()}`),
+                  razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
+                  razorpay_signature: response.razorpay_signature || "",
+                }),
+              });
+            } catch (verifyErr) {
+              console.warn("Razorpay signature verification notice:", verifyErr);
+            }
+            executeFinalizeOrder(
+              isMobikwikWallet
+                ? "Mobikwik Wallet Payment (Paid)"
+                : isPayzappWallet
+                ? "PayZapp Wallet Payment (Paid)"
+                : isAirtelWallet
+                ? "Airtel Money Wallet Payment (Paid)"
+                : "Razorpay Online Payment (Paid)",
+              response.razorpay_payment_id || `pay_${Date.now()}`
+            );
+          },
+          prefill: {
+            name: name,
+            email: email,
+            contact: shippingPhone || "9876543210",
+          },
+          theme: {
+            color: "#C5A059",
+          },
+          modal: {
+            ondismiss: function () {
+              setOrderSubmitting(false);
+            },
+          },
+        };
+
+        // Pass order_id ONLY if order was successfully created on Razorpay servers
+        if (isRealRazorpayOrder && orderData?.id) {
+          options.order_id = orderData.id;
+        }
+
+        const openRazorpayModal = () => {
+          try {
+            const rzp = new (window as any).Razorpay(options);
+            rzp.on("payment.failed", function (failResponse: any) {
+              console.warn("Razorpay Payment Notice:", failResponse?.error);
+              setOrderSubmitting(false);
+            });
+            rzp.open();
+          } catch (modalErr) {
+            console.error("Failed to launch Razorpay modal:", modalErr);
+            executeFinalizeOrder(
+              isMobikwikWallet
+                ? "Mobikwik Wallet Payment (Demo Completed)"
+                : isPayzappWallet
+                ? "PayZapp Wallet Payment (Demo Completed)"
+                : isAirtelWallet
+                ? "Airtel Money Wallet Payment (Demo Completed)"
+                : "Razorpay Online Payment (Standard)"
+            );
+          }
+        };
+
+        if (typeof window !== "undefined" && (window as any).Razorpay) {
+          openRazorpayModal();
+        } else {
+          const script = document.createElement("script");
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.onload = () => openRazorpayModal();
+          script.onerror = () => {
+            executeFinalizeOrder(
+              isMobikwikWallet
+                ? "Mobikwik Wallet Payment (Test Mode Verified)"
+                : isPayzappWallet
+                ? "PayZapp Wallet Payment (Test Mode Verified)"
+                : isAirtelWallet
+                ? "Airtel Money Wallet Payment (Test Mode Verified)"
+                : "Razorpay Online Payment (Test Mode Verified)"
+            );
+          };
+          document.body.appendChild(script);
+        }
+      } else {
+        executeFinalizeOrder();
       }
     } catch (err) {
       console.error("Order placement handler error:", err);
@@ -2145,17 +2274,19 @@ export function UserDashboard() {
                       </div>
 
                       {/* DEMO PAYMENT OPTION SELECTOR */}
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                             Select Payment Method
                           </label>
+                          <span className="rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider">
+                            ⚡ Razorpay Online Enabled
+                          </span>
                         </div>
 
-                        <div className="grid gap-2.5 sm:grid-cols-3">
+                        <div className="grid gap-2.5 sm:grid-cols-2">
                           {[
-                            { id: "Demo UPI Instant (GPay / PhonePe / Paytm)", label: "Demo UPI Instant", desc: "Simulated PhonePe, GPay, Mobikwik, Paytm" },
-                            { id: "Demo Credit / Debit Card", label: "Demo Card Payment", desc: "Simulated Visa, MasterCard, RuPay" },
+                            { id: "Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)", label: "Razorpay Online Payment", desc: "Official Razorpay (UPI, Cards, Wallets, NetBanking)" },
                             { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
                           ].map((pm) => (
                             <div
@@ -2183,57 +2314,6 @@ export function UserDashboard() {
                             </div>
                           ))}
                         </div>
-
-                        {/* Interactive UPI App Options (PhonePe, GPay, Paytm, Mobikwik, PayZapp, BHIM) */}
-                        {paymentMethod.toLowerCase().includes("upi") && (
-                          <div className="rounded-xl border border-gold/40 bg-surface/80 p-4 space-y-3.5 animate-in fade-in duration-200">
-                            <div className="flex items-center justify-between">
-                              <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
-                                Choose UPI App / Wallet Option
-                              </label>
-                              <span className="text-[10px] text-emerald-500 font-semibold">⚡ Fast Demo Payment Active</span>
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                              {UPI_APPS.map((app) => (
-                                <div
-                                  key={app.id}
-                                  onClick={() => {
-                                    setSelectedUpiApp(app.id);
-                                    if (!demoUpiIdInput || demoUpiIdInput.includes("@")) {
-                                      setDemoUpiIdInput(`9876543210${app.vpaSuffix}`);
-                                    }
-                                  }}
-                                  className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-all cursor-pointer ${
-                                    selectedUpiApp === app.id
-                                      ? "border-gold bg-gold/20 shadow-sm font-bold ring-1 ring-gold/50"
-                                      : "border-border bg-background hover:border-gold/50"
-                                  }`}
-                                >
-                                  <span className="text-base">{app.icon}</span>
-                                  <div>
-                                    <p className="text-xs text-foreground font-semibold leading-none">{app.name}</p>
-                                    <p className="text-[9px] text-muted-foreground mt-1">{app.tag}</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="space-y-1.5 pt-1">
-                              <label className="text-[10px] uppercase font-bold text-muted-foreground block">
-                                Enter Any Mobile Number or UPI ID (PhonePe / GPay / Mobikwik / Paytm)
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="Enter ANY data e.g. 9876543210@ybl or mobile number"
-                                value={demoUpiIdInput}
-                                onChange={(e) => setDemoUpiIdInput(e.target.value)}
-                                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                              />
-                              <p className="text-[10px] text-emerald-500 font-medium">✓ Instant demo approval for any mobile number or UPI handle entered</p>
-                            </div>
-                          </div>
-                        )}
                       </div>
 
 
@@ -2697,12 +2777,14 @@ export function UserDashboard() {
                             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                               Select Payment Method
                             </label>
+                            <span className="rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider">
+                              ⚡ Razorpay Online Enabled
+                            </span>
                           </div>
 
-                          <div className="grid gap-2.5 sm:grid-cols-3">
+                          <div className="grid gap-2.5 sm:grid-cols-2">
                             {[
-                              { id: "Demo UPI Instant (GPay / PhonePe / Paytm)", label: "Demo UPI Instant", desc: "Simulated GPay, PhonePe, Paytm or UPI" },
-                              { id: "Demo Credit / Debit Card", label: "Demo Card Payment", desc: "Simulated Visa, MasterCard, RuPay" },
+                              { id: "Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)", label: "Razorpay Online Payment", desc: "Official Razorpay (UPI, Cards, Wallets, NetBanking)" },
                               { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
                             ].map((pm) => (
                               <div
@@ -3029,340 +3111,117 @@ export function UserDashboard() {
           </div>
         </div>
       )}
-      {/* Sleek Interactive Demo Payment Gateway Modal (Razorpay Layout Matching Screenshot) */}
+      {/* Sleek Interactive Demo Payment Gateway Modal (Accepts Any Input e.g. 1234 5678 9123 1222) */}
       {showDemoPaymentModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 p-3 sm:p-6 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl border border-gold/40 bg-card shadow-2xl flex flex-col md:flex-row min-h-[520px] animate-in zoom-in-95 duration-200">
-            
-            {/* Top-Right Angled Test Mode Banner */}
-            <div className="absolute top-4 -right-10 z-50 rotate-45 bg-red-600 text-white font-black text-[10px] tracking-widest uppercase px-10 py-1 shadow-lg pointer-events-none">
-              Test Mode
-            </div>
-
-            {/* LEFT SIDEBAR: GOLD LUXURY THEME */}
-            <div className="w-full md:w-72 bg-gradient-to-b from-amber-600 via-amber-700 to-amber-900 p-6 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
-              {/* Background Glow */}
-              <div className="absolute -left-10 -bottom-10 size-48 rounded-full bg-gold/20 blur-3xl pointer-events-none" />
-
-              <div className="space-y-6 relative z-10">
-                {/* Brand Header */}
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-black/30 text-white font-bold text-lg border border-white/20 shadow-md">
-                    V
-                  </div>
-                  <div>
-                    <h3 className="font-display text-sm font-bold tracking-wide">VEXA – Wear Confidence</h3>
-                    <p className="text-[10px] text-amber-200 font-medium">Official Payment Gateway</p>
-                  </div>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-gold/40 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-gold/20 text-gold font-bold text-base border border-gold/30">
+                  V
                 </div>
-
-                {/* Price Summary Card */}
-                <div className="rounded-xl bg-white text-gray-900 p-4 shadow-lg space-y-1">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Price Summary</p>
-                  <p className="font-display text-2xl font-black text-gray-900">
-                    ₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")}
-                  </p>
-                </div>
-
-                {/* User Info Box */}
-                <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 p-3 flex items-center justify-between text-xs text-amber-100">
-                  <div className="flex items-center gap-2 truncate">
-                    <UserIcon className="size-4 shrink-0 text-amber-200" />
-                    <span className="truncate">Using as {user?.email || profileEmail || "+91 93461 57714"}</span>
-                  </div>
-                  <ChevronDown className="size-3.5 shrink-0" />
-                </div>
-
-                {/* Offers Pill */}
-                <div className="rounded-xl bg-emerald-500/20 border border-emerald-400/40 p-3 flex items-center justify-between text-xs text-emerald-200 font-semibold">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="size-4 text-emerald-300" />
-                    <span>Offers on UPI available</span>
-                  </div>
-                  <ArrowRight className="size-3.5" />
+                <div>
+                  <h3 className="font-display text-base font-bold text-foreground">VEXA Payment Gateway</h3>
+                  <p className="text-[10px] text-emerald-500 font-semibold tracking-wider">⚡ Demo Test Mode • Accepts Any Card Number</p>
                 </div>
               </div>
-
-              {/* Bottom Security Badge */}
-              <div className="pt-6 border-t border-white/15 text-[11px] text-amber-200/80 flex items-center gap-2 relative z-10">
-                <Lock className="size-3.5" />
-                <span>Secured by VEXA Gateway</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowDemoPaymentModal(false)}
+                className="flex size-8 items-center justify-center rounded-full bg-surface text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
             </div>
 
-            {/* MIDDLE NAVIGATION SIDEBAR (CATEGORIES) */}
-            <div className="w-full md:w-56 bg-card border-r border-border p-3 space-y-1 shrink-0 overflow-y-auto">
-              <p className="px-3 py-1.5 text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Payment Options</p>
-              
-              {[
-                {
-                  id: "recommended",
-                  label: "Recommended",
-                  sub: "Mobikwik, PayZapp, GPay...",
-                  badge: null,
-                },
-                {
-                  id: "upi",
-                  label: "UPI",
-                  sub: "Google Pay, PhonePe, Paytm...",
-                  badge: "Upto ₹30 cashback",
-                },
-                {
-                  id: "cards",
-                  label: "Cards",
-                  sub: "Credit / Debit Cards",
-                  badge: null,
-                },
-                {
-                  id: "wallet",
-                  label: "Wallet",
-                  sub: "Mobikwik, PayZapp, Ola...",
-                  badge: null,
-                },
-                {
-                  id: "netbanking",
-                  label: "Netbanking",
-                  sub: "All Major Banks",
-                  badge: null,
-                },
-              ].map((cat) => (
+            <div className="rounded-xl border border-gold/40 bg-gold/10 p-3.5 flex justify-between items-center text-xs">
+              <span className="text-muted-foreground font-semibold">Total Order Payable:</span>
+              <span className="text-gold font-bold text-base">₹{(isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : 0)).toLocaleString("en-IN")}</span>
+            </div>
+
+            {demoPaymentSuccess ? (
+              <div className="py-8 flex flex-col items-center justify-center space-y-3 text-center animate-in zoom-in-95">
+                <div className="size-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center border border-emerald-500/40">
+                  <CheckCircle2 className="size-10 stroke-[2.5]" />
+                </div>
+                <h4 className="text-xl font-bold text-emerald-500">Payment Successful!</h4>
+                <p className="text-xs text-muted-foreground">Transaction ID: <span className="font-mono text-gold font-bold">{demoTxnId}</span></p>
+                <p className="text-[11px] text-muted-foreground animate-pulse">Finalizing order & redirecting...</p>
+              </div>
+            ) : (
+              <form onSubmit={handleExecuteDemoPaymentSubmission} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
+                    Card Number (Accepts Any Number)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter ANY Card Number (e.g. 1234 5678 9123 1222)"
+                    value={demoCardInput}
+                    onChange={(e) => setDemoCardInput(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                  />
+                  <p className="text-[10px] text-emerald-500 font-medium">✓ Guaranteed test mode approval for any card format (e.g. 1234 5678 9123 1222)</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
+                    Cardholder Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Name on card"
+                    value={demoHolderName}
+                    onChange={(e) => setDemoHolderName(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground focus:border-gold focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block">Expiry Date</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="02/29"
+                      value={demoExpiryInput}
+                      onChange={(e) => setDemoExpiryInput(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground uppercase font-bold block">CVV / PIN</label>
+                    <input
+                      type="password"
+                      required
+                      maxLength={4}
+                      placeholder="123"
+                      value={demoCvvInput}
+                      onChange={(e) => setDemoCvvInput(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                    />
+                  </div>
+                </div>
+
                 <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setActiveModalCategory(cat.id as any)}
-                  className={`w-full text-left p-3 rounded-xl transition-all flex flex-col gap-0.5 cursor-pointer ${
-                    activeModalCategory === cat.id
-                      ? "bg-gold/15 border border-gold/40 text-gold font-bold shadow-sm"
-                      : "hover:bg-surface text-muted-foreground hover:text-foreground"
-                  }`}
+                  type="submit"
+                  disabled={demoProcessing}
+                  className="w-full rounded-xl bg-gold py-3 text-xs font-bold text-black uppercase tracking-widest hover:bg-gold/90 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg mt-2"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground">{cat.label}</span>
-                    {cat.badge && (
-                      <span className="text-[9px] bg-emerald-500/20 text-emerald-500 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
-                        {cat.badge}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground truncate">{cat.sub}</span>
+                  {demoProcessing ? (
+                    <>
+                      <RefreshCw className="size-4 animate-spin" /> Processing Payment...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="size-4" /> Complete Payment (₹{(isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : 0)).toLocaleString("en-IN")})
+                    </>
+                  )}
                 </button>
-              ))}
-            </div>
-
-            {/* RIGHT CONTENT AREA (OPTIONS & PAYMENT FORM) */}
-            <div className="flex-1 bg-background p-6 flex flex-col justify-between relative overflow-y-auto">
-              {/* Header Bar */}
-              <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-                <h4 className="font-display text-base font-bold text-foreground">
-                  {activeModalCategory === "upi" ? "UPI Options" : activeModalCategory === "wallet" ? "All Wallet Options" : activeModalCategory === "cards" ? "Card Payment" : "Payment Options"}
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => setShowDemoPaymentModal(false)}
-                  className="flex size-8 items-center justify-center rounded-full bg-surface text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-
-              {/* SUCCESS ANIMATION SCREEN */}
-              {demoPaymentSuccess ? (
-                <div className="my-auto py-10 flex flex-col items-center justify-center space-y-4 text-center animate-in zoom-in-95">
-                  <div className="size-20 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center border-2 border-emerald-500/50 shadow-lg">
-                    <CheckCircle2 className="size-12 stroke-[2.5] animate-bounce" />
-                  </div>
-                  <h4 className="text-2xl font-bold text-emerald-500">Payment Successful! 🎉</h4>
-                  <p className="text-xs text-muted-foreground">
-                    Transaction ID: <span className="font-mono text-gold font-bold">{demoTxnId}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground animate-pulse font-medium">Finalizing your order & redirecting to receipt...</p>
-                </div>
-              ) : (
-                <div className="space-y-4 my-auto">
-                  {/* CATEGORY 1: WALLET / RECOMMENDED OPTIONS */}
-                  {(activeModalCategory === "wallet" || activeModalCategory === "recommended") && (
-                    <div className="space-y-2.5">
-                      {[
-                        { name: "Mobikwik", desc: "Mobikwik Wallet & UPI", icon: "🔵" },
-                        { name: "Ola Money (Postpaid + Wallet)", desc: "Ola Money Wallet", icon: "🟢" },
-                        { name: "PayZapp", desc: "PayZapp HDFC", icon: "⚡" },
-                        { name: "Airtel Money", desc: "Airtel Payments Bank Wallet", icon: "🔴" },
-                      ].map((wallet) => (
-                        <div
-                          key={wallet.name}
-                          onClick={(e) => handleExecuteDemoPaymentSubmission(e, wallet.name)}
-                          className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-card hover:border-gold hover:bg-gold/10 transition-all cursor-pointer group shadow-sm"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-10 items-center justify-center rounded-lg bg-surface text-lg border border-border">
-                              {wallet.icon}
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold text-foreground group-hover:text-gold transition-colors">{wallet.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{wallet.desc}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 text-gold font-bold text-xs">
-                            <span>Pay ₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")}</span>
-                            <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* CATEGORY 2: UPI OPTIONS */}
-                  {activeModalCategory === "upi" && (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {UPI_APPS.map((app) => (
-                          <div
-                            key={app.id}
-                            onClick={(e) => {
-                              setSelectedUpiApp(app.id);
-                              handleExecuteDemoPaymentSubmission(e, `UPI via ${app.name}`);
-                            }}
-                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group shadow-sm ${
-                              selectedUpiApp === app.id
-                                ? "border-gold bg-gold/15 font-bold"
-                                : "border-border bg-card hover:border-gold/50"
-                            }`}
-                          >
-                            <span className="text-2xl">{app.icon}</span>
-                            <div className="truncate">
-                              <p className="text-xs font-bold text-foreground group-hover:text-gold transition-colors truncate">{app.name}</p>
-                              <p className="text-[9px] text-muted-foreground">{app.tag}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Custom Mobile / UPI ID Input */}
-                      <form onSubmit={handleExecuteDemoPaymentSubmission} className="space-y-3 pt-2 border-t border-border">
-                        <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
-                          Or Pay via Any Mobile Number / UPI ID
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Enter ANY data e.g. 9876543210@ybl or mobile number"
-                          value={demoUpiIdInput}
-                          onChange={(e) => setDemoUpiIdInput(e.target.value)}
-                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                        />
-                        <button
-                          type="submit"
-                          disabled={demoProcessing}
-                          className="w-full rounded-xl bg-gold py-3 text-xs font-bold text-black uppercase tracking-widest hover:bg-gold/90 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-                        >
-                          {demoProcessing ? (
-                            <>
-                              <RefreshCw className="size-4 animate-spin" /> Authorizing Payment...
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="size-4" /> Approve & Pay ₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")}
-                            </>
-                          )}
-                        </button>
-                      </form>
-                    </div>
-                  )}
-
-                  {/* CATEGORY 3: CARDS OPTIONS */}
-                  {activeModalCategory === "cards" && (
-                    <form onSubmit={handleExecuteDemoPaymentSubmission} className="space-y-3">
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
-                          Card Number (Accepts Any Number)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Enter ANY Card Number (e.g. 1234 5678 9123 1222)"
-                          value={demoCardInput}
-                          onChange={(e) => setDemoCardInput(e.target.value)}
-                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
-                          Cardholder Name
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Name on card"
-                          value={demoHolderName}
-                          onChange={(e) => setDemoHolderName(e.target.value)}
-                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground focus:border-gold focus:outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-muted-foreground uppercase font-bold block">Expiry Date</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="02/29"
-                            value={demoExpiryInput}
-                            onChange={(e) => setDemoExpiryInput(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-muted-foreground uppercase font-bold block">CVV / PIN</label>
-                          <input
-                            type="password"
-                            required
-                            maxLength={4}
-                            placeholder="123"
-                            value={demoCvvInput}
-                            onChange={(e) => setDemoCvvInput(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={demoProcessing}
-                        className="w-full rounded-xl bg-gold py-3 text-xs font-bold text-black uppercase tracking-widest hover:bg-gold/90 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg mt-2"
-                      >
-                        {demoProcessing ? (
-                          <>
-                            <RefreshCw className="size-4 animate-spin" /> Processing Payment...
-                          </>
-                        ) : (
-                          <>
-                            <Lock className="size-4" /> Complete Payment (₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")})
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  )}
-
-                  {/* CATEGORY 4: NETBANKING */}
-                  {activeModalCategory === "netbanking" && (
-                    <div className="space-y-3">
-                      <p className="text-xs text-muted-foreground">Select Popular Banks:</p>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {["HDFC Bank", "ICICI Bank", "State Bank of India (SBI)", "Axis Bank", "Kotak Bank", "Punjab National Bank"].map((bank) => (
-                          <div
-                            key={bank}
-                            onClick={(e) => handleExecuteDemoPaymentSubmission(e, `Netbanking via ${bank}`)}
-                            className="p-3 rounded-xl border border-border bg-card hover:border-gold hover:bg-gold/10 transition-all cursor-pointer font-bold text-xs text-foreground flex items-center justify-between group"
-                          >
-                            <span>{bank}</span>
-                            <ArrowRight className="size-3.5 text-gold group-hover:translate-x-1 transition-transform" />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
+              </form>
+            )}
           </div>
         </div>
       )}

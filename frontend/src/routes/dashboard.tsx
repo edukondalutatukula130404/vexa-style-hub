@@ -64,6 +64,15 @@ type OrderItem = {
 
 type TabType = "profile" | "orders" | "addresses" | "cart" | "wishlist" | "support" | "booking";
 
+const UPI_APPS = [
+  { id: "phonepe", name: "PhonePe", tag: "Instant UPI", icon: "🟣", vpaSuffix: "@ybl" },
+  { id: "gpay", name: "Google Pay", tag: "Instant UPI", icon: "🔵", vpaSuffix: "@okaxis" },
+  { id: "paytm", name: "Paytm UPI", tag: "Wallet & UPI", icon: "🔷", vpaSuffix: "@paytm" },
+  { id: "mobikwik", name: "Mobikwik", tag: "Wallet & UPI", icon: "🔵", vpaSuffix: "@ikwik" },
+  { id: "payzapp", name: "PayZapp HDFC", tag: "Instant UPI", icon: "⚡", vpaSuffix: "@hdfcbank" },
+  { id: "bhim", name: "BHIM / Any UPI", tag: "All UPI Apps", icon: "🇮🇳", vpaSuffix: "@upi" },
+];
+
 export function UserDashboard() {
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
@@ -403,8 +412,10 @@ export function UserDashboard() {
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const isExpanded = !sidebarCollapsed || sidebarHovered;
 
-  // Interactive Demo Payment Modal State (Accepts Any Input e.g. 1234 5678 9123 1222)
+  // Interactive Demo Payment Modal State (Accepts Any Input e.g. PhonePe, GPay, Mobikwik, Paytm)
   const [showDemoPaymentModal, setShowDemoPaymentModal] = useState(false);
+  const [selectedUpiApp, setSelectedUpiApp] = useState("phonepe");
+  const [demoUpiIdInput, setDemoUpiIdInput] = useState("9876543210@ybl");
   const [demoCardInput, setDemoCardInput] = useState("1234 5678 9123 1222");
   const [demoExpiryInput, setDemoExpiryInput] = useState("02/29");
   const [demoCvvInput, setDemoCvvInput] = useState("123");
@@ -913,10 +924,14 @@ export function UserDashboard() {
         setShowDemoPaymentModal(false);
         setDemoPaymentSuccess(false);
 
-        executeFinalizeOrder(
-          `Demo Online Payment (Card: ${demoCardInput || "Any Card"} - Paid)`,
-          txn
-        );
+        const activeAppObj = UPI_APPS.find((a) => a.id === selectedUpiApp);
+        const appName = activeAppObj ? activeAppObj.name : "UPI App";
+
+        const paymentLabel = paymentMethod.toLowerCase().includes("upi")
+          ? `Demo Instant UPI (${appName}: ${demoUpiIdInput || "9876543210@ybl"} - Paid)`
+          : `Demo Card Payment (Card: ${demoCardInput || "Any Card"} - Paid)`;
+
+        executeFinalizeOrder(paymentLabel, txn);
       }, 1000);
     }, 600);
   };
@@ -2127,7 +2142,7 @@ export function UserDashboard() {
                       </div>
 
                       {/* DEMO PAYMENT OPTION SELECTOR */}
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                             Select Payment Method
@@ -2136,7 +2151,7 @@ export function UserDashboard() {
 
                         <div className="grid gap-2.5 sm:grid-cols-3">
                           {[
-                            { id: "Demo UPI Instant (GPay / PhonePe / Paytm)", label: "Demo UPI Instant", desc: "Simulated GPay, PhonePe, Paytm or UPI" },
+                            { id: "Demo UPI Instant (GPay / PhonePe / Paytm)", label: "Demo UPI Instant", desc: "Simulated PhonePe, GPay, Mobikwik, Paytm" },
                             { id: "Demo Credit / Debit Card", label: "Demo Card Payment", desc: "Simulated Visa, MasterCard, RuPay" },
                             { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
                           ].map((pm) => (
@@ -2165,6 +2180,57 @@ export function UserDashboard() {
                             </div>
                           ))}
                         </div>
+
+                        {/* Interactive UPI App Options (PhonePe, GPay, Paytm, Mobikwik, PayZapp, BHIM) */}
+                        {paymentMethod.toLowerCase().includes("upi") && (
+                          <div className="rounded-xl border border-gold/40 bg-surface/80 p-4 space-y-3.5 animate-in fade-in duration-200">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
+                                Choose UPI App / Wallet Option
+                              </label>
+                              <span className="text-[10px] text-emerald-500 font-semibold">⚡ Fast Demo Payment Active</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                              {UPI_APPS.map((app) => (
+                                <div
+                                  key={app.id}
+                                  onClick={() => {
+                                    setSelectedUpiApp(app.id);
+                                    if (!demoUpiIdInput || demoUpiIdInput.includes("@")) {
+                                      setDemoUpiIdInput(`9876543210${app.vpaSuffix}`);
+                                    }
+                                  }}
+                                  className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-all cursor-pointer ${
+                                    selectedUpiApp === app.id
+                                      ? "border-gold bg-gold/20 shadow-sm font-bold ring-1 ring-gold/50"
+                                      : "border-border bg-background hover:border-gold/50"
+                                  }`}
+                                >
+                                  <span className="text-base">{app.icon}</span>
+                                  <div>
+                                    <p className="text-xs text-foreground font-semibold leading-none">{app.name}</p>
+                                    <p className="text-[9px] text-muted-foreground mt-1">{app.tag}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="space-y-1.5 pt-1">
+                              <label className="text-[10px] uppercase font-bold text-muted-foreground block">
+                                Enter Any Mobile Number or UPI ID (PhonePe / GPay / Mobikwik / Paytm)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Enter ANY data e.g. 9876543210@ybl or mobile number"
+                                value={demoUpiIdInput}
+                                onChange={(e) => setDemoUpiIdInput(e.target.value)}
+                                className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                              />
+                              <p className="text-[10px] text-emerald-500 font-medium">✓ Instant demo approval for any mobile number or UPI handle entered</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
 
@@ -2960,7 +3026,7 @@ export function UserDashboard() {
           </div>
         </div>
       )}
-      {/* Sleek Interactive Demo Payment Gateway Modal (Accepts Any Input e.g. 1234 5678 9123 1222) */}
+      {/* Sleek Interactive Demo Payment Gateway Modal */}
       {showDemoPaymentModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-gold/40 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
@@ -2970,8 +3036,12 @@ export function UserDashboard() {
                   V
                 </div>
                 <div>
-                  <h3 className="font-display text-base font-bold text-foreground">VEXA Payment Gateway</h3>
-                  <p className="text-[10px] text-emerald-500 font-semibold tracking-wider">⚡ Demo Test Mode • Accepts Any Card Number</p>
+                  <h3 className="font-display text-base font-bold text-foreground">
+                    {paymentMethod.toLowerCase().includes("upi") ? "VEXA Instant UPI Gateway" : "VEXA Card Gateway"}
+                  </h3>
+                  <p className="text-[10px] text-emerald-500 font-semibold tracking-wider">
+                    ⚡ Demo Test Mode • {paymentMethod.toLowerCase().includes("upi") ? "Accepts Any PhonePe / GPay / Mobikwik / Paytm ID" : "Accepts Any Card Number"}
+                  </p>
                 </div>
               </div>
               <button
@@ -2999,60 +3069,109 @@ export function UserDashboard() {
               </div>
             ) : (
               <form onSubmit={handleExecuteDemoPaymentSubmission} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
-                    Card Number (Accepts Any Number)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter ANY Card Number (e.g. 1234 5678 9123 1222)"
-                    value={demoCardInput}
-                    onChange={(e) => setDemoCardInput(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                  />
-                  <p className="text-[10px] text-emerald-500 font-medium">✓ Guaranteed test mode approval for any card format (e.g. 1234 5678 9123 1222)</p>
-                </div>
+                {paymentMethod.toLowerCase().includes("upi") ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
+                        Select Preferred UPI App
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {UPI_APPS.map((app) => (
+                          <button
+                            key={app.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedUpiApp(app.id);
+                              if (!demoUpiIdInput || demoUpiIdInput.includes("@")) {
+                                setDemoUpiIdInput(`9876543210${app.vpaSuffix}`);
+                              }
+                            }}
+                            className={`flex flex-col items-center justify-center p-2.5 rounded-lg border text-center transition-all cursor-pointer ${
+                              selectedUpiApp === app.id
+                                ? "border-gold bg-gold/20 font-bold shadow-sm ring-1 ring-gold/50 text-gold"
+                                : "border-border bg-background hover:border-gold/50 text-foreground"
+                            }`}
+                          >
+                            <span className="text-lg">{app.icon}</span>
+                            <span className="text-[11px] font-semibold mt-1">{app.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
-                    Cardholder Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Name on card"
-                    value={demoHolderName}
-                    onChange={(e) => setDemoHolderName(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground focus:border-gold focus:outline-none"
-                  />
-                </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
+                        Mobile Number or UPI ID (Accepts Any Input)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter ANY data e.g. 9876543210@ybl"
+                        value={demoUpiIdInput}
+                        onChange={(e) => setDemoUpiIdInput(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                      />
+                      <p className="text-[10px] text-emerald-500 font-medium">✓ Guaranteed instant success for any mobile number or UPI handle entered</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
+                        Card Number (Accepts Any Number)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter ANY Card Number (e.g. 1234 5678 9123 1222)"
+                        value={demoCardInput}
+                        onChange={(e) => setDemoCardInput(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                      />
+                      <p className="text-[10px] text-emerald-500 font-medium">✓ Guaranteed test mode approval for any card format (e.g. 1234 5678 9123 1222)</p>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground uppercase font-bold block">Expiry Date</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="02/29"
-                      value={demoExpiryInput}
-                      onChange={(e) => setDemoExpiryInput(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground uppercase font-bold block">CVV / PIN</label>
-                    <input
-                      type="password"
-                      required
-                      maxLength={4}
-                      placeholder="123"
-                      value={demoCvvInput}
-                      onChange={(e) => setDemoCvvInput(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
-                    />
-                  </div>
-                </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gold uppercase tracking-wider block">
+                        Cardholder Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Name on card"
+                        value={demoHolderName}
+                        onChange={(e) => setDemoHolderName(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-xs text-foreground focus:border-gold focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground uppercase font-bold block">Expiry Date</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="02/29"
+                          value={demoExpiryInput}
+                          onChange={(e) => setDemoExpiryInput(e.target.value)}
+                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground uppercase font-bold block">CVV / PIN</label>
+                        <input
+                          type="password"
+                          required
+                          maxLength={4}
+                          placeholder="123"
+                          value={demoCvvInput}
+                          onChange={(e) => setDemoCvvInput(e.target.value)}
+                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs text-foreground font-mono focus:border-gold focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"
@@ -3065,7 +3184,7 @@ export function UserDashboard() {
                     </>
                   ) : (
                     <>
-                      <Lock className="size-4" /> Complete Payment (₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")})
+                      <Lock className="size-4" /> Approve & Pay ₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")}
                     </>
                   )}
                 </button>

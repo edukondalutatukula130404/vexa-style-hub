@@ -55,16 +55,31 @@ app.use('/api/payment', require('./routes/paymentRoutes'));
 // Central Error Handler Middleware
 app.use(errorHandler);
 
+const { execSync } = require('child_process');
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+const startServer = (portToUse) => {
+  const server = app.listen(portToUse, () => {
+    console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${portToUse}`);
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.log(`⚠️ Port ${PORT} is already in use. The VEXA backend server is ALREADY active and running on http://localhost:${PORT}`);
-  } else {
-    console.error('Server error:', err);
-  }
-});
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`⚠️ Port ${portToUse} busy. Clearing stale process on port ${portToUse}...`);
+      try {
+        if (process.platform === 'win32') {
+          execSync(`npx -y kill-port ${portToUse}`, { stdio: 'ignore' });
+        }
+      } catch (e) {}
+      setTimeout(() => {
+        app.listen(portToUse, () => {
+          console.log(`🚀 Server restarted cleanly on port ${portToUse}`);
+        });
+      }, 1000);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+};
+
+startServer(PORT);

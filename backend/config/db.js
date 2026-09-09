@@ -1,18 +1,27 @@
 const mongoose = require('mongoose');
 
+// Disable Mongoose command buffering so queries don't hang when DB is disconnected
+mongoose.set('bufferCommands', false);
+
 const connectDB = async () => {
   try {
     const connUri = process.env.MONGO_URI || process.env.MONGODB_URI;
     if (!connUri) {
-      console.warn('⚠️  No MONGO_URI or MONGODB_URI found in environment variables.');
-      console.warn('Please add MONGO_URI to your backend/.env file to connect to your database.');
-      return;
+      console.warn('⚠️  No MONGO_URI found in environment variables.');
+      return false;
     }
-    const conn = await mongoose.connect(connUri);
+    const conn = await mongoose.connect(connUri, {
+      serverSelectionTimeoutMS: 3000
+    });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    return true;
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
+    console.warn(`⚠️  MongoDB Connection Warning: ${error.message}`);
+    console.log('💡 Backend operating with fallback mock data mode.');
+    return false;
   }
 };
 
 module.exports = connectDB;
+
+

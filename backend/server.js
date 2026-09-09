@@ -11,10 +11,15 @@ const { seedItems } = require('./controllers/itemController');
 dotenv.config();
 
 // Connect to MongoDB Database and Seed Admin User & Items
-connectDB().then(() => {
-  seedAdmin();
-  seedItems();
+connectDB().then((isConnected) => {
+  if (isConnected) {
+    seedAdmin();
+    seedItems();
+  } else {
+    console.warn('⚠️  Skipping database seeding because MongoDB connection is not active.');
+  }
 });
+
 
 const app = express();
 
@@ -44,6 +49,8 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/items', require('./routes/itemRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/payment', require('./routes/paymentRoutes'));
+
 
 // Central Error Handler Middleware
 app.use(errorHandler);

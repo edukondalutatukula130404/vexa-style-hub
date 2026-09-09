@@ -392,7 +392,7 @@ export function UserDashboard() {
   const [shippingCity, setShippingCity] = useState("Bengaluru");
   const [shippingState, setShippingState] = useState("Karnataka");
   const [shippingPincode, setShippingPincode] = useState("560038");
-  const [paymentMethod, setPaymentMethod] = useState<string>("Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)");
+  const [paymentMethod, setPaymentMethod] = useState<string>("Demo UPI Instant (GPay / PhonePe / Paytm)");
   const [shippingAddress, setShippingAddress] = useState<string>(
     "EDUKONDALU (+91 9876543210), 100 Feet Road, Indiranagar, Stage 2, Bengaluru, Karnataka - 560038"
   );
@@ -819,7 +819,7 @@ export function UserDashboard() {
       const fullAddr = shippingAddress || `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
 
       const executeFinalizeOrder = (methodLabel?: string, paymentId?: string) => {
-        const finalPaymentMethod = methodLabel || paymentMethod || "Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)";
+        const finalPaymentMethod = methodLabel || paymentMethod || "Demo Instant Payment (UPI / Card)";
         const displayMethod = paymentId ? `${finalPaymentMethod} (ID: ${paymentId})` : finalPaymentMethod;
 
         const demoOrderObj: OrderItem = {
@@ -928,160 +928,13 @@ export function UserDashboard() {
         }, 600);
       };
 
-      const isMobikwikWallet = paymentMethod.toLowerCase().includes("mobikwik");
-      const isPayzappWallet = paymentMethod.toLowerCase().includes("payzapp");
-      const isAirtelWallet = paymentMethod.toLowerCase().includes("airtel");
-      const isWalletChoice = isMobikwikWallet || isPayzappWallet || isAirtelWallet || paymentMethod.toLowerCase().includes("wallet");
-      const isRazorpay = !paymentMethod || paymentMethod.toLowerCase().includes("razorpay") || isWalletChoice;
+      const isCod = paymentMethod.toLowerCase().includes("cod") || paymentMethod.toLowerCase().includes("delivery");
 
-      if (isRazorpay && finalPayable > 0) {
-        let orderData: any = null;
-        let keyId = "rzp_test_TZpuTmnp4m79jk";
-        let isRealRazorpayOrder = false;
-
-        try {
-          const res = await fetch(`${API_URL}/payment/create-order`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ amount: finalPayable, currency: "INR" }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.success && data.order) {
-              orderData = data.order;
-              keyId = data.keyId || keyId;
-              if (data.order.id && !data.isFallback && !data.order.id.startsWith("order_rzp_")) {
-                isRealRazorpayOrder = true;
-              }
-            }
-          }
-        } catch (payErr) {
-          console.warn("Razorpay order creation notice:", payErr);
-        }
-
-        const rzpAmount = orderData?.amount || Math.round(finalPayable * 100);
-        const rzpCurrency = orderData?.currency || "INR";
-
-        const options: any = {
-          key: keyId,
-          amount: rzpAmount,
-          currency: rzpCurrency,
-          name: "VEXA - Wear Confidence",
-          description: isMobikwikWallet
-            ? `Payment via Mobikwik Wallet for ${itemsToOrder.length} item(s)`
-            : isPayzappWallet
-            ? `Payment via PayZapp Wallet for ${itemsToOrder.length} item(s)`
-            : isAirtelWallet
-            ? `Payment via Airtel Money Wallet for ${itemsToOrder.length} item(s)`
-            : `Payment for ${itemsToOrder.length} Luxury Streetwear item(s)`,
-          image: "/favicon.svg",
-          config: {
-            display: {
-              blocks: {
-                wallets: {
-                  name: "Pay via Mobikwik, PayZapp, Airtel Money & Wallets",
-                  instruments: [
-                    {
-                      method: "wallet",
-                      wallets: ["mobikwik", "payzapp", "airtelmoney", "paytm", "phonepe", "freecharge", "olamoney", "jiomoney", "amazonpay"]
-                    }
-                  ]
-                }
-              },
-              sequence: ["block.wallets", "block.banks"],
-              preferences: {
-                show_default_blocks: true
-              }
-            }
-          },
-          handler: async function (response: any) {
-            try {
-              await fetch(`${API_URL}/payment/verify-payment`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id || (isRealRazorpayOrder ? orderData?.id : `order_rzp_${Date.now()}`),
-                  razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
-                  razorpay_signature: response.razorpay_signature || "",
-                }),
-              });
-            } catch (verifyErr) {
-              console.warn("Razorpay signature verification notice:", verifyErr);
-            }
-            executeFinalizeOrder(
-              isMobikwikWallet
-                ? "Mobikwik Wallet Payment (Paid)"
-                : isPayzappWallet
-                ? "PayZapp Wallet Payment (Paid)"
-                : isAirtelWallet
-                ? "Airtel Money Wallet Payment (Paid)"
-                : "Razorpay Online Payment (Paid)",
-              response.razorpay_payment_id || `pay_${Date.now()}`
-            );
-          },
-          prefill: {
-            name: name,
-            email: email,
-            contact: shippingPhone || "9876543210",
-          },
-          theme: {
-            color: "#C5A059",
-          },
-          modal: {
-            ondismiss: function () {
-              setOrderSubmitting(false);
-            },
-          },
-        };
-
-        // Pass order_id ONLY if order was successfully created on Razorpay servers
-        if (isRealRazorpayOrder && orderData?.id) {
-          options.order_id = orderData.id;
-        }
-
-        const openRazorpayModal = () => {
-          try {
-            const rzp = new (window as any).Razorpay(options);
-            rzp.on("payment.failed", function (failResponse: any) {
-              console.warn("Razorpay Payment Notice:", failResponse?.error);
-              setOrderSubmitting(false);
-            });
-            rzp.open();
-          } catch (modalErr) {
-            console.error("Failed to launch Razorpay modal:", modalErr);
-            executeFinalizeOrder(
-              isMobikwikWallet
-                ? "Mobikwik Wallet Payment (Demo Completed)"
-                : isPayzappWallet
-                ? "PayZapp Wallet Payment (Demo Completed)"
-                : isAirtelWallet
-                ? "Airtel Money Wallet Payment (Demo Completed)"
-                : "Razorpay Online Payment (Standard)"
-            );
-          }
-        };
-
-        if (typeof window !== "undefined" && (window as any).Razorpay) {
-          openRazorpayModal();
-        } else {
-          const script = document.createElement("script");
-          script.src = "https://checkout.razorpay.com/v1/checkout.js";
-          script.onload = () => openRazorpayModal();
-          script.onerror = () => {
-            executeFinalizeOrder(
-              isMobikwikWallet
-                ? "Mobikwik Wallet Payment (Test Mode Verified)"
-                : isPayzappWallet
-                ? "PayZapp Wallet Payment (Test Mode Verified)"
-                : isAirtelWallet
-                ? "Airtel Money Wallet Payment (Test Mode Verified)"
-                : "Razorpay Online Payment (Test Mode Verified)"
-            );
-          };
-          document.body.appendChild(script);
-        }
+      if (isCod) {
+        executeFinalizeOrder("Cash on Delivery (COD)");
       } else {
-        executeFinalizeOrder();
+        setShowDemoPaymentModal(true);
+        setOrderSubmitting(false);
       }
     } catch (err) {
       console.error("Order placement handler error:", err);
@@ -2279,20 +2132,16 @@ export function UserDashboard() {
                           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                             Select Payment Method
                           </label>
-                          <span className="rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider">
-                            ⚡ Razorpay Online Enabled
+                          <span className="rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 text-[9px] font-bold text-emerald-500 uppercase tracking-wider">
+                            ⚡ Fast Demo Payment Active
                           </span>
                         </div>
 
-                        <div className="grid gap-2.5 sm:grid-cols-2">
+                        <div className="grid gap-2.5 sm:grid-cols-3">
                           {[
-                            { id: "Razorpay Online Payment (UPI, Cards, NetBanking, Mobikwik, PayZapp, Airtel Money, Wallets)", label: "Razorpay Online Payment", desc: "Official Razorpay (UPI, Mobikwik, PayZapp, Cards)" },
-                            { id: "Mobikwik Wallet (Online & Demo)", label: "Mobikwik Wallet", desc: "Mobikwik Wallet Instant Payment" },
-                            { id: "PayZapp Wallet (Online & Demo)", label: "PayZapp / HDFC Wallet", desc: "HDFC PayZapp Wallet Payment" },
-                            { id: "Airtel Money / Airtel Wallet", label: "Airtel Money / Airtel Wallet", desc: "Airtel Payments Bank & Airtel Money Wallet" },
-                            { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
-                            { id: "Demo UPI (GPay / PhonePe / Paytm / Airtel UPI)", label: "Demo UPI Instant", desc: "Simulated GPay, PhonePe, Paytm or Airtel UPI" },
+                            { id: "Demo UPI Instant (GPay / PhonePe / Paytm)", label: "Demo UPI Instant", desc: "Simulated GPay, PhonePe, Paytm or UPI" },
                             { id: "Demo Credit / Debit Card", label: "Demo Card Payment", desc: "Simulated Visa, MasterCard, RuPay" },
+                            { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
                           ].map((pm) => (
                             <div
                               key={pm.id}
@@ -2782,20 +2631,16 @@ export function UserDashboard() {
                             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                               Select Payment Method
                             </label>
-                            <span className="rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider">
-                              ⚡ Razorpay Online Enabled
+                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 text-[9px] font-bold text-emerald-500 uppercase tracking-wider">
+                              ⚡ Fast Demo Payment Active
                             </span>
                           </div>
 
-                          <div className="grid gap-2.5 sm:grid-cols-2">
+                          <div className="grid gap-2.5 sm:grid-cols-3">
                             {[
-                              { id: "Razorpay Online Payment (UPI, Cards, NetBanking, Mobikwik, PayZapp, Airtel Money, Wallets)", label: "Razorpay Online Payment", desc: "Official Razorpay (UPI, Mobikwik, PayZapp, Cards)" },
-                              { id: "Mobikwik Wallet (Online & Demo)", label: "Mobikwik Wallet", desc: "Mobikwik Wallet Instant Payment" },
-                              { id: "PayZapp Wallet (Online & Demo)", label: "PayZapp / HDFC Wallet", desc: "HDFC PayZapp Wallet Payment" },
-                              { id: "Airtel Money / Airtel Wallet", label: "Airtel Money / Airtel Wallet", desc: "Airtel Payments Bank & Airtel Money Wallet" },
-                              { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
-                              { id: "Demo UPI (GPay / PhonePe / Paytm / Airtel UPI)", label: "Demo UPI Instant", desc: "Simulated GPay, PhonePe, Paytm or Airtel UPI" },
+                              { id: "Demo UPI Instant (GPay / PhonePe / Paytm)", label: "Demo UPI Instant", desc: "Simulated GPay, PhonePe, Paytm or UPI" },
                               { id: "Demo Credit / Debit Card", label: "Demo Card Payment", desc: "Simulated Visa, MasterCard, RuPay" },
+                              { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
                             ].map((pm) => (
                               <div
                                 key={pm.id}

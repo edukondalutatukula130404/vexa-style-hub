@@ -768,6 +768,159 @@ export function UserDashboard() {
 
 
 
+  const executeFinalizeOrder = (methodLabel?: string, paymentId?: string) => {
+    const currentUser = user || (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("vexa_auth_user") || "null") : null);
+    const email = currentUser?.email || profileEmail || (typeof window !== "undefined" ? localStorage.getItem("vexa_user_email") || "" : "") || "customer@vexa.store";
+    const name = currentUser?.name || profileName || "VEXA Customer";
+
+    const isCart = isCartCheckout || (cartItems.length > 0 && !selectedProduct);
+
+    const itemsToOrder = isCart
+      ? cartItems.map((ci) => ({
+          id: ci.product?.id || "item-" + Date.now(),
+          name: ci.product?.name || "Premium Tee",
+          price: ci.product?.price || 0,
+          size: ci.size || "M",
+          color: ci.product?.color || "Signature Black",
+          quantity: ci.quantity || 1,
+          image: ci.product?.image || "",
+        }))
+      : selectedProduct
+      ? [
+          {
+            id: selectedProduct.id,
+            name: selectedProduct.name,
+            price: selectedProduct.price,
+            size: selectedSize,
+            color: selectedProduct.color,
+            quantity: quantity,
+            image: selectedProduct.image,
+          },
+        ]
+      : [];
+
+    let calculatedTotal = isCart
+      ? totalAmount
+      : selectedProduct
+      ? selectedProduct.price * quantity
+      : 0;
+
+    let finalPayable = isCart ? finalOrderTotal : calculatedTotal;
+    if (!finalPayable || isNaN(finalPayable) || finalPayable <= 0) {
+      finalPayable = itemsToOrder.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+    }
+
+    const fullAddr = shippingAddress || `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
+
+    const finalPaymentMethod = methodLabel || paymentMethod || "Demo Instant Payment (UPI / Card)";
+    const displayMethod = paymentId ? `${finalPaymentMethod} (ID: ${paymentId})` : finalPaymentMethod;
+
+    const demoOrderObj: OrderItem = {
+      _id: "ORD-" + Math.floor(100000 + Math.random() * 900000),
+      userEmail: email,
+      userName: name,
+      items: itemsToOrder,
+      totalAmount: finalPayable,
+      status: "Processing",
+      paymentMethod: displayMethod,
+      shippingAddress: fullAddr,
+      createdAt: new Date().toISOString(),
+    };
+
+    setLastPlacedOrder(demoOrderObj);
+
+    // 1. Append to order state & localStorage cache
+    setMyOrders((prev) => [demoOrderObj, ...prev]);
+
+    if (typeof window !== "undefined") {
+      try {
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        localStorage.setItem("vexa_demo_orders", JSON.stringify([demoOrderObj, ...cached]));
+
+        // Deduct Warehouse Stock
+        const inventory = JSON.parse(localStorage.getItem("vexa_inventory_stocks") || "{}");
+        itemsToOrder.forEach((item) => {
+          const key = item.name;
+          const qty = item.quantity || 1;
+          const currentStock = inventory[key] !== undefined ? inventory[key] : 15;
+          inventory[key] = Math.max(0, currentStock - qty);
+        });
+        localStorage.setItem("vexa_inventory_stocks", JSON.stringify(inventory));
+        window.dispatchEvent(new Event("vexa_inventory_updated"));
+        window.dispatchEvent(new Event("vexa_items_updated"));
+      } catch (e) {
+        console.warn("Failed to cache order:", e);
+      }
+    }
+
+    // 2. Clear Cart
+    if (isCart || cartItems.length > 0) {
+      clearCart();
+    }
+
+    // 3. Reset Checkout Flow State to ORDER SUCCESSFUL PAGE
+    setSelectedProduct(null);
+    setIsCartCheckout(false);
+    setCartCheckoutStep("success");
+    setCheckoutStep(1);
+    setOrderSubmitting(false);
+
+    // 4. Keep user on Order Successful Page screen
+    if (typeof window !== "undefined") {
+      window.history.pushState({}, "", "/dashboard?tab=cart");
+    }
+
+    // 5. Post to backend asynchronously in background
+    fetch(`${API_URL}/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userEmail: email,
+        userName: name,
+        items: itemsToOrder,
+        totalAmount: finalPayable,
+        paymentMethod: demoOrderObj.paymentMethod,
+        shippingAddress: fullAddr,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && data.data && data.data._id) {
+          const realId = data.data._id;
+          setMyOrders((prev) =>
+            prev.map((o) =>
+              o._id === demoOrderObj._id ? { ...o, _id: realId, id: realId } : o
+            )
+          );
+        }
+      })
+      .catch((err) => console.warn("Background order POST notice:", err));
+  };
+
+  const handleExecuteDemoPaymentSubmission = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (demoProcessing) return;
+
+    setDemoProcessing(true);
+    const txn = `pay_demo_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    setDemoTxnId(txn);
+
+    setTimeout(() => {
+      setDemoProcessing(false);
+      setDemoPaymentSuccess(true);
+
+      setTimeout(() => {
+        setShowDemoPaymentModal(false);
+        setDemoPaymentSuccess(false);
+
+        executeFinalizeOrder(
+          `Demo Online Payment (Card: ${demoCardInput || "Any Card"} - Paid)`,
+          txn
+        );
+      }, 1000);
+    }, 600);
+  };
+
   const handlePlaceOrder = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e) e.preventDefault();
     if (orderSubmitting) return;
@@ -775,159 +928,6 @@ export function UserDashboard() {
     setOrderSubmitting(true);
 
     try {
-      const currentUser = user || (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("vexa_auth_user") || "null") : null);
-      const email = currentUser?.email || profileEmail || (typeof window !== "undefined" ? localStorage.getItem("vexa_user_email") || "" : "") || "customer@vexa.store";
-      const name = currentUser?.name || profileName || "VEXA Customer";
-
-      const isCart = isCartCheckout || (cartItems.length > 0 && !selectedProduct);
-
-      const itemsToOrder = isCart
-        ? cartItems.map((ci) => ({
-            id: ci.product?.id || "item-" + Date.now(),
-            name: ci.product?.name || "Premium Tee",
-            price: ci.product?.price || 0,
-            size: ci.size || "M",
-            color: ci.product?.color || "Signature Black",
-            quantity: ci.quantity || 1,
-            image: ci.product?.image || "",
-          }))
-        : selectedProduct
-        ? [
-            {
-              id: selectedProduct.id,
-              name: selectedProduct.name,
-              price: selectedProduct.price,
-              size: selectedSize,
-              color: selectedProduct.color,
-              quantity: quantity,
-              image: selectedProduct.image,
-            },
-          ]
-        : [];
-
-      let calculatedTotal = isCart
-        ? totalAmount
-        : selectedProduct
-        ? selectedProduct.price * quantity
-        : 0;
-
-      let finalPayable = isCart ? finalOrderTotal : calculatedTotal;
-      if (!finalPayable || isNaN(finalPayable) || finalPayable <= 0) {
-        finalPayable = itemsToOrder.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
-      }
-
-      const fullAddr = shippingAddress || `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
-
-      const executeFinalizeOrder = (methodLabel?: string, paymentId?: string) => {
-        const finalPaymentMethod = methodLabel || paymentMethod || "Demo Instant Payment (UPI / Card)";
-        const displayMethod = paymentId ? `${finalPaymentMethod} (ID: ${paymentId})` : finalPaymentMethod;
-
-        const demoOrderObj: OrderItem = {
-          _id: "ORD-" + Math.floor(100000 + Math.random() * 900000),
-          userEmail: email,
-          userName: name,
-          items: itemsToOrder,
-          totalAmount: finalPayable,
-          status: "Processing",
-          paymentMethod: displayMethod,
-          shippingAddress: fullAddr,
-          createdAt: new Date().toISOString(),
-        };
-
-        setLastPlacedOrder(demoOrderObj);
-
-        // 1. Append to order state & localStorage cache
-        setMyOrders((prev) => [demoOrderObj, ...prev]);
-
-        if (typeof window !== "undefined") {
-          try {
-            const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
-            localStorage.setItem("vexa_demo_orders", JSON.stringify([demoOrderObj, ...cached]));
-
-            // Deduct Warehouse Stock
-            const inventory = JSON.parse(localStorage.getItem("vexa_inventory_stocks") || "{}");
-            itemsToOrder.forEach((item) => {
-              const key = item.name;
-              const qty = item.quantity || 1;
-              const currentStock = inventory[key] !== undefined ? inventory[key] : 15;
-              inventory[key] = Math.max(0, currentStock - qty);
-            });
-            localStorage.setItem("vexa_inventory_stocks", JSON.stringify(inventory));
-            window.dispatchEvent(new Event("vexa_inventory_updated"));
-            window.dispatchEvent(new Event("vexa_items_updated"));
-          } catch (e) {
-            console.warn("Failed to cache order:", e);
-          }
-        }
-
-        // 2. Clear Cart
-        if (isCart || cartItems.length > 0) {
-          clearCart();
-        }
-
-        // 3. Reset Checkout Flow State to ORDER SUCCESSFUL PAGE
-        setSelectedProduct(null);
-        setIsCartCheckout(false);
-        setCartCheckoutStep("success");
-        setCheckoutStep(1);
-        setOrderSubmitting(false);
-
-        // 4. Keep user on Order Successful Page screen
-        if (typeof window !== "undefined") {
-          window.history.pushState({}, "", "/dashboard?tab=cart");
-        }
-
-        // 5. Post to backend asynchronously in background
-        fetch(`${API_URL}/orders`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userEmail: email,
-            userName: name,
-            items: itemsToOrder,
-            totalAmount: finalPayable,
-            paymentMethod: demoOrderObj.paymentMethod,
-            shippingAddress: fullAddr,
-          }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data && data.success && data.data && data.data._id) {
-              const realId = data.data._id;
-              setMyOrders((prev) =>
-                prev.map((o) =>
-                  o._id === demoOrderObj._id ? { ...o, _id: realId, id: realId } : o
-                )
-              );
-            }
-          })
-          .catch((err) => console.warn("Background order POST notice:", err));
-      };
-
-      const handleExecuteDemoPaymentSubmission = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        if (demoProcessing) return;
-
-        setDemoProcessing(true);
-        const txn = `pay_demo_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-        setDemoTxnId(txn);
-
-        setTimeout(() => {
-          setDemoProcessing(false);
-          setDemoPaymentSuccess(true);
-
-          setTimeout(() => {
-            setShowDemoPaymentModal(false);
-            setDemoPaymentSuccess(false);
-
-            executeFinalizeOrder(
-              `Demo Online Payment (Card: ${demoCardInput || "Any Card"} - Paid)`,
-              txn
-            );
-          }, 1000);
-        }, 600);
-      };
-
       const isCod = paymentMethod.toLowerCase().includes("cod") || paymentMethod.toLowerCase().includes("delivery");
 
       if (isCod) {
@@ -2985,7 +2985,7 @@ export function UserDashboard() {
 
             <div className="rounded-xl border border-gold/40 bg-gold/10 p-3.5 flex justify-between items-center text-xs">
               <span className="text-muted-foreground font-semibold">Total Order Payable:</span>
-              <span className="text-gold font-bold text-base">₹{(isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : 0)).toLocaleString("en-IN")}</span>
+              <span className="text-gold font-bold text-base">₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")}</span>
             </div>
 
             {demoPaymentSuccess ? (
@@ -3065,7 +3065,7 @@ export function UserDashboard() {
                     </>
                   ) : (
                     <>
-                      <Lock className="size-4" /> Complete Payment (₹{(isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : 0)).toLocaleString("en-IN")})
+                      <Lock className="size-4" /> Complete Payment (₹{((isCartCheckout ? finalOrderTotal : (selectedProduct ? selectedProduct.price * quantity : totalAmount || 0)) || 0).toLocaleString("en-IN")})
                     </>
                   )}
                 </button>

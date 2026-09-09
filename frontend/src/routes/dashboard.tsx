@@ -2132,9 +2132,6 @@ export function UserDashboard() {
                           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                             Select Payment Method
                           </label>
-                          <span className="rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 text-[9px] font-bold text-emerald-500 uppercase tracking-wider">
-                            ⚡ Fast Demo Payment Active
-                          </span>
                         </div>
 
                         <div className="grid gap-2.5 sm:grid-cols-3">
@@ -2631,9 +2628,6 @@ export function UserDashboard() {
                             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                               Select Payment Method
                             </label>
-                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 text-[9px] font-bold text-emerald-500 uppercase tracking-wider">
-                              ⚡ Fast Demo Payment Active
-                            </span>
                           </div>
 
                           <div className="grid gap-2.5 sm:grid-cols-3">

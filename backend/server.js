@@ -58,28 +58,40 @@ app.use(errorHandler);
 const { execSync } = require('child_process');
 const PORT = process.env.PORT || 5000;
 
-const startServer = (portToUse) => {
-  const server = app.listen(portToUse, () => {
-    console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${portToUse}`);
-  });
-
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.warn(`⚠️ Port ${portToUse} busy. Clearing stale process on port ${portToUse}...`);
-      try {
-        if (process.platform === 'win32') {
-          execSync(`npx -y kill-port ${portToUse}`, { stdio: 'ignore' });
+const ensurePortFree = (port) => {
+  try {
+    if (process.platform === 'win32') {
+      const output = execSync(`netstat -aon | findstr :${port} | findstr LISTENING`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const lines = output.trim().split('\n');
+      lines.forEach((line) => {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && pid !== '0' && pid !== String(process.pid)) {
+          execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
         }
-      } catch (e) {}
-      setTimeout(() => {
-        app.listen(portToUse, () => {
-          console.log(`🚀 Server restarted cleanly on port ${portToUse}`);
-        });
-      }, 1000);
-    } else {
-      console.error('Server error:', err);
+      });
     }
-  });
+  } catch (e) {
+    // Port is already free
+  }
 };
 
-startServer(PORT);
+ensurePortFree(PORT);
+
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`⚠️ Port ${PORT} busy. Clearing stale process...`);
+    ensurePortFree(PORT);
+    setTimeout(() => {
+      app.listen(PORT, () => {
+        console.log(`🚀 Server restarted cleanly on port ${PORT}`);
+      });
+    }, 1000);
+  } else {
+    console.error('Server error:', err);
+  }
+});

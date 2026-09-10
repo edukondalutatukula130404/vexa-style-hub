@@ -82,6 +82,7 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
 
+// Ready: VEXA MERN Stack Server
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.warn(`⚠️ Port ${PORT} busy. Clearing stale process...`);

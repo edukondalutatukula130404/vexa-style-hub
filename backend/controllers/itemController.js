@@ -6,9 +6,10 @@ const defaultItems = [
     name: 'Emerald Acid Wash Boxy Tee',
     description: '240 GSM heavyweight cotton with custom emerald acid wash texture and drop-shoulder silhouette.',
     price: 1899,
+    oldPrice: 2499,
     category: 'Limited',
     collectionType: 'Oversized 240 GSM',
-    image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=800&auto=format&fit=crop&q=80',
     inStock: true
   },
   {
@@ -16,9 +17,10 @@ const defaultItems = [
     name: 'Lavender Lilac Drop-Shoulder Tee',
     description: '240 GSM combed cotton in pastel lilac tone with luxury heavy rib collar.',
     price: 1699,
+    oldPrice: 2199,
     category: 'Oversized',
     collectionType: 'Oversized 240 GSM',
-    image: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80',
     inStock: true
   },
   {
@@ -26,9 +28,10 @@ const defaultItems = [
     name: 'Gold-Embroidered Luxe Tee',
     description: 'High-density 240 GSM luxury cream cotton featuring metallic gold chest embroidery.',
     price: 1799,
+    oldPrice: 2399,
     category: 'Limited',
     collectionType: 'Limited Edition',
-    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&auto=format&fit=crop&q=80',
     inStock: true
   },
   {
@@ -36,6 +39,7 @@ const defaultItems = [
     name: 'Vintage Rust Heavyweight Tee',
     description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
     price: 1699,
+    oldPrice: 2099,
     category: 'Oversized',
     collectionType: 'Explore Collections',
     image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800&auto=format&fit=crop&q=80',
@@ -46,6 +50,7 @@ const defaultItems = [
     name: 'Obsidian Stealth Oversized Tee',
     description: 'Deep obsidian black 240 GSM pre-shrunk cotton with subtle tone-on-tone silicone branding.',
     price: 1499,
+    oldPrice: 1999,
     category: 'Oversized',
     collectionType: 'Explore Collections',
     image: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80',
@@ -162,54 +167,59 @@ exports.seedItems = async () => {
     const count = await Item.countDocuments();
     if (count === 0) {
       console.log('📦 Seeding initial VEXA Heavyweight T-Shirt collection items...');
-      const defaultItems = [
+      const seedData = [
         {
           name: 'Emerald Acid Wash Boxy Tee',
           description: '240 GSM heavyweight cotton with custom emerald acid wash texture and drop-shoulder silhouette.',
           price: 1899,
+          oldPrice: 2499,
           category: 'Limited',
           collectionType: 'Oversized 240 GSM',
-          image: '',
+          image: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=800&auto=format&fit=crop&q=80',
           inStock: true
         },
         {
           name: 'Lavender Lilac Drop-Shoulder Tee',
           description: '240 GSM combed cotton in pastel lilac tone with luxury heavy rib collar.',
           price: 1699,
+          oldPrice: 2199,
           category: 'Oversized',
           collectionType: 'Oversized 240 GSM',
-          image: '',
+          image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80',
           inStock: true
         },
         {
           name: 'Gold-Embroidered Luxe Tee',
           description: 'High-density 240 GSM luxury cream cotton featuring metallic gold chest embroidery.',
           price: 1799,
+          oldPrice: 2399,
           category: 'Limited',
           collectionType: 'Limited Edition',
-          image: '',
+          image: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&auto=format&fit=crop&q=80',
           inStock: true
         },
         {
           name: 'Vintage Rust Heavyweight Tee',
           description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
           price: 1699,
+          oldPrice: 2099,
           category: 'Oversized',
           collectionType: 'Explore Collections',
-          image: '',
+          image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800&auto=format&fit=crop&q=80',
           inStock: true
         },
         {
           name: 'Obsidian Stealth Oversized Tee',
           description: 'Deep obsidian black 240 GSM pre-shrunk cotton with subtle tone-on-tone silicone branding.',
           price: 1499,
+          oldPrice: 1999,
           category: 'Oversized',
           collectionType: 'Explore Collections',
-          image: '',
+          image: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80',
           inStock: true
         }
       ];
-      await Item.insertMany(defaultItems);
+      await Item.insertMany(seedData);
       console.log('✅ Default VEXA items seeded successfully into database');
     }
   } catch (err) {

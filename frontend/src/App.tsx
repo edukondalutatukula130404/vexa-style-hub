@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { MobileFrameWrapper } from "@/components/MobileFrameWrapper";
 
 // Route Pages
 import { Home } from "@/routes/index";
@@ -36,14 +37,16 @@ function Layout() {
     location.pathname === "/register";
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground">
-      <ScrollToTop />
-      <Navbar />
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      {!hideFooter && <Footer />}
-    </div>
+    <MobileFrameWrapper>
+      <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground">
+        <ScrollToTop />
+        <Navbar />
+        <main className="flex-1">
+          <Outlet />
+        </main>
+        {!hideFooter && <Footer />}
+      </div>
+    </MobileFrameWrapper>
   );
 }
 

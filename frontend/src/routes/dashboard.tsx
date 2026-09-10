@@ -332,6 +332,25 @@ export function UserDashboard() {
     setEditMobile(addr.mobile || "9876543210");
   };
 
+  const handleExecuteDemoPaymentSubmission = (e: React.FormEvent) => {
+    e.preventDefault();
+    setDemoProcessing(true);
+    setTimeout(() => {
+      setDemoProcessing(false);
+      setDemoPaymentSuccess(true);
+      setDemoTxnId("VEXA_TXN_" + Math.floor(10000000 + Math.random() * 90000000));
+      setTimeout(() => {
+        setShowDemoPaymentModal(false);
+        setDemoPaymentSuccess(false);
+        setDemoCardInput("");
+        setDemoHolderName("");
+        setDemoExpiryInput("");
+        setDemoCvvInput("");
+        setActiveTab("orders");
+      }, 2000);
+    }, 1500);
+  };
+
   const handleSaveEditAddress = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAddressId) return;

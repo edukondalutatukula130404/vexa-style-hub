@@ -122,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 4,
-                        color: Colors.white,
+                        color: AppTheme.textColor,
                       ),
                     ),
                   ],
@@ -133,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppTheme.textColor,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   'Email Address',
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
+                    color: AppTheme.textColor,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -208,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: GoogleFonts.outfit(color: Colors.white),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
@@ -229,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   'Password',
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
+                    color: AppTheme.textColor,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -238,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  style: GoogleFonts.outfit(color: Colors.white),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your password';

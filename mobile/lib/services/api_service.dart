@@ -243,7 +243,7 @@ class ApiService {
         final data = jsonDecode(response.body);
         final List itemsJson = data is List ? data : (data['data'] ?? []);
         final items = itemsJson.map((json) => ItemModel.fromJson(json)).toList();
-        if (items.isNotEmpty) return items;
+        if (items.length >= getFallbackItems().length) return items;
       }
     } catch (_) {
       // Try auto discover active server
@@ -259,7 +259,7 @@ class ApiService {
             final data = jsonDecode(response.body);
             final List itemsJson = data is List ? data : (data['data'] ?? []);
             final items = itemsJson.map((json) => ItemModel.fromJson(json)).toList();
-            if (items.isNotEmpty) return items;
+            if (items.length >= getFallbackItems().length) return items;
           }
         } catch (_) {}
       }
@@ -269,7 +269,7 @@ class ApiService {
 
   static List<ItemModel> getFallbackItems() {
     return [
-      // isNewDrop: true → collectionType: 'New Arrivals'
+      // ── NEW ARRIVALS (LATEST DROPS) ──────────────────────────────────────
       ItemModel(
         id: 'vx-08',
         name: 'Emerald Acid Wash Boxy Tee',
@@ -297,6 +297,47 @@ class ApiService {
         inStock: true,
       ),
       ItemModel(
+        id: 'vx-07',
+        name: 'Vintage Rust Heavyweight Tee',
+        description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
+        price: 1699,
+        oldPrice: 2399,
+        color: 'Vintage Rust',
+        colors: ['Vintage Rust'],
+        category: 'Oversized',
+        collectionType: 'New Arrivals',
+        image: 'assets/images/tee-rust.png',
+        inStock: true,
+      ),
+      ItemModel(
+        id: 'vx-04',
+        name: 'Desert Sand Minimalist Tee',
+        description: 'Clean desert sand 240 GSM minimalist silhouette, bio-washed for lasting softness.',
+        price: 1549,
+        oldPrice: 2149,
+        color: 'Desert Sand',
+        colors: ['Desert Sand'],
+        category: 'Limited',
+        collectionType: 'New Arrivals',
+        image: 'assets/images/tee-beige.jpg',
+        inStock: true,
+      ),
+      ItemModel(
+        id: 'vx-06',
+        name: 'Olive Military Heritage Tee',
+        description: 'Military olive 240 GSM heritage tee with garment-washed finish and relaxed oversized fit.',
+        price: 1649,
+        oldPrice: 2399,
+        color: 'Military Olive',
+        colors: ['Military Olive'],
+        category: 'Limited',
+        collectionType: 'New Arrivals',
+        image: 'assets/images/tee-olive.jpg',
+        inStock: true,
+      ),
+
+      // ── FEATURED CATALOG COLLECTION ──────────────────────────────────────
+      ItemModel(
         id: 'vx-00',
         name: 'Gold-Embroidered Luxe Tee',
         description: 'High-density 240 GSM luxury cream cotton featuring metallic gold chest embroidery.',
@@ -307,19 +348,6 @@ class ApiService {
         category: 'Limited',
         collectionType: 'Featured',
         image: 'assets/images/hero_luxury_tshirt.png',
-        inStock: true,
-      ),
-      ItemModel(
-        id: 'vx-07',
-        name: 'Vintage Rust Heavyweight Tee',
-        description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
-        price: 1699,
-        oldPrice: 2399,
-        color: 'Vintage Rust',
-        colors: ['Vintage Rust'],
-        category: 'Oversized',
-        collectionType: 'Featured',
-        image: 'assets/images/tee-rust.png',
         inStock: true,
       ),
       ItemModel(
@@ -344,7 +372,7 @@ class ApiService {
         color: 'Ivory White',
         colors: ['Ivory White'],
         category: 'Classic',
-        collectionType: 'Essentials',
+        collectionType: 'Featured',
         image: 'assets/images/tee-white.jpg',
         inStock: true,
       ),
@@ -357,21 +385,8 @@ class ApiService {
         color: 'Midnight Navy',
         colors: ['Midnight Navy'],
         category: 'Oversized',
-        collectionType: 'Essentials',
+        collectionType: 'Featured',
         image: 'assets/images/tee-navy.jpg',
-        inStock: true,
-      ),
-      ItemModel(
-        id: 'vx-04',
-        name: 'Desert Sand Minimalist Tee',
-        description: 'Clean desert sand 240 GSM minimalist silhouette, bio-washed for lasting softness.',
-        price: 1549,
-        oldPrice: 2149,
-        color: 'Desert Sand',
-        colors: ['Desert Sand'],
-        category: 'Limited',
-        collectionType: 'Essentials',
-        image: 'assets/images/tee-beige.jpg',
         inStock: true,
       ),
       ItemModel(
@@ -383,21 +398,8 @@ class ApiService {
         color: 'Charcoal Grey',
         colors: ['Charcoal Grey'],
         category: 'Classic',
-        collectionType: 'Essentials',
+        collectionType: 'Featured',
         image: 'assets/images/tee-charcoal.jpg',
-        inStock: true,
-      ),
-      ItemModel(
-        id: 'vx-06',
-        name: 'Olive Military Heritage Tee',
-        description: 'Military olive 240 GSM heritage tee with garment-washed finish and relaxed oversized fit.',
-        price: 1649,
-        oldPrice: 2399,
-        color: 'Military Olive',
-        colors: ['Military Olive'],
-        category: 'Limited',
-        collectionType: 'Essentials',
-        image: 'assets/images/tee-olive.jpg',
         inStock: true,
       ),
     ];

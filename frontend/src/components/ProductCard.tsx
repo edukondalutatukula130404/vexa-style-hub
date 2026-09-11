@@ -54,9 +54,9 @@ export function ProductCard({ product }: { product: Product }) {
     <>
       <article
         onClick={handleCardClick}
-        className="group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition-all duration-500 hover:-translate-y-2 hover:border-gold hover:shadow-goldy flex flex-col justify-between h-full w-full"
+        className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-all duration-500 hover:-translate-y-1.5 hover:border-gold hover:shadow-goldy flex flex-col justify-between h-full w-full shadow-sm"
       >
-        <div className="relative overflow-hidden shrink-0 aspect-[3/4] w-full">
+        <div className="relative overflow-hidden shrink-0 aspect-[4/5] w-full bg-surface">
           <img
             src={product.image}
             alt={`${product.name} in ${product.color}`}
@@ -66,13 +66,19 @@ export function ProductCard({ product }: { product: Product }) {
             height={1100}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
-          <span className="absolute left-3 top-3 rounded-full border border-gold/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[#1c1917] font-extrabold shadow-md">
+
+          {/* Category Pill Badge (Bottom-Left on Image, matching mobile app) */}
+          <span className="absolute left-2.5 bottom-2.5 z-10 rounded-md border border-white/20 bg-black/75 px-2.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-white font-extrabold shadow-sm backdrop-blur-xs">
             {product.category}
           </span>
-          <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5">
-            <span className="btn-gold rounded-full px-2.5 py-1 text-[10px] shadow-sm">
-              {off}% Off
-            </span>
+
+          {/* Top-Right Badges & Favorite Heart Icon */}
+          <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1.5">
+            {off > 0 && (
+              <span className="btn-gold rounded-full px-2 py-0.5 text-[9px] font-extrabold shadow-sm">
+                {off}% OFF
+              </span>
+            )}
             <button
               type="button"
               onClick={(e) => {
@@ -80,22 +86,22 @@ export function ProductCard({ product }: { product: Product }) {
                 e.stopPropagation();
                 toggleWishlist(product);
               }}
-              className={`flex size-8 items-center justify-center rounded-full border transition-all cursor-pointer shadow-md active:scale-90 ${
+              className={`flex size-7.5 items-center justify-center rounded-full border transition-all cursor-pointer shadow-md active:scale-90 ${
                 isWishlisted
                   ? "border-red-500/80 bg-black/90 text-red-500 shadow-red-500/20"
                   : "border-gold/50 bg-black/70 text-gold hover:bg-gold hover:text-primary-foreground"
               }`}
               title={isWishlisted ? "Remove from Wishlist" : "Save to Wishlist"}
             >
-              <Heart className={`size-4 transition-all ${isWishlisted ? "fill-red-500 text-red-500 scale-110" : ""}`} />
+              <Heart className={`size-3.5 transition-all ${isWishlisted ? "fill-red-500 text-red-500 scale-110" : ""}`} />
             </button>
           </div>
 
-          {/* Action Options Bar: Always visible on Mobile (< lg), Slide-up Hover on Desktop (>= lg) */}
-          <div className="absolute inset-x-0 bottom-0 z-20 flex gap-2 bg-black/95 p-3.5 border-t border-gold/30 transition-all duration-500 ease-out opacity-100 translate-y-0 pointer-events-auto lg:opacity-0 lg:translate-y-full lg:pointer-events-none lg:group-hover:opacity-100 lg:group-hover:translate-y-0 lg:group-hover:pointer-events-auto">
+          {/* Desktop Hover Action Options Bar (Only visible on >= lg desktop hover) */}
+          <div className="hidden lg:flex absolute inset-x-0 bottom-0 z-20 gap-2 bg-black/95 p-3 border-t border-gold/30 transition-all duration-300 ease-out opacity-0 translate-y-full pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
             <button
               onClick={handleAddToCart}
-              className="btn-gold hover:btn-gold-hover flex-1 flex items-center justify-center gap-1.5 rounded-sm py-2.5 text-[10px] uppercase tracking-wider font-bold cursor-pointer shadow-goldy transition-transform active:scale-95"
+              className="btn-gold hover:btn-gold-hover flex-1 flex items-center justify-center gap-1.5 rounded-sm py-2 text-[10px] uppercase tracking-wider font-bold cursor-pointer shadow-goldy transition-transform active:scale-95"
             >
               <ShoppingBag className="size-3.5" /> Add to Cart
             </button>
@@ -104,37 +110,38 @@ export function ProductCard({ product }: { product: Product }) {
                 e.stopPropagation();
                 setShowQuickView(true);
               }}
-              className="btn-outline-gold flex items-center justify-center rounded-sm px-3 py-2.5 text-[10px] font-bold text-gold hover:bg-gold hover:text-primary-foreground cursor-pointer transition-transform active:scale-95"
+              className="btn-outline-gold flex items-center justify-center rounded-sm px-2.5 py-2 text-[10px] font-bold text-gold hover:bg-gold hover:text-primary-foreground cursor-pointer transition-transform active:scale-95"
               title="Quick View Product Details"
             >
-              <Eye className="size-4" />
+              <Eye className="size-3.5" />
             </button>
           </div>
         </div>
 
-        <div className="space-y-3 p-5 flex-1 flex flex-col justify-between">
-          <div className="space-y-1.5">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-display text-base font-bold text-foreground group-hover:text-gold transition-colors line-clamp-2 min-h-[2.8rem] flex items-center">
-                {product.name}
-              </h3>
-              <span className="flex items-center gap-1 text-xs text-gold font-bold shrink-0 pt-0.5">
-                <Star className="size-3 fill-current text-gold" />
-                {product.rating}
-              </span>
-            </div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+        {/* Card Body Info */}
+        <div className="space-y-2 p-3.5 flex-1 flex flex-col justify-between">
+          <div className="space-y-1">
+            <h3 className="font-display text-xs sm:text-sm font-bold text-foreground group-hover:text-gold transition-colors line-clamp-1">
+              {product.name}
+            </h3>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground line-clamp-1">
               {product.color}
             </p>
           </div>
 
-          <div className="flex items-baseline justify-between pt-2 border-t border-border/30 mt-auto">
-            <div className="flex items-baseline gap-2">
-              <span className="text-lg font-bold text-gold">₹{product.price.toLocaleString("en-IN")}</span>
-              <span className="text-sm text-muted-foreground line-through">
-                ₹{product.oldPrice.toLocaleString("en-IN")}
-              </span>
+          <div className="flex items-baseline justify-between pt-1.5 border-t border-border/30 mt-auto">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm sm:text-base font-extrabold text-[#B8860B]">₹{product.price.toLocaleString("en-IN")}</span>
+              {product.oldPrice > product.price && (
+                <span className="text-[11px] text-muted-foreground line-through">
+                  ₹{product.oldPrice.toLocaleString("en-IN")}
+                </span>
+              )}
             </div>
+            <span className="flex items-center gap-0.5 text-[10px] text-gold font-bold">
+              <Star className="size-3 fill-current text-gold" />
+              {product.rating}
+            </span>
           </div>
         </div>
       </article>

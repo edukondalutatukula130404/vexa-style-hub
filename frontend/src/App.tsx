@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { MobileFrameWrapper } from "@/components/MobileFrameWrapper";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 
 // Route Pages
 import { Home } from "@/routes/index";
@@ -38,13 +39,14 @@ function Layout() {
 
   return (
     <MobileFrameWrapper>
-      <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground">
+      <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground pb-16 md:pb-0">
         <ScrollToTop />
         <Navbar />
         <main className="flex-1">
           <Outlet />
         </main>
         {!hideFooter && <Footer />}
+        <MobileBottomNav />
       </div>
     </MobileFrameWrapper>
   );

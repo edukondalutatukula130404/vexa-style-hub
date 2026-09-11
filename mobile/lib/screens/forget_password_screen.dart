@@ -108,7 +108,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.textColor, size: 20),
           onPressed: () {
             if (_currentStep == 2) {
               setState(() {
@@ -158,7 +158,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppTheme.textColor,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -211,14 +211,14 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                 // Step 1 Form: Email
                 Text(
                   'Email Address',
-                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
                   enabled: _currentStep == 1,
                   keyboardType: TextInputType.emailAddress,
-                  style: GoogleFonts.outfit(color: Colors.white),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email address';
@@ -239,13 +239,13 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                 if (_currentStep == 2) ...[
                   Text(
                     'Reset Code',
-                    style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                    style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _codeController,
                     keyboardType: TextInputType.number,
-                    style: GoogleFonts.outfit(color: Colors.white),
+                    style: GoogleFonts.outfit(color: AppTheme.textColor),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter reset code';
@@ -260,13 +260,13 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                   const SizedBox(height: 20),
                   Text(
                     'New Password',
-                    style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                    style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _newPasswordController,
                     obscureText: _obscurePassword,
-                    style: GoogleFonts.outfit(color: Colors.white),
+                    style: GoogleFonts.outfit(color: AppTheme.textColor),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your new password';

@@ -18,8 +18,18 @@ interface MobileFrameWrapperProps {
 }
 
 export function MobileFrameWrapper({ children }: MobileFrameWrapperProps) {
-  const [isMobileFrame, setIsMobileFrame] = useState<boolean>(true);
+  const [isMobileFrame, setIsMobileFrame] = useState<boolean>(false);
+  const [isMobileScreen, setIsMobileScreen] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<string>("4:48 PM");
+
+  useEffect(() => {
+    const checkScreen = () => {
+      setIsMobileScreen(window.innerWidth < 768);
+    };
+    checkScreen();
+    window.addEventListener("resize", checkScreen);
+    return () => window.removeEventListener("resize", checkScreen);
+  }, []);
 
   useEffect(() => {
     const updateClock = () => {
@@ -35,19 +45,22 @@ export function MobileFrameWrapper({ children }: MobileFrameWrapperProps) {
     return () => clearInterval(interval);
   }, []);
 
-  if (!isMobileFrame) {
+  // On mobile screens (<768px) or when mobile frame is off, render full responsive app directly
+  if (!isMobileFrame || isMobileScreen) {
     return (
       <div className="relative min-h-screen w-full">
-        {/* Floating View Switcher Button */}
-        <div className="fixed bottom-6 right-6 z-[99999]">
-          <button
-            onClick={() => setIsMobileFrame(true)}
-            className="flex items-center gap-2 rounded-full border border-gold/60 bg-[#1c1917] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-gold shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <Smartphone className="size-4" />
-            <span>📱 Mobile Simulator</span>
-          </button>
-        </div>
+        {/* Floating View Switcher Button (Desktop only) */}
+        {!isMobileScreen && (
+          <div className="fixed bottom-6 right-6 z-[99999]">
+            <button
+              onClick={() => setIsMobileFrame(true)}
+              className="flex items-center gap-2 rounded-full border border-gold/60 bg-[#1c1917] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-gold shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <Smartphone className="size-4" />
+              <span>📱 Mobile Simulator</span>
+            </button>
+          </div>
+        )}
         {children}
       </div>
     );

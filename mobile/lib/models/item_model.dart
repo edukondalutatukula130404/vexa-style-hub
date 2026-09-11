@@ -21,9 +21,9 @@ class ItemModel {
     required this.colors,
     required this.category,
     required this.collectionType,
-    required this.image,
+    required String image,
     required this.inStock,
-  });
+  }) : image = _resolveImage(image, name, id);
 
   factory ItemModel.fromJson(Map<String, dynamic> json) {
     List<String> parsedColors = [];
@@ -34,10 +34,10 @@ class ItemModel {
     }
 
     final rawImage = (json['image'] ?? json['imageUrl'] ?? '') as String;
-    final resolvedImage = _resolveImage(rawImage, json['name'] ?? '');
+    final itemId = (json['_id'] ?? json['id'] ?? '') as String;
 
     return ItemModel(
-      id: json['_id'] ?? json['id'] ?? '',
+      id: itemId,
       name: json['name'] ?? json['title'] ?? 'Fashion Item',
       description: json['description'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
@@ -46,29 +46,33 @@ class ItemModel {
       colors: parsedColors.isNotEmpty ? parsedColors : ['Black'],
       category: json['category'] ?? 'Apparel',
       collectionType: json['collectionType'] ?? json['collection'] ?? 'Trending',
-      image: resolvedImage,
+      image: rawImage,
       inStock: json['inStock'] ?? true,
     );
   }
 
-  /// Maps a product name to its local bundled asset when the backend image is empty.
-  static String _resolveImage(String rawImage, String name) {
-    if (rawImage.isNotEmpty) return rawImage;
-
-    // Name-to-local-asset mapping (matches web frontend assets)
+  /// Maps each product ID or name to its unique bundled T-shirt asset image.
+  static String _resolveImage(String rawImage, String name, [String id = '']) {
     final n = name.toLowerCase();
-    if (n.contains('emerald'))   return 'assets/images/tee-emerald.png';
-    if (n.contains('lavender') || n.contains('lilac')) return 'assets/images/tee-lavender.png';
-    if (n.contains('rust'))      return 'assets/images/tee-rust.png';
-    if (n.contains('obsidian') || n.contains('black')) return 'assets/images/tee-black.jpg';
-    if (n.contains('gold') || n.contains('cream') || n.contains('oatmeal') || n.contains('beige')) return 'assets/images/tee-beige.jpg';
-    if (n.contains('charcoal'))  return 'assets/images/tee-charcoal.jpg';
-    if (n.contains('navy') || n.contains('midnight')) return 'assets/images/tee-navy.jpg';
-    if (n.contains('olive') || n.contains('military')) return 'assets/images/tee-olive.jpg';
-    if (n.contains('white') || n.contains('essential')) return 'assets/images/tee-white.jpg';
-    if (n.contains('silk') || n.contains('luxe') || n.contains('luxury')) return 'assets/images/hero_luxury_tshirt.png';
+    final itemID = id.toLowerCase();
 
-    // Generic fallback
+    if (itemID == 'vx-08' || n.contains('emerald'))   return 'assets/images/tee-emerald.png';
+    if (itemID == 'vx-12' || n.contains('lavender') || n.contains('lilac')) return 'assets/images/tee-lavender.png';
+    if (itemID == 'vx-00' || n.contains('gold') || n.contains('luxe tee')) return 'assets/images/hero_luxury_tshirt.png';
+    if (itemID == 'vx-07' || n.contains('rust'))      return 'assets/images/tee-rust.png';
+    if (itemID == 'vx-01' || n.contains('obsidian') || n.contains('stealth')) return 'assets/images/tee-black.jpg';
+    if (itemID == 'vx-02' || n.contains('ivory'))     return 'assets/images/tee-white.jpg';
+    if (itemID == 'vx-03' || n.contains('midnight') || n.contains('indigo')) return 'assets/images/tee-navy.jpg';
+    if (itemID == 'vx-04' || n.contains('desert') || n.contains('sand')) return 'assets/images/tee-beige.jpg';
+    if (itemID == 'vx-05' || n.contains('charcoal'))  return 'assets/images/tee-charcoal.jpg';
+    if (itemID == 'vx-06' || n.contains('military'))  return 'assets/images/tee-olive.jpg';
+    if (itemID == 'vx-15' || n.contains('cyber') || n.contains('chrome')) return 'assets/images/promo_banner_1.png';
+    if (itemID == 'vx-16' || n.contains('crimson'))   return 'assets/images/promo_banner_2.png';
+
+    if (rawImage.isNotEmpty && rawImage.startsWith('assets/')) {
+      return rawImage;
+    }
+
     return 'assets/images/hero_luxury_tshirt.png';
   }
 

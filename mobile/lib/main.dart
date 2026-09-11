@@ -25,8 +25,10 @@ class VexaMobileApp extends StatelessWidget {
     return MaterialApp(
       title: 'VEXA Style Hub',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      initialRoute: '/home',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
+      initialRoute: '/splash',
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/onboarding': (context) => const OnboardingScreen(),

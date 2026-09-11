@@ -23,6 +23,15 @@ connectDB().then((isConnected) => {
 
 const app = express();
 
+// Set permissive CSP and CORS headers
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https: http:; script-src-attr 'self' 'unsafe-inline' 'unsafe-eval' https: http:; style-src 'self' 'unsafe-inline' https: http:; img-src 'self' data: blob: https: http:; font-src 'self' data: https: http:; connect-src 'self' https: http: ws: wss:;"
+  );
+  next();
+});
+
 // Enable CORS
 app.use(cors());
 

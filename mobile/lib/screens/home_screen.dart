@@ -3,26 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../config/api_config.dart';
 import '../models/item_model.dart';
-import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
-import '../theme/app_theme.dart';
-import '../widgets/server_config_dialog.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
+import 'all_products_screen.dart';
+import 'products_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 
-// ── Gold colour tokens ─────────────────────────────────────────────────────
-const Color _gold = Color(0xFFD4AF37);
-const Color _goldDark = Color(0xFF966F1E);
-const Color _cream = Color(0xFFF4EFE6);
-const Color _cardBg = Color(0xFF1A1814);
-const Color _surfaceBg = Color(0xFF22201D);
-const Color _bgColor = Color(0xFF0F0E0C);
-const Color _subtext = Color(0xFFB0A89C);
-const Color _border = Color(0xFF2E2B27);
+// ── Gold & White theme tokens ─────────────────────────────────────────────
+const Color _gold = Color(0xFFB8860B);
+const Color _goldDark = Color(0xFF8B6508);
+const Color _cardBg = Color(0xFFFFFFFF);
+const Color _surfaceBg = Color(0xFFF1F5F9);
+const Color _bgColor = Color(0xFFFAFAFC);
+const Color _subtext = Color(0xFF64748B);
+const Color _border = Color(0xFFE2E8F0);
+const Color _textDark = Color(0xFF0F172A);
 
 // ── Smart image loader: asset path → Image.asset, URL → Image.network ───────
 Widget _productImage(
@@ -71,6 +70,7 @@ const _promoBanners = [
     body: 'Sculpted from 240 GSM bio-washed heavy cotton with double-stitched collar reinforcement.',
     cta: 'EXPLORE COLLECTION',
     img: 'assets/images/promo_banner_1.png',
+    imgAlignment: Alignment.topCenter,
   ),
   (
     tag: 'BESPOKE CUSTOMISATION',
@@ -79,6 +79,7 @@ const _promoBanners = [
     body: 'Personalize colorways, custom embroidery & bulk orders directly from your user dashboard.',
     cta: 'BOOK CUSTOM TEE',
     img: 'assets/images/promo_banner_2.png',
+    imgAlignment: Alignment.center,
   ),
   (
     tag: 'VEXA SIGNATURE ESSENTIALS',
@@ -87,16 +88,8 @@ const _promoBanners = [
     body: 'Engineered for lasting quality, zero color bleeding, and pre-shrunk combed long-staple luxury cotton.',
     cta: 'SHOP CATALOG',
     img: 'assets/images/hero_luxury_tshirt.png',
+    imgAlignment: Alignment.center,
   ),
-];
-
-const _marqueeItems = [
-  'FREE SHIPPING OVER ₹1999',
-  'PREMIUM COTTON',
-  'OVERSIZED FIT',
-  'CASH ON DELIVERY',
-  '30-DAY RETURNS',
-  'LIMITED DROPS',
 ];
 
 class HomeScreen extends StatefulWidget {
@@ -107,10 +100,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  UserModel? _currentUser;
   List<ItemModel> _items = ApiService.getFallbackItems(); // show products immediately
   final bool _isLoading = false; // always ready — items pre-loaded from local assets
-  String _selectedCategory = 'All';
+  final String _selectedCategory = 'All';
   String _searchQuery = '';
   final Set<String> _favoriteIds = {};
   int _currentTabIndex = 0;
@@ -120,43 +112,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _bannerIndex = 0;
   Timer? _bannerTimer;
 
-  // Marquee scroll
-  late final ScrollController _marqueeController;
-  Timer? _marqueeTimer;
+  // Main page scroll controller
+  late final ScrollController _mainScrollController;
 
-  final List<String> _categories = ['All', 'T-Shirts', 'Tops', 'Jackets', 'Pants'];
+  // Middle-Out screen & tab transition controller
+  late final AnimationController _tabAnimController;
 
   @override
   void initState() {
     super.initState();
+    _mainScrollController = ScrollController();
     ApiConfig.baseUrlNotifier.addListener(_onServerUrlChanged);
     _loadUserAndItems();
+
+    _tabAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+    _tabAnimController.value = 1.0;
 
     // Start promo banner auto-cycle
     _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (mounted) setState(() => _bannerIndex = (_bannerIndex + 1) % _promoBanners.length);
-    });
-
-    // Marquee scroll controller
-    _marqueeController = ScrollController();
-    Future.delayed(const Duration(milliseconds: 600), _startMarquee);
-  }
-
-  void _startMarquee() {
-    if (!mounted || !_marqueeController.hasClients) return;
-    _marqueeTimer = Timer.periodic(const Duration(milliseconds: 30), (_) {
-      if (!mounted || !_marqueeController.hasClients) return;
-      final max = _marqueeController.position.maxScrollExtent;
-      final pos = _marqueeController.offset;
-      if (pos >= max) {
-        _marqueeController.jumpTo(0);
-      } else {
-        _marqueeController.animateTo(
-          pos + 1.5,
-          duration: const Duration(milliseconds: 30),
-          curve: Curves.linear,
-        );
-      }
     });
   }
 
@@ -164,20 +141,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void dispose() {
     ApiConfig.baseUrlNotifier.removeListener(_onServerUrlChanged);
     _bannerTimer?.cancel();
-    _marqueeTimer?.cancel();
-    _marqueeController.dispose();
+    _mainScrollController.dispose();
+    _tabAnimController.dispose();
     super.dispose();
   }
+
+  void _navigateToScreen(Widget page) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+  }
+
+  bool _isRealUser = false;
 
   void _onServerUrlChanged() {
     if (mounted) _loadUserAndItems();
   }
 
   Future<void> _loadUserAndItems() async {
-    // Load user session (fast — local storage)
     final user = await AuthService.getUser();
-    if (!mounted) return;
-    setState(() => _currentUser = user);
+    final realUser = user != null && user.id != 'guest_user';
+    if (mounted) {
+      setState(() {
+        _isRealUser = realUser;
+      });
+    }
 
     // Fetch from API in background — UI already shows fallback items
     try {
@@ -204,50 +193,167 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   int get _totalCartCount => _cartItems.fold(0, (s, c) => s + c.quantity);
 
+  List<ItemModel> get _newArrivals {
+    final list = _items.where((it) =>
+      it.collectionType.toLowerCase().contains('new') ||
+      it.collectionType.toLowerCase().contains('drop')
+    ).toList();
+    if (list.isNotEmpty) return list;
+    return _items.take(2).toList();
+  }
+
   List<ItemModel> get _filteredItems {
     return _items.where((item) {
-      final matchCat = _selectedCategory == 'All' || item.category.toLowerCase() == _selectedCategory.toLowerCase();
+      final cat = item.category.toLowerCase();
+      final sel = _selectedCategory.toLowerCase();
+      final matchCat = sel == 'all' ||
+          cat == sel ||
+          (sel == 't-shirts' && (cat == 'oversized' || cat == 'classic' || cat == 'limited' || cat.contains('shirt'))) ||
+          (sel == 'tops' && (cat == 'top' || cat == 'oversized' || cat.contains('top'))) ||
+          (sel == 'jackets' && cat.contains('jacket')) ||
+          (sel == 'pants' && cat.contains('pant'));
+
       final matchSearch = _searchQuery.isEmpty ||
           item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          item.description.toLowerCase().contains(_searchQuery.toLowerCase());
+          item.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          item.color.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchCat && matchSearch;
     }).toList();
   }
 
+  List<ItemModel> get _featuredItems {
+    final filtered = _filteredItems;
+    if (_searchQuery.isNotEmpty || _selectedCategory != 'All') {
+      return filtered;
+    }
+    final newArrivalIds = _newArrivals.map((e) => e.id).toSet();
+    final featured = filtered.where((e) => !newArrivalIds.contains(e.id)).toList();
+    if (featured.isNotEmpty) return featured;
+    return filtered;
+  }
+
   void _openProductDetail(ItemModel item) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailScreen(
-          item: item,
-          onAddToCart: (it, color, size, qty) => _addToCart(it, color, size, qty),
-        ),
+    _navigateToScreen(
+      ProductDetailScreen(
+        item: item,
+        onAddToCart: (it, color, size, qty) => _addToCart(it, color, size, qty),
       ),
     );
   }
 
-  void _handleLogout() {
-    showDialog(
+  void _handleBannerTap(String cta) {
+    if (cta.toLowerCase().contains('custom')) {
+      _showCustomTeeBottomSheet();
+    } else {
+      _navigateToScreen(
+        AllProductsScreen(
+          items: _items,
+          onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
+          favoriteIds: _favoriteIds,
+          onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
+        ),
+      );
+    }
+  }
+
+  void _showCustomTeeBottomSheet() {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final detailsController = TextEditingController();
+
+    showModalBottomSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: _cardBg,
-        title: Text('Log Out', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to log out of VEXA Style Hub?', style: GoogleFonts.outfit(color: _subtext)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-            onPressed: () async {
-              final nav = Navigator.of(context);
-              await AuthService.clearSession();
-              if (!mounted) return;
-              nav.pop();
-              nav.pushReplacementNamed('/login');
-            },
-            child: const Text('Log Out'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            top: 24,
+            left: 20,
+            right: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 45,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: _subtext.withAlpha(80),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('BESPOKE CUSTOMISATION', style: GoogleFonts.outfit(fontSize: 10, color: _gold, fontWeight: FontWeight.w700, letterSpacing: 2.5)),
+              const SizedBox(height: 4),
+              Text('Book Your Custom Tee', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
+              const SizedBox(height: 4),
+              Text('Personalized embroidery, custom colorways & bulk orders.', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                style: GoogleFonts.outfit(color: _textDark),
+                decoration: InputDecoration(
+                  labelText: 'Your Name',
+                  labelStyle: GoogleFonts.outfit(color: _subtext),
+                  prefixIcon: const Icon(Icons.person_outline_rounded, color: _gold),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                style: GoogleFonts.outfit(color: _textDark),
+                decoration: InputDecoration(
+                  labelText: 'Phone / WhatsApp Number',
+                  labelStyle: GoogleFonts.outfit(color: _subtext),
+                  prefixIcon: const Icon(Icons.phone_outlined, color: _gold),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: detailsController,
+                maxLines: 2,
+                style: GoogleFonts.outfit(color: _textDark),
+                decoration: InputDecoration(
+                  labelText: 'Customization Details (e.g. Embroidery, color, size)',
+                  labelStyle: GoogleFonts.outfit(color: _subtext),
+                  prefixIcon: const Icon(Icons.edit_note_rounded, color: _gold),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _goldDark,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Custom Tee request submitted! We will reach out on WhatsApp shortly.'),
+                        backgroundColor: _goldDark,
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  },
+                  child: Text('Submit Custom Order Request', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -264,32 +370,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onRefresh: _loadUserAndItems,
               color: _gold,
               child: CustomScrollView(
+                controller: _mainScrollController,
                 slivers: [
-                  // 1. HERO BANNER
-                  SliverToBoxAdapter(child: _buildHero()),
-
-                  // 2. MARQUEE TICKER
-                  SliverToBoxAdapter(child: _buildMarquee()),
-
-                  // 3. FEATURES GRID
-                  SliverToBoxAdapter(child: _buildFeaturesSection()),
-
-                  // 4. PROMO BANNER CAROUSEL
+                  // 1. PROMO BANNER CAROUSEL
                   SliverToBoxAdapter(child: _buildPromoBannerCarousel()),
 
-                  // 5. NEW ARRIVALS (horizontal scroll)
+                  // 2. NEW ARRIVALS (horizontal scroll)
                   SliverToBoxAdapter(child: _buildNewArrivalsSection()),
 
-                  // 6. SEARCH + CATEGORY PILLS + FEATURED CATALOG
+                  // 3. SEARCH + FEATURED CATALOG (Horizontal Side Scroll)
                   SliverToBoxAdapter(child: _buildSearchBar()),
-                  SliverToBoxAdapter(child: _buildCategoryPills()),
                   SliverToBoxAdapter(child: _buildFeaturedCatalogHeader()),
-                  _buildCatalogGrid(),
+                  SliverToBoxAdapter(child: _buildFeaturedCatalogHorizontalList()),
 
-                  // 7. SERVICES BAR
+                  // 4. FEATURES GRID (Engineered Excellence)
+                  SliverToBoxAdapter(child: _buildFeaturesSection()),
+
+                  // 5. SERVICES BAR (WhatsApp Order)
                   SliverToBoxAdapter(child: _buildServicesBar()),
 
-                  // 8. JOIN VEXA CTA
+                  // 6. JOIN VEXA CTA (Last)
                   SliverToBoxAdapter(child: _buildJoinCta()),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -305,8 +405,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: _bgColor,
       elevation: 0,
       automaticallyImplyLeading: false,
-      titleSpacing: 12,
+      centerTitle: false,
+      titleSpacing: 16,
       title: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
@@ -324,279 +426,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('VEXA', style: GoogleFonts.cinzel(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16, color: _gold)),
-              Text('WEAR CONFIDENCE', style: GoogleFonts.outfit(fontSize: 7, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Colors.white60)),
+              Text('WEAR CONFIDENCE', style: GoogleFonts.outfit(fontSize: 7, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: _subtext)),
             ],
           ),
         ],
       ),
-      actions: [
-        IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          icon: const Icon(Icons.dns_rounded, color: _gold, size: 20),
-          tooltip: 'Server Settings',
-          onPressed: () => ServerConfigDialog.show(context),
-        ),
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
-              onPressed: () => setState(() => _currentTabIndex = 1),
-            ),
-            if (_totalCartCount > 0)
-              Positioned(
-                right: 2,
-                top: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(color: _goldDark, shape: BoxShape.circle),
-                  constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                  child: Text('$_totalCartCount',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
-              ),
-          ],
-        ),
-        if (_currentUser == null)
-          Padding(
-            padding: const EdgeInsets.only(right: 8, left: 4),
-            child: SizedBox(
-              height: 32,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _goldDark,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                ),
-                onPressed: () => Navigator.pushNamed(context, '/login'),
-                icon: const Icon(Icons.lock_outline_rounded, size: 12),
-                label: Text('LOGIN', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.0)),
-              ),
-            ),
-          )
-        else
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            icon: const Icon(Icons.logout_rounded, color: _subtext, size: 20),
-            onPressed: _handleLogout,
-            tooltip: 'Log Out',
-          ),
-      ],
-    );
-  }
-
-  // ── 1. HERO ────────────────────────────────────────────────────────────
-  Widget _buildHero() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _goldDark.withAlpha(80)),
-          boxShadow: [BoxShadow(color: _goldDark.withAlpha(30), blurRadius: 20, offset: const Offset(0, 8))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Tag pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: _gold.withAlpha(20),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _gold.withAlpha(80)),
-              ),
-              child: Text('Elevate your everyday style',
-                  style: GoogleFonts.outfit(fontSize: 10, color: _gold, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-            ),
-            const SizedBox(height: 14),
-            // Title
-            RichText(
-              text: TextSpan(children: [
-                TextSpan(
-                  text: 'PREMIUM\nT-SHIRT\n',
-                  style: GoogleFonts.cinzel(fontSize: 28, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: 1.2, color: _cream),
-                ),
-                TextSpan(
-                  text: 'COLLECTION',
-                  style: GoogleFonts.cinzel(fontSize: 28, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: 1.2, color: _gold),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Engineered in 240 GSM heavyweight cotton, finished by hand, and cut for the modern oversized silhouette. This is VEXA — wear confidence, wear style.',
-              style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext, height: 1.5),
-            ),
-            const SizedBox(height: 20),
-            // CTA Buttons
-            Row(children: [
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _goldDark,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: () => setState(() => _selectedCategory = 'All'),
-                  child: FittedBox(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('SHOP THE DROP',
-                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: Colors.white)),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _cream),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: () => Navigator.pushNamed(context, '/onboarding'),
-                  child: FittedBox(
-                    child: Text('OUR STORY',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: _cream)),
-                  ),
-                ),
-              ),
-            ]),
-
-            const SizedBox(height: 20),
-
-            // Featured product card preview
-            if (_items.isNotEmpty) _buildHeroProductCard(_items.first),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeroProductCard(ItemModel item) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surfaceBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _goldDark.withAlpha(100)),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              // Always show the same hero image as mobile responsive website
-              Image.asset(
-                'assets/images/hero_luxury_tshirt.png',
-                height: 220,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _cream,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: _goldDark),
-                  ),
-                  child: Text('SIGNATURE DROP',
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: const Color(0xFF1C1917))),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: _goldDark, borderRadius: BorderRadius.circular(6)),
-                  child: Text('30% Off',
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                      const SizedBox(height: 4),
-                      Row(children: [
-                        Text('₹${item.price.toStringAsFixed(0)}',
-                            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: _gold)),
-                        if (item.oldPrice != null) ...[
-                          const SizedBox(width: 8),
-                          Text('₹${item.oldPrice!.toStringAsFixed(0)}',
-                              style: GoogleFonts.outfit(fontSize: 12, color: _subtext, decoration: TextDecoration.lineThrough)),
-                        ],
-                      ]),
-                    ],
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _goldDark,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  ),
-                  onPressed: () => _openProductDetail(item),
-                  child: Text('View', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── 2. MARQUEE TICKER ─────────────────────────────────────────────────
-  Widget _buildMarquee() {
-    final items = [..._marqueeItems, ..._marqueeItems];
-    return Container(
-      margin: const EdgeInsets.only(top: 16),
-      decoration: const BoxDecoration(
-        border: Border.symmetric(horizontal: BorderSide(color: _border, width: 1)),
-      ),
-      height: 40,
-      child: ListView.builder(
-        controller: _marqueeController,
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: items.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Text(
-            '✦  ${items[i]}',
-            style: GoogleFonts.outfit(fontSize: 10, letterSpacing: 2, color: _subtext, fontWeight: FontWeight.w500),
-          ),
-        ),
-      ),
+      actions: const [],
     );
   }
 
@@ -613,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(children: [
-              TextSpan(text: 'Crafted to the ', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              TextSpan(text: 'Crafted to the ', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
               TextSpan(text: 'last stitch', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _gold)),
             ]),
           ),
@@ -649,14 +484,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const SizedBox(height: 4),
           RichText(
             text: TextSpan(children: [
-              TextSpan(text: 'Promotional ', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              TextSpan(text: 'Promotional ', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
               TextSpan(text: 'Showcase', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _gold)),
             ]),
           ),
           const SizedBox(height: 14),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 600),
-            child: _PromoBannerCard(key: ValueKey(_bannerIndex), banner: b),
+            child: _PromoBannerCard(
+              key: ValueKey(_bannerIndex),
+              banner: b,
+              onTap: () => _handleBannerTap(b.cta),
+            ),
           ),
           // Dot indicators
           const SizedBox(height: 12),
@@ -682,7 +521,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── 5. NEW ARRIVALS ────────────────────────────────────────────────────
   Widget _buildNewArrivalsSection() {
-    final newArrivals = _items.take(4).toList();
+    final newArrivals = _newArrivals;
     if (newArrivals.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 28, 0, 0),
@@ -700,13 +539,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('New Arrivals', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                    Text('New Arrivals', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark)),
                     GestureDetector(
-                      onTap: () => setState(() => _selectedCategory = 'All'),
-                      child: Row(children: [
-                        Text('Explore All', style: GoogleFonts.outfit(fontSize: 11, color: _gold, fontWeight: FontWeight.w600)),
-                        const Icon(Icons.arrow_forward_rounded, size: 14, color: _gold),
-                      ]),
+                      onTap: () {
+                        _navigateToScreen(
+                          AllProductsScreen(
+                            items: _items,
+                            onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
+                            favoriteIds: _favoriteIds,
+                            onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _gold.withAlpha(25),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: _gold.withAlpha(80)),
+                        ),
+                        child: Row(children: [
+                          Text('Explore All', style: GoogleFonts.outfit(fontSize: 11, color: _gold, fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.arrow_forward_rounded, size: 14, color: _gold),
+                        ]),
+                      ),
                     ),
                   ],
                 ),
@@ -787,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   Text(item.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
                   const SizedBox(height: 4),
                   Row(children: [
                     Text('₹${item.price.toStringAsFixed(0)}',
@@ -825,39 +682,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildCategoryPills() {
-    return SizedBox(
-      height: 56,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        itemCount: _categories.length,
-        itemBuilder: (_, i) {
-          final cat = _categories[i];
-          final sel = _selectedCategory == cat;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(cat),
-              selected: sel,
-              onSelected: (_) => setState(() => _selectedCategory = cat),
-              selectedColor: _goldDark,
-              backgroundColor: _cardBg,
-              checkmarkColor: Colors.white,
-              labelStyle: GoogleFonts.outfit(color: sel ? Colors.white : _subtext, fontWeight: sel ? FontWeight.bold : FontWeight.normal, fontSize: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: sel ? _gold : _border),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            ),
-          );
-        },
-      ),
-    );
-  }
+
 
   Widget _buildFeaturedCatalogHeader() {
+    final items = _featuredItems.length > 4 ? _featuredItems.take(4).toList() : _featuredItems;
+    final count = items.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
@@ -868,8 +697,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Featured Collection', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-              Text('${_filteredItems.length} items', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+              Text('Featured Collection', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
+              Text('$count items', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
             ],
           ),
         ],
@@ -877,36 +706,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  SliverWidget _buildCatalogGrid() {
-    if (_filteredItems.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(children: [
-            const Icon(Icons.checkroom_outlined, size: 60, color: _subtext),
-            const SizedBox(height: 16),
-            Text('No items found', style: GoogleFonts.outfit(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text('Try adjusting your search or filter.', style: GoogleFonts.outfit(color: _subtext)),
-          ]),
-        ),
+  Widget _buildFeaturedCatalogHorizontalList() {
+    final items = _featuredItems.length > 4 ? _featuredItems.take(4).toList() : _featuredItems;
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(children: [
+          const Icon(Icons.checkroom_outlined, size: 60, color: _subtext),
+          const SizedBox(height: 16),
+          Text('No items found', style: GoogleFonts.outfit(fontSize: 18, color: _textDark, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          Text('Try adjusting your search or filter.', style: GoogleFonts.outfit(color: _subtext)),
+        ]),
       );
     }
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.62,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-        ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final item = _filteredItems[index];
-            final isFav = _favoriteIds.contains(item.id);
-            return GestureDetector(
-              onTap: () => _openProductDetail(item),
+    return SizedBox(
+      height: 325,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: items.length,
+        itemBuilder: (_, index) {
+          final item = items[index];
+          final isFav = _favoriteIds.contains(item.id);
+          return Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: SizedBox(
+              width: 200,
               child: Container(
                 decoration: BoxDecoration(
                   color: _cardBg,
@@ -920,11 +746,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Expanded(
                       child: Stack(
                         children: [
-                          _productImage(
-                            item.image,
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
+                          GestureDetector(
+                            onTap: () => _openProductDetail(item),
+                            child: _productImage(
+                              item.image,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                           Positioned(
                             top: 8,
@@ -956,10 +785,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                          GestureDetector(
+                            onTap: () => _openProductDetail(item),
+                            child: Text(item.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                          ),
                           const SizedBox(height: 3),
                           Row(children: [
                             Text('₹${item.price.toStringAsFixed(0)}',
@@ -997,10 +829,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-            );
-          },
-          childCount: _filteredItems.length,
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1040,7 +871,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(s.title,
-                              style: GoogleFonts.outfit(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                              style: GoogleFonts.outfit(fontSize: 11, color: _textDark, fontWeight: FontWeight.w700, letterSpacing: 0.2),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(s.body, style: GoogleFonts.outfit(fontSize: 10, color: _subtext), maxLines: 1),
@@ -1074,9 +905,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(children: [
-                TextSpan(text: 'Join the ', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                TextSpan(text: 'Join the ', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark)),
                 TextSpan(text: 'VEXA', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: _gold)),
-                TextSpan(text: ' circle', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                TextSpan(text: ' circle', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark)),
               ]),
             ),
             const SizedBox(height: 12),
@@ -1095,7 +926,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                    onPressed: () => _navigateToScreen(const RegisterScreen()),
                     child: Text('Create Account',
                         style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
                   ),
@@ -1108,7 +939,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+                    onPressed: () => _navigateToScreen(const LoginScreen()),
                     child: Text('Sign In',
                         style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: _gold, letterSpacing: 0.5)),
                   ),
@@ -1132,31 +963,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         index: _currentTabIndex,
         children: [
           _buildDiscoverTab(),
-          CartScreen(cartItems: _cartItems, onCartUpdated: () => setState(() {})),
-          const ProfileScreen(),
+          ProductsScreen(
+            items: _items,
+            onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
+            favoriteIds: _favoriteIds,
+            onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
+            showBackButton: false,
+          ),
+          CartScreen(
+            cartItems: _cartItems,
+            onCartUpdated: () => setState(() {}),
+            onNavigateToProducts: () => setState(() => _currentTabIndex = 1),
+          ),
+          ProfileScreen(
+            onNavigateToDiscover: () async {
+              final user = await AuthService.getUser();
+              final realUser = user != null && user.id != 'guest_user';
+              setState(() {
+                _currentTabIndex = 0;
+                _isRealUser = realUser;
+              });
+            },
+          ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: _border, width: 1))),
-        child: BottomNavigationBar(
-          currentIndex: _currentTabIndex,
-          onTap: (i) => setState(() => _currentTabIndex = i),
-          backgroundColor: _cardBg,
-          selectedItemColor: _gold,
-          unselectedItemColor: _subtext,
-          selectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: GoogleFonts.outfit(fontSize: 11),
-          items: [
-            const BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore_rounded), label: 'Discover'),
-            BottomNavigationBarItem(
-              icon: Badge(label: Text('$_totalCartCount'), isLabelVisible: _totalCartCount > 0, backgroundColor: _goldDark, child: const Icon(Icons.shopping_bag_outlined)),
-              activeIcon: Badge(label: Text('$_totalCartCount'), isLabelVisible: _totalCartCount > 0, backgroundColor: _goldDark, child: const Icon(Icons.shopping_bag_rounded)),
-              label: 'Cart',
+      bottomNavigationBar: (_currentTabIndex == 3 && !_isRealUser)
+          ? null
+          : Container(
+              decoration: const BoxDecoration(border: Border(top: BorderSide(color: _border, width: 1))),
+              child: BottomNavigationBar(
+                currentIndex: _currentTabIndex,
+                onTap: (i) async {
+                  final user = await AuthService.getUser();
+                  final realUser = user != null && user.id != 'guest_user';
+                  setState(() {
+                    _currentTabIndex = i;
+                    _isRealUser = realUser;
+                  });
+                },
+                backgroundColor: _cardBg,
+                selectedItemColor: _gold,
+                unselectedItemColor: _subtext,
+                type: BottomNavigationBarType.fixed,
+                selectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+                unselectedLabelStyle: GoogleFonts.outfit(fontSize: 11),
+                items: [
+                  const BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore_rounded), label: 'Discover'),
+                  const BottomNavigationBarItem(icon: Icon(Icons.grid_view_outlined), activeIcon: Icon(Icons.grid_view_rounded), label: 'Products'),
+                  BottomNavigationBarItem(
+                    icon: Badge(label: Text('$_totalCartCount'), isLabelVisible: _totalCartCount > 0, backgroundColor: _goldDark, child: const Icon(Icons.shopping_bag_outlined)),
+                    activeIcon: Badge(label: Text('$_totalCartCount'), isLabelVisible: _totalCartCount > 0, backgroundColor: _goldDark, child: const Icon(Icons.shopping_bag_rounded)),
+                    label: 'Cart',
+                  ),
+                  const BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), activeIcon: Icon(Icons.person_rounded), label: 'Profile'),
+                ],
+              ),
             ),
-            const BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), activeIcon: Icon(Icons.person_rounded), label: 'Profile'),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1208,7 +1070,7 @@ class _FeatureCard extends StatelessWidget {
                   style: GoogleFonts.outfit(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: _textDark,
                     height: 1.2,
                   ),
                 ),
@@ -1235,94 +1097,103 @@ typedef _PromoBannerData = ({
   String body,
   String cta,
   String img,
+  Alignment imgAlignment,
 });
 
 class _PromoBannerCard extends StatelessWidget {
   final _PromoBannerData banner;
-  const _PromoBannerCard({super.key, required this.banner});
+  final VoidCallback? onTap;
+  const _PromoBannerCard({super.key, required this.banner, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 260,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _gold.withAlpha(80)),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Stack(
-        children: [
-          // Background image
-          Positioned.fill(
-            child: Image.asset(
-              banner.img,
-              fit: BoxFit.cover,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 235,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _gold.withAlpha(80)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(20),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
-          ),
-          // Gradient overlay
-          Positioned.fill(
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Stack(
+          children: [
+            // Background image with custom alignment so model head & tee options are perfectly centered and framed
+            Positioned.fill(
+              child: Image.asset(
+                banner.img,
+                fit: BoxFit.cover,
+                alignment: banner.imgAlignment,
+              ),
+            ),
+
+          // Soft bottom shadow for button visibility
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 60,
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [Color(0xEA0F0E0C), Color(0x880F0E0C), Color(0x000F0E0C)],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withAlpha(140),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
           ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _cream,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _gold.withAlpha(100)),
+
+          // Only CTA Option Button at the bottom
+          Positioned(
+            left: 12,
+            bottom: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: _goldDark,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(60),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
-                  child: Text(banner.tag,
-                      style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: const Color(0xFF1C1917))),
-                ),
-                const SizedBox(height: 10),
-                Text(banner.title,
-                    style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, height: 1.2)),
-                const SizedBox(height: 6),
-                Text('✨ ${banner.subtitle} ✨',
-                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _gold, letterSpacing: 0.5)),
-                const SizedBox(height: 8),
-                Text(banner.body,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(fontSize: 11, color: _subtext, height: 1.4)),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _goldDark,
-                    borderRadius: BorderRadius.circular(6),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    banner.cta,
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.6,
+                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(banner.cta,
-                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward_rounded, size: 12, color: Colors.white),
-                    ],
-                  ),
-                ),
-              ],
+                  const SizedBox(width: 5),
+                  const Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
+                ],
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // Typedef alias so SliverWidget compiles without issue

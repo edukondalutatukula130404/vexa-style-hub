@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../config/api_config.dart';
 import '../services/auth_service.dart';
-import '../theme/app_theme.dart';
-import '../widgets/server_config_dialog.dart';
+
+const Color _gold = Color(0xFFB8860B);
+const Color _goldDark = Color(0xFF8B6508);
+const Color _cardBg = Color(0xFFFFFFFF);
+const Color _bgColor = Color(0xFFFAFAFC);
+const Color _subtext = Color(0xFF64748B);
+const Color _border = Color(0xFFE2E8F0);
+const Color _textDark = Color(0xFF0F172A);
 
 class OnboardingPageData {
   final String tag;
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color glowColor;
+  final String imagePath;
 
   OnboardingPageData({
     required this.tag,
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.glowColor,
+    required this.imagePath,
   });
 }
 
@@ -35,31 +40,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<OnboardingPageData> _pages = [
     OnboardingPageData(
       tag: 'HAUTE COUTURE 2026',
-      title: 'Discover Luxury\nFashion Trends',
-      subtitle: 'Explore haute couture, designer outfits, and exclusive seasonal wardrobe drops carefully curated for you.',
+      title: 'Discover Luxury\nOversized Apparel',
+      subtitle: 'Sculpted from 240 GSM bio-washed heavy cotton with double-stitched collar reinforcement.',
+      icon: Icons.checkroom_rounded,
+      imagePath: 'assets/images/hero_luxury_tshirt.png',
+    ),
+    OnboardingPageData(
+      tag: 'BESPOKE CUSTOMISATION',
+      title: 'Personalized Embroidery\n& Custom Fits',
+      subtitle: 'Tailor colorways, custom embroidery, and bulk orders tailored directly to your aesthetic.',
       icon: Icons.auto_awesome_rounded,
-      glowColor: AppTheme.primaryColor,
+      imagePath: 'assets/images/promo_banner_2.png',
     ),
     OnboardingPageData(
-      tag: 'SMART AI STYLING',
-      title: 'Personalized\nStyle Recommendations',
-      subtitle: 'Tailored outfit suggestions based on your personal color palette and aesthetic preferences.',
-      icon: Icons.style_rounded,
-      glowColor: const Color(0xFF00CEC9),
-    ),
-    OnboardingPageData(
-      tag: 'INSTANT SERVER SYNC',
-      title: 'Seamless & Secure\nShopping Experience',
-      subtitle: 'Fast checkout, real-time catalog syncing with any server instance, and instant customer service.',
-      icon: Icons.shopping_bag_rounded,
-      glowColor: const Color(0xFFE84393),
+      tag: 'EXPRESS DISPATCH & COD',
+      title: 'Seamless Shopping\n& Fast Shipping',
+      subtitle: 'Enjoy 2–4 day express delivery, Cash on Delivery support, and hassle-free 30-day returns.',
+      icon: Icons.local_shipping_rounded,
+      imagePath: 'assets/images/promo_banner_1.png',
     ),
   ];
 
   Future<void> _completeOnboarding() async {
     await AuthService.setOnboardingSeen();
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/login');
+    Navigator.pushReplacementNamed(context, '/home');
   }
 
   @override
@@ -71,79 +76,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: _bgColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar (Branding + Server Settings + Skip Button)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.checkroom_rounded, color: AppTheme.accentColor, size: 24),
-                      const SizedBox(width: 8),
-                      Text(
-                        'VEXA',
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+            // Top Right Standalone Skip Button
+            Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4, right: 16),
+                child: TextButton(
+                  onPressed: _completeOnboarding,
+                  child: Text(
+                    'Skip',
+                    style: GoogleFonts.outfit(
+                      color: _subtext,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  Row(
-                    children: [
-                      // Active Server Pill Button
-                      ValueListenableBuilder<String>(
-                        valueListenable: ApiConfig.baseUrlNotifier,
-                        builder: (context, baseUrl, _) {
-                          return GestureDetector(
-                            onTap: () => ServerConfigDialog.show(context),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceColor,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: AppTheme.accentColor.withAlpha(50)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.dns_rounded, size: 14, color: AppTheme.accentColor),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Server API',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: _completeOnboarding,
-                        child: Text(
-                          'Skip',
-                          style: GoogleFonts.outfit(
-                            color: AppTheme.subtextColor,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
             // PageView Carousel
@@ -159,7 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemBuilder: (context, index) {
                   final page = _pages[index];
                   return Padding(
-                    padding: const EdgeInsets.all(32.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -167,64 +119,106 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
-                            color: page.glowColor.withAlpha(30),
+                            color: _gold.withAlpha(20),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: page.glowColor.withAlpha(80)),
+                            border: Border.all(color: _gold.withAlpha(80)),
                           ),
                           child: Text(
                             page.tag,
                             style: GoogleFonts.outfit(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 2,
-                              color: page.glowColor,
+                              color: _goldDark,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 36),
-                        // Icon Circle Container
+                        const SizedBox(height: 28),
+
+                        // Image Preview Card
                         Container(
-                          width: 160,
-                          height: 160,
+                          height: 240,
+                          width: double.infinity,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: page.glowColor.withAlpha(25),
-                            border: Border.all(
-                              color: page.glowColor.withAlpha(80),
-                              width: 2,
-                            ),
+                            color: _cardBg,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: _border),
                             boxShadow: [
                               BoxShadow(
-                                color: page.glowColor.withAlpha(60),
-                                blurRadius: 40,
+                                color: _goldDark.withAlpha(25),
+                                blurRadius: 24,
                                 offset: const Offset(0, 10),
                               ),
                             ],
                           ),
-                          child: Icon(
-                            page.icon,
-                            size: 72,
-                            color: page.glowColor,
+                          clipBehavior: Clip.hardEdge,
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: Image.asset(
+                                  page.imagePath,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black.withAlpha(120),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 16,
+                                right: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: _goldDark,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withAlpha(80),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    page.icon,
+                                    size: 22,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 32),
+
                         Text(
                           page.title,
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
-                            fontSize: 28,
+                          style: GoogleFonts.cinzel(
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                             height: 1.25,
-                            color: Colors.white,
+                            letterSpacing: 1,
+                            color: _textDark,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Text(
                           page.subtitle,
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
-                            fontSize: 15,
-                            color: AppTheme.subtextColor,
+                            fontSize: 13.5,
+                            color: _subtext,
                             height: 1.5,
                           ),
                         ),
@@ -234,9 +228,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
-            // Bottom Controls
+
+            // Bottom Controls (Page Indicators + Next/Get Started)
             Padding(
-              padding: const EdgeInsets.all(32.0),
+              padding: const EdgeInsets.all(24.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -246,18 +241,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       _pages.length,
                       (index) => AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.only(right: 8),
-                        height: 8,
-                        width: _currentPage == index ? 28 : 8,
+                        margin: const EdgeInsets.only(right: 6),
+                        height: 6,
+                        width: _currentPage == index ? 24 : 6,
                         decoration: BoxDecoration(
                           color: _currentPage == index
-                              ? AppTheme.primaryColor
-                              : AppTheme.subtextColor.withAlpha(80),
-                          borderRadius: BorderRadius.circular(4),
+                              ? _goldDark
+                              : _subtext.withAlpha(80),
+                          borderRadius: BorderRadius.circular(3),
                         ),
                       ),
                     ),
                   ),
+
                   // Next / Get Started Button
                   ElevatedButton(
                     onPressed: () {
@@ -271,20 +267,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                      backgroundColor: _goldDark,
+                      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
+                        borderRadius: BorderRadius.circular(14),
                       ),
+                      elevation: 3,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                          _currentPage == _pages.length - 1 ? 'GET STARTED' : 'NEXT',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                            fontSize: 13,
+                            color: Colors.white,
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
                       ],
                     ),
                   ),

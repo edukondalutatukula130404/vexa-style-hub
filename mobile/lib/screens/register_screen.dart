@@ -79,7 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.textColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -107,7 +107,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppTheme.textColor,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -156,12 +156,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Full Name
                 Text(
                   'Full Name',
-                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _nameController,
-                  style: GoogleFonts.outfit(color: Colors.white),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your full name';
@@ -178,13 +178,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Email
                 Text(
                   'Email Address',
-                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: GoogleFonts.outfit(color: Colors.white),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
@@ -204,13 +204,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Password
                 Text(
                   'Password',
-                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  style: GoogleFonts.outfit(color: Colors.white),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter a password';
@@ -241,13 +241,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Confirm Password
                 Text(
                   'Confirm Password',
-                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
-                  style: GoogleFonts.outfit(color: Colors.white),
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
                   validator: (value) {
                     if (value != _passwordController.text) {
                       return 'Passwords do not match';

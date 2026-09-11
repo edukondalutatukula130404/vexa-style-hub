@@ -49,13 +49,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.textColor, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Text(
                     'Item Details',
                     style: GoogleFonts.outfit(
-                      color: Colors.white,
+                      color: AppTheme.textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -63,7 +63,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   IconButton(
                     icon: Icon(
                       _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: _isFavorite ? const Color(0xFFFF4757) : Colors.white,
+                      color: _isFavorite ? const Color(0xFFFF4757) : AppTheme.textColor,
                     ),
                     onPressed: () {
                       setState(() {
@@ -93,18 +93,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         borderRadius: BorderRadius.circular(24),
                         child: Stack(
                           children: [
-                            Image.network(
-                              widget.item.image,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: AppTheme.surfaceColor,
-                                child: const Center(
-                                  child: Icon(Icons.image_not_supported_outlined, color: AppTheme.subtextColor, size: 48),
+                            if (widget.item.image.startsWith('assets/'))
+                              Image.asset(
+                                widget.item.image,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                              )
+                            else
+                              Image.network(
+                                widget.item.image,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: AppTheme.surfaceColor,
+                                  child: const Center(
+                                    child: Icon(Icons.image_not_supported_outlined, color: AppTheme.subtextColor, size: 48),
+                                  ),
                                 ),
                               ),
-                            ),
                             Positioned(
                               top: 16,
                               left: 16,
@@ -169,7 +177,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       style: GoogleFonts.outfit(
                                         fontSize: 24,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: AppTheme.textColor,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
@@ -193,7 +201,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    '\$${widget.item.price.toStringAsFixed(2)}',
+                                    '₹${widget.item.price.toStringAsFixed(0)}',
                                     style: GoogleFonts.outfit(
                                       fontSize: 24,
                                       fontWeight: FontWeight.w800,
@@ -202,7 +210,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ),
                                   if (widget.item.oldPrice != null)
                                     Text(
-                                      '\$${widget.item.oldPrice!.toStringAsFixed(2)}',
+                                      '₹${widget.item.oldPrice!.toStringAsFixed(0)}',
                                       style: GoogleFonts.outfit(
                                         fontSize: 14,
                                         color: AppTheme.subtextColor,
@@ -221,7 +229,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             style: GoogleFonts.outfit(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppTheme.textColor,
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -260,7 +268,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             style: GoogleFonts.outfit(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppTheme.textColor,
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -310,7 +318,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 style: GoogleFonts.outfit(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppTheme.textColor,
                                 ),
                               ),
                               Container(
@@ -322,7 +330,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 child: Row(
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.remove_rounded, color: Colors.white, size: 18),
+                                      icon: const Icon(Icons.remove_rounded, color: AppTheme.textColor, size: 18),
                                       onPressed: () {
                                         if (_quantity > 1) {
                                           setState(() {
@@ -336,14 +344,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       child: Text(
                                         '$_quantity',
                                         style: GoogleFonts.outfit(
-                                          color: Colors.white,
+                                          color: AppTheme.textColor,
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                                      icon: const Icon(Icons.add_rounded, color: AppTheme.textColor, size: 18),
                                       onPressed: () {
                                         setState(() {
                                           _quantity++;
@@ -363,7 +371,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             style: GoogleFonts.outfit(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppTheme.textColor,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -413,7 +421,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       child: Text(
                         'Add to Cart',
                         style: GoogleFonts.outfit(
-                          color: Colors.white,
+                          color: AppTheme.textColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),

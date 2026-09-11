@@ -2,58 +2,113 @@ const Item = require('../models/Item');
 
 const defaultItems = [
   {
-    _id: '101',
+    _id: 'vx-08',
     name: 'Emerald Acid Wash Boxy Tee',
     description: '240 GSM heavyweight cotton with custom emerald acid wash texture and drop-shoulder silhouette.',
     price: 1899,
-    oldPrice: 2499,
+    oldPrice: 2699,
     category: 'Limited',
-    collectionType: 'Oversized 240 GSM',
-    image: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=800&auto=format&fit=crop&q=80',
+    collectionType: 'New Arrivals',
+    image: 'assets/images/tee-emerald.png',
     inStock: true
   },
   {
-    _id: '102',
+    _id: 'vx-12',
     name: 'Lavender Lilac Drop-Shoulder Tee',
     description: '240 GSM combed cotton in pastel lilac tone with luxury heavy rib collar.',
     price: 1699,
-    oldPrice: 2199,
+    oldPrice: 2399,
     category: 'Oversized',
-    collectionType: 'Oversized 240 GSM',
-    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80',
+    collectionType: 'New Arrivals',
+    image: 'assets/images/tee-lavender.png',
     inStock: true
   },
   {
-    _id: '103',
+    _id: 'vx-00',
     name: 'Gold-Embroidered Luxe Tee',
     description: 'High-density 240 GSM luxury cream cotton featuring metallic gold chest embroidery.',
     price: 1799,
-    oldPrice: 2399,
+    oldPrice: 2499,
     category: 'Limited',
-    collectionType: 'Limited Edition',
-    image: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&auto=format&fit=crop&q=80',
+    collectionType: 'Featured',
+    image: 'assets/images/hero_luxury_tshirt.png',
     inStock: true
   },
   {
-    _id: '104',
+    _id: 'vx-07',
     name: 'Vintage Rust Heavyweight Tee',
     description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
     price: 1699,
-    oldPrice: 2099,
+    oldPrice: 2399,
     category: 'Oversized',
-    collectionType: 'Explore Collections',
-    image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800&auto=format&fit=crop&q=80',
+    collectionType: 'Featured',
+    image: 'assets/images/tee-rust.png',
     inStock: true
   },
   {
-    _id: '105',
+    _id: 'vx-01',
     name: 'Obsidian Stealth Oversized Tee',
     description: 'Deep obsidian black 240 GSM pre-shrunk cotton with subtle tone-on-tone silicone branding.',
     price: 1499,
-    oldPrice: 1999,
+    oldPrice: 2199,
     category: 'Oversized',
-    collectionType: 'Explore Collections',
-    image: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80',
+    collectionType: 'Featured',
+    image: 'assets/images/tee-black.jpg',
+    inStock: true
+  },
+  {
+    _id: 'vx-02',
+    name: 'Ivory Signature Drop-Shoulder Tee',
+    description: 'Classic ivory white 240 GSM drop-shoulder silhouette with signature rib collar.',
+    price: 1399,
+    oldPrice: 1999,
+    category: 'Classic',
+    collectionType: 'Featured',
+    image: 'assets/images/tee-white.jpg',
+    inStock: true
+  },
+  {
+    _id: 'vx-03',
+    name: 'Midnight Indigo Heavyweight Tee',
+    description: 'Rich midnight navy 240 GSM heavyweight tee with double-stitched collar.',
+    price: 1599,
+    oldPrice: 2299,
+    category: 'Oversized',
+    collectionType: 'Featured',
+    image: 'assets/images/tee-navy.jpg',
+    inStock: true
+  },
+  {
+    _id: 'vx-04',
+    name: 'Desert Sand Minimalist Tee',
+    description: 'Clean desert sand 240 GSM minimalist silhouette, bio-washed for lasting softness.',
+    price: 1549,
+    oldPrice: 2149,
+    category: 'Limited',
+    collectionType: 'Featured',
+    image: 'assets/images/tee-beige.jpg',
+    inStock: true
+  },
+  {
+    _id: 'vx-05',
+    name: 'Charcoal Luxe Distressed Tee',
+    description: 'Charcoal grey 240 GSM distressed-finish luxury tee with relaxed boxy cut.',
+    price: 1449,
+    oldPrice: 2099,
+    category: 'Classic',
+    collectionType: 'Featured',
+    image: 'assets/images/tee-charcoal.jpg',
+    inStock: true
+  },
+  {
+    _id: 'vx-06',
+    name: 'Olive Military Heritage Tee',
+    description: 'Military olive 240 GSM heritage tee with garment-washed finish and relaxed oversized fit.',
+    price: 1649,
+    oldPrice: 2399,
+    category: 'Limited',
+    collectionType: 'Featured',
+    image: 'assets/images/tee-olive.jpg',
     inStock: true
   }
 ];
@@ -63,11 +118,26 @@ const defaultItems = [
 // @access  Public
 exports.getItems = async (req, res, next) => {
   try {
-    const items = await Item.find();
-    res.status(200).json({
+    const dbItems = await Item.find();
+    
+    // Official 10 mobile app products ALWAYS take top priority
+    const defaultIds = new Set(defaultItems.map(i => i._id.toLowerCase()));
+    const defaultNames = new Set(defaultItems.map(i => i.name.toLowerCase().trim()));
+
+    // Filter out old legacy seed or duplicate items from MongoDB that conflict with mobile app products
+    const extraCustomDbItems = dbItems.filter(i => {
+      const id = (i._id || i.id || '').toString().toLowerCase().trim();
+      const name = (i.name || '').toLowerCase().trim();
+      if (name.includes('emerald silk')) return false;
+      return !defaultIds.has(id) && !defaultNames.has(name);
+    });
+
+    const finalItems = [...defaultItems, ...extraCustomDbItems];
+
+    return res.status(200).json({
       success: true,
-      count: items.length,
-      data: items
+      count: finalItems.length,
+      data: finalItems
     });
   } catch (error) {
     res.status(200).json({
@@ -161,66 +231,133 @@ exports.deleteItem = async (req, res, next) => {
   }
 };
 
-// @desc    Seed initial items if DB empty
+// @desc    Seed initial items if DB empty or update unsplash images
 exports.seedItems = async () => {
   try {
+    const seedData = [
+      {
+        _id: 'vx-08',
+        name: 'Emerald Acid Wash Boxy Tee',
+        description: '240 GSM heavyweight cotton with custom emerald acid wash texture and drop-shoulder silhouette.',
+        price: 1899,
+        oldPrice: 2699,
+        category: 'Limited',
+        collectionType: 'New Arrivals',
+        image: 'assets/images/tee-emerald.png',
+        inStock: true
+      },
+      {
+        _id: 'vx-12',
+        name: 'Lavender Lilac Drop-Shoulder Tee',
+        description: '240 GSM combed cotton in pastel lilac tone with luxury heavy rib collar.',
+        price: 1699,
+        oldPrice: 2399,
+        category: 'Oversized',
+        collectionType: 'New Arrivals',
+        image: 'assets/images/tee-lavender.png',
+        inStock: true
+      },
+      {
+        _id: 'vx-00',
+        name: 'Gold-Embroidered Luxe Tee',
+        description: 'High-density 240 GSM luxury cream cotton featuring metallic gold chest embroidery.',
+        price: 1799,
+        oldPrice: 2499,
+        category: 'Limited',
+        collectionType: 'Featured',
+        image: 'assets/images/hero_luxury_tshirt.png',
+        inStock: true
+      },
+      {
+        _id: 'vx-07',
+        name: 'Vintage Rust Heavyweight Tee',
+        description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
+        price: 1699,
+        oldPrice: 2399,
+        category: 'Oversized',
+        collectionType: 'Featured',
+        image: 'assets/images/tee-rust.png',
+        inStock: true
+      },
+      {
+        _id: 'vx-01',
+        name: 'Obsidian Stealth Oversized Tee',
+        description: 'Deep obsidian black 240 GSM pre-shrunk cotton with subtle tone-on-tone silicone branding.',
+        price: 1499,
+        oldPrice: 2199,
+        category: 'Oversized',
+        collectionType: 'Featured',
+        image: 'assets/images/tee-black.jpg',
+        inStock: true
+      },
+      {
+        _id: 'vx-02',
+        name: 'Ivory Signature Drop-Shoulder Tee',
+        description: 'Classic ivory white 240 GSM drop-shoulder silhouette with signature rib collar.',
+        price: 1399,
+        oldPrice: 1999,
+        category: 'Classic',
+        collectionType: 'Featured',
+        image: 'assets/images/tee-white.jpg',
+        inStock: true
+      },
+      {
+        _id: 'vx-03',
+        name: 'Midnight Indigo Heavyweight Tee',
+        description: 'Rich midnight navy 240 GSM heavyweight tee with double-stitched collar.',
+        price: 1599,
+        oldPrice: 2299,
+        category: 'Oversized',
+        collectionType: 'Featured',
+        image: 'assets/images/tee-navy.jpg',
+        inStock: true
+      },
+      {
+        _id: 'vx-04',
+        name: 'Desert Sand Minimalist Tee',
+        description: 'Clean desert sand 240 GSM minimalist silhouette, bio-washed for lasting softness.',
+        price: 1549,
+        oldPrice: 2149,
+        category: 'Limited',
+        collectionType: 'Featured',
+        image: 'assets/images/tee-beige.jpg',
+        inStock: true
+      },
+      {
+        _id: 'vx-05',
+        name: 'Charcoal Luxe Distressed Tee',
+        description: 'Charcoal grey 240 GSM distressed-finish luxury tee with relaxed boxy cut.',
+        price: 1449,
+        oldPrice: 2099,
+        category: 'Classic',
+        collectionType: 'Featured',
+        image: 'assets/images/tee-charcoal.jpg',
+        inStock: true
+      },
+      {
+        _id: 'vx-06',
+        name: 'Olive Military Heritage Tee',
+        description: 'Military olive 240 GSM heritage tee with garment-washed finish and relaxed oversized fit.',
+        price: 1649,
+        oldPrice: 2399,
+        category: 'Limited',
+        collectionType: 'Featured',
+        image: 'assets/images/tee-olive.jpg',
+        inStock: true
+      }
+    ];
+
     const count = await Item.countDocuments();
     if (count === 0) {
       console.log('📦 Seeding initial VEXA Heavyweight T-Shirt collection items...');
-      const seedData = [
-        {
-          name: 'Emerald Acid Wash Boxy Tee',
-          description: '240 GSM heavyweight cotton with custom emerald acid wash texture and drop-shoulder silhouette.',
-          price: 1899,
-          oldPrice: 2499,
-          category: 'Limited',
-          collectionType: 'Oversized 240 GSM',
-          image: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=800&auto=format&fit=crop&q=80',
-          inStock: true
-        },
-        {
-          name: 'Lavender Lilac Drop-Shoulder Tee',
-          description: '240 GSM combed cotton in pastel lilac tone with luxury heavy rib collar.',
-          price: 1699,
-          oldPrice: 2199,
-          category: 'Oversized',
-          collectionType: 'Oversized 240 GSM',
-          image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80',
-          inStock: true
-        },
-        {
-          name: 'Gold-Embroidered Luxe Tee',
-          description: 'High-density 240 GSM luxury cream cotton featuring metallic gold chest embroidery.',
-          price: 1799,
-          oldPrice: 2399,
-          category: 'Limited',
-          collectionType: 'Limited Edition',
-          image: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&auto=format&fit=crop&q=80',
-          inStock: true
-        },
-        {
-          name: 'Vintage Rust Heavyweight Tee',
-          description: 'Heavyweight vintage rust vintage-wash finish, boxy oversized drop-shoulder cut.',
-          price: 1699,
-          oldPrice: 2099,
-          category: 'Oversized',
-          collectionType: 'Explore Collections',
-          image: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800&auto=format&fit=crop&q=80',
-          inStock: true
-        },
-        {
-          name: 'Obsidian Stealth Oversized Tee',
-          description: 'Deep obsidian black 240 GSM pre-shrunk cotton with subtle tone-on-tone silicone branding.',
-          price: 1499,
-          oldPrice: 1999,
-          category: 'Oversized',
-          collectionType: 'Explore Collections',
-          image: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80',
-          inStock: true
-        }
-      ];
       await Item.insertMany(seedData);
       console.log('✅ Default VEXA items seeded successfully into database');
+    } else {
+      // Update any items with unsplash images to use clean asset paths
+      await Item.updateMany(
+        { image: { $regex: 'unsplash.com', $options: 'i' } },
+        { $set: { image: 'assets/images/tee-emerald.png' } }
+      );
     }
   } catch (err) {
     console.error('Error seeding items:', err.message);

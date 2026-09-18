@@ -6,10 +6,21 @@ const nodemailer = require('nodemailer');
  * or automatically creates a live Ethereal Test Account for instant email delivery & inbox preview.
  */
 const createTransporter = async () => {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
 
   if (user && pass && user.trim() !== '' && pass.trim() !== '') {
+    const cleanUser = user.trim();
+    const cleanPass = pass.trim();
+
+    if (cleanUser.includes('@gmail')) {
+      return nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: cleanUser, pass: cleanPass },
+        tls: { rejectUnauthorized: false }
+      });
+    }
+
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = Number(process.env.SMTP_PORT) || 587;
 
@@ -17,7 +28,7 @@ const createTransporter = async () => {
       host,
       port,
       secure: port === 465,
-      auth: { user, pass },
+      auth: { user: cleanUser, pass: cleanPass },
       tls: { rejectUnauthorized: false }
     });
   }
@@ -48,7 +59,8 @@ const createTransporter = async () => {
  * @param {string} userName - Name of user
  */
 const sendResetCodeEmail = async (toEmail, code, userName = 'Valued Member') => {
-  const fromEmail = process.env.FROM_EMAIL || '"VEXA Luxury Wear" <noreply@vexa.com>';
+  const fromEmail = process.env.FROM_EMAIL || (process.env.EMAIL_USER ? `"VEXA Luxury Wear" <${process.env.EMAIL_USER}>` : '"VEXA Luxury Wear" <noreply@vexa.com>');
+
   const transporter = await createTransporter();
 
   const formattedCode = code.split('').join(' ');

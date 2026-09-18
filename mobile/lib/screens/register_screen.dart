@@ -82,17 +82,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.textColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_ethernet_rounded, color: AppTheme.accentColor),
-            tooltip: 'Server Connection Settings',
-            onPressed: () {
-              ServerConfigDialog.show(context).then((_) {
-                if (mounted) setState(() { _errorMessage = null; });
-              });
-            },
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

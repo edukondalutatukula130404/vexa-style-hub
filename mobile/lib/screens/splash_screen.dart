@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../config/api_config.dart';
 import '../theme/app_theme.dart';
-
-import 'home_screen.dart';
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -125,7 +124,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     _initializeAndNavigate();
   }
 
-  void _navigateToNextScreen() {
+  void _navigateToNextScreen(Widget targetScreen) {
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
 
@@ -133,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       context,
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 900),
-        pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => targetScreen,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final curvedAnim = CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic);
           return AnimatedBuilder(
@@ -154,7 +153,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   Future<void> _initializeAndNavigate() async {
     ApiConfig.autoDiscoverBackend();
     await Future.delayed(const Duration(milliseconds: 2600));
-    _navigateToNextScreen();
+    _navigateToNextScreen(const OnboardingScreen());
   }
 
   @override
@@ -170,7 +169,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
-        onTap: _navigateToNextScreen,
+        onTap: () {
+          _navigateToNextScreen(const OnboardingScreen());
+        },
         behavior: HitTestBehavior.opaque,
         child: AnimatedBuilder(
           animation: _centerOpenAnimation,

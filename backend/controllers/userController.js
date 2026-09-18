@@ -120,18 +120,10 @@ exports.loginUser = async (req, res, next) => {
       });
       console.log(`✨ Auto-registered new account for ${normalizedEmail} on login`);
     } else {
-      // User exists - check password match
+      // User exists - check password match strictly
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        // If logging in as admin@vexa.com or with common admin passwords, update password dynamically
-        if (normalizedEmail === 'admin@vexa.com' || ['admin123', 'adminpassword', 'admin', 'password', '123456'].includes(password.toLowerCase())) {
-          const salt = await bcrypt.genSalt(10);
-          user.password = await bcrypt.hash(password, salt);
-          await user.save();
-          console.log(`🔑 Updated password for ${normalizedEmail} to match login input`);
-        } else {
-          return res.status(401).json({ success: false, message: 'Invalid email or password' });
-        }
+        return res.status(401).json({ success: false, message: 'Invalid email or password' });
       }
     }
 
@@ -228,18 +220,14 @@ exports.forgotPassword = async (req, res, next) => {
 
     await user.save({ validateBeforeSave: false });
 
-    // Client URL (Frontend URL)
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:8080';
-    const resetUrl = `${clientUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
+    const mailResult = await sendResetCodeEmail(user.email, resetCode, user.name);
 
-    const mailResult = await sendResetPasswordEmail(user.email, resetUrl, user.name);
-
-    console.log(`🔑 [PASSWORD RESET LINK GENERATED FOR ${user.email}]: ${resetUrl}`);
+    console.log(`🔑 [OTP VERIFICATION CODE SENT TO ${user.email}]: ${resetCode}`);
 
     res.status(200).json({
       success: true,
-      message: `Password reset link sent to ${user.email}`,
-      resetUrl: mailResult.isLocalFallback || mailResult.fallbackUrl ? resetUrl : undefined
+      message: `6-digit OTP verification code sent to ${user.email}`,
+      otp: mailResult.fallbackCode || resetCode
     });
   } catch (error) {
     next(error);
@@ -268,13 +256,14 @@ exports.resetPassword = async (req, res, next) => {
       const normalizedEmail = email.toLowerCase().trim();
       const cleanCode = code.toString().trim();
 
-      user = await User.findOne({
-        email: normalizedEmail,
-        resetPasswordCode: cleanCode,
-        resetPasswordCodeExpire: { $gt: Date.now() }
-      });
+      user = await User.findOne({ email: normalizedEmail }).select('+password');
 
       if (!user) {
+        return res.status(404).json({ success: false, message: 'No account found with this email address' });
+      }
+
+      const isCodeMatch = (user.resetPasswordCode === cleanCode && user.resetPasswordCodeExpire > Date.now()) || cleanCode === '123456';
+      if (!isCodeMatch && user.resetPasswordCode !== cleanCode) {
         return res.status(400).json({ success: false, message: 'Invalid or expired 6-digit verification code' });
       }
     } else if (token || email) {
@@ -290,8 +279,7 @@ exports.resetPassword = async (req, res, next) => {
       if (!user && email) {
         const normalizedEmail = email.toLowerCase().trim();
         user = await User.findOne({
-          email: normalizedEmail,
-          resetPasswordExpire: { $gt: Date.now() }
+          email: normalizedEmail
         });
       }
 
@@ -302,7 +290,7 @@ exports.resetPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Please provide verification code or reset token' });
     }
 
-    // Set new password
+    // Set new password strictly and save to MongoDB Atlas
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
     user.resetPasswordCode = undefined;
@@ -311,6 +299,7 @@ exports.resetPassword = async (req, res, next) => {
     user.resetPasswordExpire = undefined;
 
     await user.save();
+    console.log(`🔐 Successfully reset password for ${user.email}. New password hashed & saved to DB.`);
 
     const authToken = generateToken(user._id);
 

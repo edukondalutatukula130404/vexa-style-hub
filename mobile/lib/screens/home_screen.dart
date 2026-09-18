@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../config/api_config.dart';
 import '../models/item_model.dart';
+import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import 'cart_screen.dart';
@@ -108,6 +109,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentTabIndex = 0;
   final List<CartItemData> _cartItems = [];
 
+  // Notifications state
+  int _unreadNotificationCount = 3;
+  final List<Map<String, dynamic>> _notifications = [
+    {
+      'id': '1',
+      'title': 'Limited Edition Drop Live! 🚀',
+      'body': 'Urban Silhouette 240 GSM Collection is now live. Claim yours before stocks run out.',
+      'time': '10m ago',
+      'isRead': false,
+      'icon': Icons.bolt_rounded,
+      'color': _gold,
+    },
+    {
+      'id': '2',
+      'title': 'Order Dispatched 📦',
+      'body': 'Your order #VX-8834 is out for delivery. Track package in your profile.',
+      'time': '2h ago',
+      'isRead': false,
+      'icon': Icons.local_shipping_outlined,
+      'color': Color(0xFF2563EB),
+    },
+    {
+      'id': '3',
+      'title': 'VIP Loyalty Access Unlocked 👑',
+      'body': 'You earned 150 VEXA Points! Enjoy early preview for next week\'s dropped styles.',
+      'time': '1d ago',
+      'isRead': false,
+      'icon': Icons.workspace_premium_outlined,
+      'color': Color(0xFFD97706),
+    },
+  ];
+
   // Auto-cycle promo banner
   int _bannerIndex = 0;
   Timer? _bannerTimer;
@@ -159,12 +192,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mounted) _loadUserAndItems();
   }
 
+  void _updateUserNotifications(UserModel? user) {
+    if (user == null) return;
+
+    final welcomeId = 'welcome_${user.id}';
+    if (!_notifications.any((n) => n['id'] == welcomeId)) {
+      final name = user.name.isNotEmpty ? user.name : 'VEXA Collector';
+      final emailDisplay = user.email.isNotEmpty ? ' (${user.email})' : '';
+      _notifications.insert(0, {
+        'id': welcomeId,
+        'title': 'Welcome Back, $name! 👋',
+        'body': 'You have successfully signed in to your VEXA account$emailDisplay. Enjoy member privileges & exclusive 240 GSM drops.',
+        'time': 'Just now',
+        'isRead': false,
+        'icon': Icons.lock_open_rounded,
+        'color': _gold,
+      });
+
+      _unreadNotificationCount = _notifications.where((n) => n['isRead'] == false).length;
+    }
+  }
+
   Future<void> _loadUserAndItems() async {
     final user = await AuthService.getUser();
     final realUser = user != null && user.id != 'guest_user';
     if (mounted) {
       setState(() {
         _isRealUser = realUser;
+        if (user != null) {
+          _updateUserNotifications(user);
+        }
       });
     }
 
@@ -389,8 +446,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   // 5. SERVICES BAR (WhatsApp Order)
                   SliverToBoxAdapter(child: _buildServicesBar()),
 
-                  // 6. JOIN VEXA CTA (Last)
-                  SliverToBoxAdapter(child: _buildJoinCta()),
+                  // 6. JOIN VEXA CTA (Only shown in Guest mode)
+                  if (!_isRealUser) SliverToBoxAdapter(child: _buildJoinCta()),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 24)),
                 ],
@@ -431,9 +488,692 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
-      actions: const [],
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12.0),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(8),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    if (!_isRealUser) {
+                      _showGuestNotificationPrompt();
+                    } else {
+                      _showNotificationsSheet();
+                    }
+                  },
+                  icon: const Icon(Icons.notifications_outlined, color: _textDark, size: 22),
+                  tooltip: 'Notifications',
+                ),
+              ),
+              if (_isRealUser && _unreadNotificationCount > 0)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: _gold,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$_unreadNotificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
+
+  Widget _buildNotificationFeatureRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: _gold.withAlpha(25),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _gold.withAlpha(60)),
+          ),
+          child: Icon(icon, color: _goldDark, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  color: _textDark,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  color: _subtext,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showGuestNotificationPrompt() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Notifications',
+      barrierColor: Colors.black.withAlpha(140),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
+      transitionBuilder: (context, anim1, anim2, child) {
+        final slideTween = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.easeOutCubic));
+
+        return SlideTransition(
+          position: anim1.drive(slideTween),
+          child: Scaffold(
+            backgroundColor: _bgColor,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 1,
+              shadowColor: Colors.black.withAlpha(15),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _gold.withAlpha(25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.notifications_outlined, color: _gold, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'NOTIFICATIONS',
+                    style: GoogleFonts.cinzel(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                      color: _textDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            body: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 12),
+                    // Centered Gold Lock Emblem with Glow Ring
+                    Container(
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: _gold.withAlpha(20),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _gold.withAlpha(80), width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _gold.withAlpha(30),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.lock_outline_rounded,
+                        color: _goldDark,
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'SIGN IN TO VIEW NOTIFICATIONS',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.cinzel(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.4,
+                        color: _textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'Please sign in to your VEXA account to view your personalized notifications, drop alerts, and order updates.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          color: _subtext,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Luxury Notification Perks preview card
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(8),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildNotificationFeatureRow(
+                            icon: Icons.local_shipping_outlined,
+                            title: 'Order Status & Live Tracking',
+                            subtitle: 'Get real-time updates on dispatch and delivery.',
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            child: Divider(height: 1, color: _border),
+                          ),
+                          _buildNotificationFeatureRow(
+                            icon: Icons.bolt_rounded,
+                            title: 'Exclusive 240 GSM Drops',
+                            subtitle: 'First access to limited edition drop collections.',
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            child: Divider(height: 1, color: _border),
+                          ),
+                          _buildNotificationFeatureRow(
+                            icon: Icons.workspace_premium_outlined,
+                            title: 'VIP Loyalty Rewards',
+                            subtitle: 'Earn points and receive exclusive member coupons.',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Action buttons
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _goldDark,
+                          elevation: 2,
+                          shadowColor: _goldDark.withAlpha(80),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, '/login');
+                        },
+                        child: Text(
+                          'SIGN IN NOW',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: _gold, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, '/register');
+                        },
+                        child: Text(
+                          'CREATE AN ACCOUNT',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                            color: _goldDark,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.outfit(
+                          color: _subtext,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showNotificationsSheet() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Notifications',
+      barrierColor: Colors.black.withAlpha(140),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
+      transitionBuilder: (context, anim1, anim2, child) {
+        final slideTween = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.easeOutCubic));
+
+        return SlideTransition(
+          position: anim1.drive(slideTween),
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              final hasUnread = _notifications.any((n) => n['isRead'] == false);
+              final hasNotifications = _notifications.isNotEmpty;
+
+              return Scaffold(
+                backgroundColor: _bgColor,
+                appBar: AppBar(
+                  backgroundColor: Colors.white,
+                  elevation: 1,
+                  shadowColor: Colors.black.withAlpha(15),
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: _gold.withAlpha(25),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.notifications_outlined, color: _gold, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'NOTIFICATIONS',
+                        style: GoogleFonts.cinzel(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                          color: _textDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: const [],
+                ),
+                body: SafeArea(
+                  child: Column(
+                    children: [
+                      // Sub-header Action Bar: Read All (if unread) & Delete All
+                      if (hasNotifications)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          color: Colors.white,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${_notifications.length} ${_notifications.length == 1 ? 'Notification' : 'Notifications'}',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _subtext,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  // ONLY SHOW READ ALL OPTION IF THERE ARE UNREAD NOTIFICATIONS
+                                  if (hasUnread)
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () {
+                                        setSheetState(() {
+                                          for (var n in _notifications) {
+                                            n['isRead'] = true;
+                                          }
+                                          _unreadNotificationCount = 0;
+                                        });
+                                        setState(() {
+                                          _unreadNotificationCount = 0;
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.done_all_rounded, color: _goldDark, size: 18),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Read All',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                                color: _goldDark,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  if (hasUnread) const SizedBox(width: 12),
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () {
+                                      setSheetState(() {
+                                        _notifications.clear();
+                                        _unreadNotificationCount = 0;
+                                      });
+                                      setState(() {
+                                        _unreadNotificationCount = 0;
+                                      });
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.delete_outline_rounded, color: Color(0xFFE53935), size: 18),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Delete All',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFFE53935),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      const Divider(height: 1),
+
+                      // Notification Items List
+                      Expanded(
+                        child: _notifications.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(20),
+                                      decoration: const BoxDecoration(
+                                        color: _surfaceBg,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(Icons.notifications_off_outlined, size: 54, color: Colors.grey.shade400),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No Notifications Yet',
+                                      style: GoogleFonts.cinzel(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'You\'re all caught up! Check back for drop alerts & order updates.',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _notifications.length,
+                                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  final n = _notifications[index];
+                                  final isUnread = n['isRead'] == false;
+
+                                  return Dismissible(
+                                    key: Key(n['id'] as String),
+                                    direction: DismissDirection.endToStart, // Left swipe
+                                    background: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: const EdgeInsets.only(right: 20),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFEBEB),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: const Color(0xFFFCA5A5).withAlpha(120)),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          const Icon(Icons.delete_outline_rounded, color: Color(0xFFE53935), size: 22),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Remove',
+                                            style: GoogleFonts.outfit(
+                                              color: const Color(0xFFE53935),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    onDismissed: (direction) {
+                                      final removedTitle = n['title'] as String;
+                                      setSheetState(() {
+                                        _notifications.removeAt(index);
+                                        _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                      });
+                                      setState(() {
+                                        _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                      });
+
+                                      ScaffoldMessenger.of(context).clearSnackBars();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Removed "$removedTitle"'),
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 2),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      );
+                                    },
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(16),
+                                      onTap: () {
+                                        if (isUnread) {
+                                          setSheetState(() {
+                                            n['isRead'] = true;
+                                            _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                          });
+                                          setState(() {
+                                            _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                          });
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: isUnread ? Colors.white : _bgColor,
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: isUnread ? _gold.withAlpha(120) : _border,
+                                            width: isUnread ? 1.5 : 1.0,
+                                          ),
+                                          boxShadow: isUnread
+                                              ? [
+                                                  BoxShadow(
+                                                    color: _gold.withAlpha(20),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 3),
+                                                  ),
+                                                ]
+                                              : [],
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Stack(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: (n['color'] as Color).withAlpha(25),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: Icon(n['icon'] as IconData, color: n['color'] as Color, size: 22),
+                                                ),
+                                                if (isUnread)
+                                                  Positioned(
+                                                    top: 0,
+                                                    right: 0,
+                                                    child: Container(
+                                                      width: 10,
+                                                      height: 10,
+                                                      decoration: const BoxDecoration(
+                                                        color: _gold,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                            const SizedBox(width: 14),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          n['title'] as String,
+                                                          style: GoogleFonts.outfit(
+                                                            fontWeight: isUnread ? FontWeight.w800 : FontWeight.bold,
+                                                            fontSize: 14.5,
+                                                            color: _textDark,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        n['time'] as String,
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 11.5,
+                                                          color: isUnread ? _goldDark : _subtext,
+                                                          fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    n['body'] as String,
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 12.5,
+                                                      color: _subtext,
+                                                      height: 1.4,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
 
   // ── 3. FEATURES GRID ──────────────────────────────────────────────────
   Widget _buildFeaturesSection() {

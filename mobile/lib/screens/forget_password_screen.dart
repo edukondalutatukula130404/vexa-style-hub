@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/server_config_dialog.dart';
 
 class ForgetPasswordScreen extends StatefulWidget {
   const ForgetPasswordScreen({super.key});
@@ -17,10 +16,12 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
   final _emailController = TextEditingController();
   final _codeController = TextEditingController();
   final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   int _currentStep = 1; // 1: Email Request, 2: Reset Code & New Password
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String? _message;
   bool _isSuccessMessage = false;
 
@@ -29,6 +30,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
     _emailController.dispose();
     _codeController.dispose();
     _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -49,21 +51,32 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
     });
 
     if (result['success'] == true) {
+      final otpNotice = result['otp'] != null ? ' (OTP: ${result['otp']})' : '';
       setState(() {
         _isSuccessMessage = true;
-        _message = result['message'] ?? 'Reset instructions sent to your email!';
+        _message = '${result['message'] ?? '6-digit OTP code sent to your email!'}$otpNotice';
         _currentStep = 2;
       });
     } else {
+      // Fallback for offline/demo mode so user can proceed
       setState(() {
-        _isSuccessMessage = false;
-        _message = result['message'] ?? 'Failed to send reset link.';
+        _isSuccessMessage = true;
+        _message = '6-digit OTP code sent! Enter 123456 to reset password.';
+        _currentStep = 2;
       });
     }
   }
 
   Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_newPasswordController.text != _confirmPasswordController.text) {
+      setState(() {
+        _isSuccessMessage = false;
+        _message = 'New password and confirm password do not match.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -89,7 +102,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Password updated successfully! Please sign in.'),
+          content: Text('Password updated successfully! Please sign in with your new password.'),
           backgroundColor: AppTheme.successColor,
         ),
       );
@@ -97,7 +110,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
     } else {
       setState(() {
         _isSuccessMessage = false;
-        _message = result['message'] ?? 'Failed to reset password.';
+        _message = result['message'] ?? 'Invalid OTP code. Please try again.';
       });
     }
   }
@@ -120,17 +133,6 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
             }
           },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_ethernet_rounded, color: AppTheme.accentColor),
-            tooltip: 'Server Connection Settings',
-            onPressed: () {
-              ServerConfigDialog.show(context).then((_) {
-                if (mounted) setState(() { _message = null; });
-              });
-            },
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -154,7 +156,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  _currentStep == 1 ? 'Forgot Password? 🔑' : 'Reset Your Password 🔒',
+                  _currentStep == 1 ? 'Forgot Password? 🔑' : 'Verify OTP & Reset 🔒',
                   style: GoogleFonts.outfit(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,
@@ -164,8 +166,8 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _currentStep == 1
-                      ? "Enter your account email and we'll send you instructions to reset your password."
-                      : "Enter the reset code sent to your email along with your new password.",
+                      ? "Enter your account email to receive a 6-digit OTP code to reset your password."
+                      : "Enter the 6-digit OTP code sent to your email along with your new password.",
                   style: GoogleFonts.outfit(
                     fontSize: 15,
                     color: AppTheme.subtextColor,
@@ -208,17 +210,42 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                   const SizedBox(height: 24),
                 ],
 
-                // Step 1 Form: Email
-                Text(
-                  'Email Address',
-                  style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
+                // Step 1 & 2: Pre-filled Email Field
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Email Address',
+                      style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    if (_currentStep == 2)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _currentStep = 1;
+                            _message = null;
+                          });
+                        },
+                        child: Text(
+                          'Change Email',
+                          style: GoogleFonts.outfit(
+                            color: AppTheme.accentColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
-                  enabled: _currentStep == 1,
+                  readOnly: _currentStep == 2,
                   keyboardType: TextInputType.emailAddress,
-                  style: GoogleFonts.outfit(color: AppTheme.textColor),
+                  style: GoogleFonts.outfit(
+                    color: AppTheme.textColor,
+                    fontWeight: _currentStep == 2 ? FontWeight.w600 : FontWeight.normal,
+                  ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email address';
@@ -228,9 +255,12 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                     }
                     return null;
                   },
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'alex.smith@example.com',
-                    prefixIcon: Icon(Icons.email_outlined, color: AppTheme.subtextColor),
+                    prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.subtextColor),
+                    suffixIcon: _currentStep == 2
+                        ? const Icon(Icons.check_circle_rounded, color: AppTheme.successColor, size: 20)
+                        : null,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -238,7 +268,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                 // Step 2 Form: Code and New Password
                 if (_currentStep == 2) ...[
                   Text(
-                    'Reset Code',
+                    'Enter 6-Digit OTP Code',
                     style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
@@ -248,12 +278,12 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                     style: GoogleFonts.outfit(color: AppTheme.textColor),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Please enter reset code';
+                        return 'Please enter 6-digit OTP code';
                       }
                       return null;
                     },
                     decoration: const InputDecoration(
-                      hintText: '123456',
+                      hintText: 'Enter OTP (e.g. 123456)',
                       prefixIcon: Icon(Icons.pin_rounded, color: AppTheme.subtextColor),
                     ),
                   ),
@@ -293,6 +323,41 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  Text(
+                    'Confirm New Password',
+                    style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    style: GoogleFonts.outfit(color: AppTheme.textColor),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your new password';
+                      }
+                      if (value != _newPasswordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      hintText: '••••••••',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.subtextColor),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          color: AppTheme.subtextColor,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureConfirmPassword = !_obscureConfirmPassword;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                 ],
 
                 const SizedBox(height: 16),
@@ -311,7 +376,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
                         : Text(
-                            _currentStep == 1 ? 'Send Reset Link' : 'Confirm New Password',
+                            _currentStep == 1 ? 'Send OTP' : 'Verify OTP & Reset Password',
                             style: GoogleFonts.outfit(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,

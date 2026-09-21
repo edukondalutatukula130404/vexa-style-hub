@@ -41,7 +41,7 @@ const defaultItems = [
     price: 1699,
     oldPrice: 2399,
     category: 'Oversized',
-    collectionType: 'Featured',
+    collectionType: 'New Arrivals',
     image: 'assets/images/tee-rust.png',
     inStock: true
   },
@@ -85,7 +85,7 @@ const defaultItems = [
     price: 1549,
     oldPrice: 2149,
     category: 'Limited',
-    collectionType: 'Featured',
+    collectionType: 'New Arrivals',
     image: 'assets/images/tee-beige.jpg',
     inStock: true
   },
@@ -107,7 +107,7 @@ const defaultItems = [
     price: 1649,
     oldPrice: 2399,
     category: 'Limited',
-    collectionType: 'Featured',
+    collectionType: 'New Arrivals',
     image: 'assets/images/tee-olive.jpg',
     inStock: true
   }
@@ -275,7 +275,7 @@ exports.seedItems = async () => {
         price: 1699,
         oldPrice: 2399,
         category: 'Oversized',
-        collectionType: 'Featured',
+        collectionType: 'New Arrivals',
         image: 'assets/images/tee-rust.png',
         inStock: true
       },
@@ -319,7 +319,7 @@ exports.seedItems = async () => {
         price: 1549,
         oldPrice: 2149,
         category: 'Limited',
-        collectionType: 'Featured',
+        collectionType: 'New Arrivals',
         image: 'assets/images/tee-beige.jpg',
         inStock: true
       },
@@ -341,7 +341,7 @@ exports.seedItems = async () => {
         price: 1649,
         oldPrice: 2399,
         category: 'Limited',
-        collectionType: 'Featured',
+        collectionType: 'New Arrivals',
         image: 'assets/images/tee-olive.jpg',
         inStock: true
       }

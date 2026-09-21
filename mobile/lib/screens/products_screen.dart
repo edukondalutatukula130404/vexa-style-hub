@@ -456,14 +456,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               child: const Icon(Icons.grid_view_rounded, color: _gold, size: 18),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('VEXA CATALOG', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 2, color: _gold)),
-                Text('All Products (${filtered.length})', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
-              ],
-            ),
+            Text('All Products (${filtered.length})', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
           ],
         ),
       ),
@@ -479,7 +472,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     onChanged: (v) => setState(() => _searchQuery = v),
                     style: GoogleFonts.outfit(color: _textDark),
                     decoration: InputDecoration(
-                      hintText: 'Search tees, colors, styles...',
                       prefixIcon: const Icon(Icons.search_rounded, color: _subtext),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(icon: const Icon(Icons.close_rounded, color: _subtext), onPressed: () => setState(() => _searchQuery = ''))

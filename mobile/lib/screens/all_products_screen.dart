@@ -112,7 +112,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
               onChanged: (v) => setState(() => _searchQuery = v),
               style: GoogleFonts.outfit(color: _textDark),
               decoration: InputDecoration(
-                hintText: 'Search tees, tops, jackets...',
                 prefixIcon: const Icon(Icons.search_rounded, color: _subtext),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(icon: const Icon(Icons.close_rounded, color: _subtext), onPressed: () => setState(() => _searchQuery = ''))

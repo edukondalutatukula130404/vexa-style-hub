@@ -211,32 +211,41 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Logo Emblem (Scale + Fade Pop)
+                          // Logo Emblem (Scale + Fade Pop) - Sleek Black Box with Gold 'V'
                           FadeTransition(
                             opacity: _logoFade,
                             child: ScaleTransition(
                               scale: _logoScale,
                               child: Container(
-                                padding: const EdgeInsets.all(24),
+                                width: 92,
+                                height: 92,
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF8B6508), Color(0xFFD4AF37), Color(0xFFB8860B)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(color: const Color(0xFFB8860B).withAlpha(160), width: 1.5),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFD4AF37).withAlpha(150),
+                                      color: const Color(0xFFB8860B).withAlpha(100),
                                       blurRadius: 36,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                    BoxShadow(
+                                      color: Colors.black.withAlpha(200),
+                                      blurRadius: 20,
                                       offset: const Offset(0, 10),
                                     ),
                                   ],
                                 ),
-                                child: const Icon(
-                                  Icons.checkroom_rounded,
-                                  size: 64,
-                                  color: Colors.black,
+                                child: Center(
+                                  child: Text(
+                                    'V',
+                                    style: GoogleFonts.cinzel(
+                                      fontSize: 54,
+                                      fontWeight: FontWeight.w900,
+                                      color: const Color(0xFFB8860B),
+                                      height: 1.1,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -250,15 +259,15 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                             child: FadeTransition(
                               opacity: _titleFade,
                               child: Text(
-                                'VEXA',
+                                'V E X A',
                                 style: GoogleFonts.cinzel(
-                                  fontSize: 58,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 12,
-                                  color: const Color(0xFFD4AF37),
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 10,
+                                  color: const Color(0xFFB8860B),
                                   shadows: [
                                     Shadow(
-                                      color: const Color(0xFFD4AF37).withAlpha(120),
+                                      color: const Color(0xFFB8860B).withAlpha(140),
                                       blurRadius: 20,
                                     ),
                                   ],
@@ -267,26 +276,26 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                             ),
                           ),
 
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
 
-                          // STYLE HUB Subtitle (Slide-Up + Fade)
+                          // WEAR CONFIDENCE Tagline Subtitle (Slide-Up + Fade)
                           SlideTransition(
                             position: _subtitleOffset,
                             child: FadeTransition(
                               opacity: _subtitleFade,
                               child: Text(
-                                'STYLE HUB',
+                                'WEAR CONFIDENCE',
                                 style: GoogleFonts.outfit(
-                                  fontSize: 16,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  letterSpacing: 6,
-                                  color: Colors.white,
+                                  letterSpacing: 5.5,
+                                  color: const Color(0xFF94A3B8),
                                 ),
                               ),
                             ),
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
 
                           // Luxury Badge (Staggered Scale)
                           ScaleTransition(
@@ -294,25 +303,25 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                             child: FadeTransition(
                               opacity: _subtitleFade,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withAlpha(140),
-                                  border: Border.all(color: const Color(0xFFD4AF37).withAlpha(160)),
+                                  color: Colors.black.withAlpha(160),
+                                  border: Border.all(color: const Color(0xFFB8860B).withAlpha(160)),
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFD4AF37).withAlpha(30),
-                                      blurRadius: 10,
+                                      color: const Color(0xFFB8860B).withAlpha(40),
+                                      blurRadius: 12,
                                     ),
                                   ],
                                 ),
                                 child: Text(
-                                  'LUXURY HEAVYWEIGHT ATTIRE',
+                                  'LUXURY HEAVYWEIGHT ATTIRE • EST. 2026',
                                   style: GoogleFonts.outfit(
                                     fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 2.5,
-                                    color: const Color(0xFFD4AF37),
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 2.2,
+                                    color: const Color(0xFFB8860B),
                                   ),
                                 ),
                               ),

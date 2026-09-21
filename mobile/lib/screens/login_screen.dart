@@ -134,6 +134,34 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
+                  // Top Left Back Button
+                  Positioned(
+                    top: topPadding + 12,
+                    left: 20,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          } else {
+                            Navigator.pushReplacementNamed(context, '/home');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(35),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withAlpha(200), width: 1.2),
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ),
+                  ),
+
                   // Top Right Guest Pill Button
                   Positioned(
                     top: topPadding + 12,

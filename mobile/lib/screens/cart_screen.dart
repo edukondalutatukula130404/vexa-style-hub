@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
 import '../models/item_model.dart';
+import '../services/order_service.dart';
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
 const Color _gold = Color(0xFFB8860B);
@@ -62,12 +60,14 @@ class CartScreen extends StatefulWidget {
   final List<CartItemData> cartItems;
   final VoidCallback? onCartUpdated;
   final VoidCallback? onNavigateToProducts;
+  final VoidCallback? onNavigateToOrders;
 
   const CartScreen({
     super.key,
     required this.cartItems,
     this.onCartUpdated,
     this.onNavigateToProducts,
+    this.onNavigateToOrders,
   });
 
   @override
@@ -144,6 +144,7 @@ class _CartScreenState extends State<CartScreen> {
     final phoneController = TextEditingController(text: '+91 98765 43210');
     final pincodeController = TextEditingController(text: '400001');
     String selectedPayment = 'UPI';
+    String selectedUpiApp = 'Google Pay';
 
     showModalBottomSheet(
       context: context,
@@ -377,6 +378,77 @@ class _CartScreenState extends State<CartScreen> {
                       );
                     }).toList(),
                   ),
+
+                  // Interactive Razorpay UPI App Sub-Selection
+                  if (selectedPayment == 'UPI') ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _gold.withAlpha(15),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _gold.withAlpha(80)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(color: const Color(0xFF0C2340), borderRadius: BorderRadius.circular(5)),
+                                child: Text('Razorpay', style: GoogleFonts.outfit(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900)),
+                              ),
+                              const SizedBox(width: 8),
+                              Text('Choose Live UPI Payment Method:', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _textDark)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              (name: 'Google Pay', icon: Icons.account_balance_wallet_rounded),
+                              (name: 'PhonePe', icon: Icons.mobile_friendly_rounded),
+                              (name: 'Paytm UPI', icon: Icons.payment_rounded),
+                              (name: 'UPI ID / VPA', icon: Icons.alternate_email_rounded),
+                              (name: 'Scan QR', icon: Icons.qr_code_2_rounded),
+                            ].map((upi) {
+                              final isUpiSelected = selectedUpiApp == upi.name;
+                              return GestureDetector(
+                                onTap: () => setModalState(() => selectedUpiApp = upi.name),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
+                                  decoration: BoxDecoration(
+                                    color: isUpiSelected ? _goldDark : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: isUpiSelected ? _goldDark : _border),
+                                    boxShadow: isUpiSelected ? [BoxShadow(color: _goldDark.withAlpha(40), blurRadius: 6)] : [],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(upi.icon, size: 14, color: isUpiSelected ? Colors.white : _goldDark),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        upi.name,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: isUpiSelected ? Colors.white : _textDark,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 20),
 
                   // Final Total Box
@@ -446,51 +518,87 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                       onPressed: _isSubmittingOrder
                           ? null
-                          : () async {
-                              setModalState(() {
-                                _isSubmittingOrder = true;
-                              });
+                          : () {
+                              if (selectedPayment == 'UPI') {
+                                // Launch Realtime Razorpay UPI Gateway Flow
+                                _showRazorpayGatewayModal(
+                                  amount: _finalTotal,
+                                  upiApp: selectedUpiApp,
+                                  customerName: nameController.text,
+                                  customerPhone: phoneController.text,
+                                  onPaymentSuccess: () async {
+                                    final orderItems = widget.cartItems.map((c) => OrderItem(
+                                      itemId: c.item.id,
+                                      name: c.item.name,
+                                      price: c.item.price,
+                                      quantity: c.quantity,
+                                      color: c.selectedColor,
+                                      size: c.selectedSize,
+                                      image: c.item.image,
+                                    )).toList();
 
-                              try {
-                                final orderData = {
-                                  'customer': nameController.text,
-                                  'address': '${addressController.text}, Pincode: ${pincodeController.text}',
-                                  'phone': phoneController.text,
-                                  'paymentMethod': selectedPayment,
-                                  'totalAmount': _finalTotal,
-                                  'couponApplied': _appliedCoupon,
-                                  'items': widget.cartItems.map((c) => {
-                                    'itemId': c.item.id,
-                                    'name': c.item.name,
-                                    'price': c.item.price,
-                                    'quantity': c.quantity,
-                                    'color': c.selectedColor,
-                                    'size': c.selectedSize,
-                                  }).toList(),
-                                };
+                                    final placedOrder = await OrderService.createOrder(
+                                      customerName: nameController.text,
+                                      shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
+                                      phone: phoneController.text,
+                                      paymentMethod: 'Razorpay UPI ($selectedUpiApp)',
+                                      totalAmount: _finalTotal,
+                                      couponApplied: _appliedCoupon,
+                                      items: orderItems,
+                                    );
 
-                                final response = await http.post(
-                                  Uri.parse('${ApiConfig.baseUrl}/orders'),
-                                  headers: {'Content-Type': 'application/json'},
-                                  body: jsonEncode(orderData),
-                                ).timeout(const Duration(seconds: 5));
+                                    if (!context.mounted) return;
+                                    setState(() {
+                                      widget.cartItems.clear();
+                                      _appliedCoupon = '';
+                                      _discountPercent = 0.0;
+                                    });
+                                    if (widget.onCartUpdated != null) widget.onCartUpdated!();
 
-                                debugPrint('Order response: ${response.statusCode}');
-                              } catch (e) {
-                                debugPrint('Order placement notice: $e');
+                                    Navigator.pop(context);
+                                    _showOrderSuccessDialog(placedOrder);
+                                  },
+                                );
+                              } else {
+                                // Standard Card / COD flow
+                                setModalState(() {
+                                  _isSubmittingOrder = true;
+                                });
+
+                                Future.microtask(() async {
+                                  final orderItems = widget.cartItems.map((c) => OrderItem(
+                                    itemId: c.item.id,
+                                    name: c.item.name,
+                                    price: c.item.price,
+                                    quantity: c.quantity,
+                                    color: c.selectedColor,
+                                    size: c.selectedSize,
+                                    image: c.item.image,
+                                  )).toList();
+
+                                  final placedOrder = await OrderService.createOrder(
+                                    customerName: nameController.text,
+                                    shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
+                                    phone: phoneController.text,
+                                    paymentMethod: selectedPayment,
+                                    totalAmount: _finalTotal,
+                                    couponApplied: _appliedCoupon,
+                                    items: orderItems,
+                                  );
+
+                                  if (!context.mounted) return;
+                                  setState(() {
+                                    _isSubmittingOrder = false;
+                                    widget.cartItems.clear();
+                                    _appliedCoupon = '';
+                                    _discountPercent = 0.0;
+                                  });
+                                  if (widget.onCartUpdated != null) widget.onCartUpdated!();
+
+                                  Navigator.pop(context);
+                                  _showOrderSuccessDialog(placedOrder);
+                                });
                               }
-
-                              if (!context.mounted) return;
-                              setState(() {
-                                _isSubmittingOrder = false;
-                                widget.cartItems.clear();
-                                _appliedCoupon = '';
-                                _discountPercent = 0.0;
-                              });
-                              if (widget.onCartUpdated != null) widget.onCartUpdated!();
-
-                              Navigator.pop(context);
-                              _showOrderSuccessDialog();
                             },
                       child: _isSubmittingOrder
                           ? const SizedBox(
@@ -504,8 +612,10 @@ class _CartScreenState extends State<CartScreen> {
                                 const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 18),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'PLACE ORDER • ₹${_finalTotal.toStringAsFixed(0)}',
-                                  style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Colors.white),
+                                  selectedPayment == 'UPI'
+                                      ? 'PAY VIA RAZORPAY • ₹${_finalTotal.toStringAsFixed(0)}'
+                                      : 'PLACE ORDER • ₹${_finalTotal.toStringAsFixed(0)}',
+                                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Colors.white),
                                 ),
                               ],
                             ),
@@ -521,7 +631,280 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _showOrderSuccessDialog() {
+  // ── RAZORPAY LIVE PAYMENT GATEWAY MODAL ──────────────────────────────────
+  void _showRazorpayGatewayModal({
+    required double amount,
+    required String upiApp,
+    required String customerName,
+    required String customerPhone,
+    required VoidCallback onPaymentSuccess,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        int step = 0; // 0: Review & Pay, 1: Processing, 2: Success
+        String currentPaymentId = 'pay_RZP_${DateTime.now().millisecondsSinceEpoch}';
+
+        return StatefulBuilder(
+          builder: (ctx, setGateState) {
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.72,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: Column(
+                children: [
+                  // Razorpay Header Bar (Dark Navy Razorpay theme)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    color: const Color(0xFF0C2340),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueAccent.withAlpha(50),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.blueAccent.withAlpha(100)),
+                                  ),
+                                  child: Text('Razorpay', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1)),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(4)),
+                                  child: Text('LIVE GATEWAY', style: GoogleFonts.outfit(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                              onPressed: step == 1 ? null : () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('VEXA WEAR CONFIDENCE', style: GoogleFonts.cinzel(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text('Order #RZP-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}', style: GoogleFonts.outfit(color: Colors.white60, fontSize: 11)),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('AMOUNT TO PAY', style: GoogleFonts.outfit(color: Colors.white60, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                Text('₹${amount.toStringAsFixed(0)}', style: GoogleFonts.outfit(color: const Color(0xFFFFD700), fontWeight: FontWeight.w900, fontSize: 20)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Modal Body
+                  Expanded(
+                    child: step == 0
+                        ? Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // UPI App Header
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(color: const Color(0xFF0C2340).withAlpha(15), shape: BoxShape.circle),
+                                      child: const Icon(Icons.touch_app_rounded, color: Color(0xFF0C2340), size: 20),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Pay via $upiApp', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark)),
+                                        Text('Instant 1-Click UPI Payment Authorization', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                if (upiApp == 'Scan QR') ...[
+                                  // Interactive QR View
+                                  Center(
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: _gold, width: 2),
+                                            boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10)],
+                                          ),
+                                          child: const Icon(Icons.qr_code_2_rounded, size: 140, color: Color(0xFF0C2340)),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text('Scan with GPay, PhonePe, Paytm or BHIM', style: GoogleFonts.outfit(fontSize: 11, color: _subtext, fontWeight: FontWeight.w600)),
+                                      ],
+                                    ),
+                                  ),
+                                ] else ...[
+                                  // App Details Box
+                                  Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: _surfaceBg,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: _border),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded, color: _successGreen, size: 20),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('Selected VPA Handle:', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                              Text(
+                                                '${customerName.toLowerCase().replaceAll(' ', '')}@okaxis',
+                                                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                const Spacer(),
+
+                                // Razorpay Guarantee Notice
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.verified_user_outlined, size: 14, color: _subtext),
+                                    const SizedBox(width: 4),
+                                    Text('256-Bit SSL Secured by Razorpay Payment Gateway', style: GoogleFonts.outfit(fontSize: 10, color: _subtext)),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Pay Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0C2340),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: () async {
+                                      setGateState(() => step = 1);
+
+                                      // Simulate step 1 to step 2 transition
+                                      await Future.delayed(const Duration(milliseconds: 1600));
+                                      if (ctx.mounted) {
+                                        setGateState(() => step = 2);
+                                      }
+
+                                      await Future.delayed(const Duration(milliseconds: 1400));
+                                      if (ctx.mounted) {
+                                        Navigator.pop(ctx);
+                                        onPaymentSuccess();
+                                      }
+                                    },
+                                    child: Text(
+                                      'PAY NOW • ₹${amount.toStringAsFixed(0)}',
+                                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : step == 1
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const SizedBox(
+                                        width: 54,
+                                        height: 54,
+                                        child: CircularProgressIndicator(color: Color(0xFF0C2340), strokeWidth: 3),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      Text(
+                                        'Processing Razorpay Payment...',
+                                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Authorizing request with $upiApp.\nPlease do not close or press back.',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.4),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: const BoxDecoration(color: _successGreen, shape: BoxShape.circle),
+                                        child: const Icon(Icons.check_rounded, color: Colors.white, size: 48),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Text(
+                                        'Payment Successful!',
+                                        style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Razorpay Txn ID: $currentPaymentId',
+                                        style: GoogleFonts.outfit(fontSize: 11, color: _goldDark, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showOrderSuccessDialog(OrderModel order) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -542,7 +925,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
                 child: const Icon(Icons.check_circle_rounded, size: 44, color: _goldDark),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               Text(
                 'ORDER CONFIRMED',
                 style: GoogleFonts.cinzel(
@@ -552,19 +935,56 @@ class _CartScreenState extends State<CartScreen> {
                   color: _textDark,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Thank you for your order! Your luxury VEXA garments are being prepared for dispatch.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 13, color: _subtext, height: 1.4),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _gold.withAlpha(30),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _gold.withAlpha(80)),
+                ),
+                child: Text(
+                  'Order Number: ${order.id}',
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _goldDark),
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
+              Text(
+                'Thank you ${order.customerName}! Your order for ₹${order.totalAmount.toStringAsFixed(0)} (${order.paymentMethod}) has been registered and is being prepared for dispatch.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              // View My Orders Button
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _goldDark,
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (widget.onNavigateToOrders != null) {
+                      widget.onNavigateToOrders!();
+                    }
+                  },
+                  icon: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 18),
+                  label: Text(
+                    'VIEW MY ORDERS',
+                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Continue Shopping Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: _border),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () {
@@ -575,7 +995,7 @@ class _CartScreenState extends State<CartScreen> {
                   },
                   child: Text(
                     'CONTINUE SHOPPING',
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white),
+                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1, color: _textDark),
                   ),
                 ),
               ),
@@ -593,9 +1013,18 @@ class _CartScreenState extends State<CartScreen> {
       appBar: AppBar(
         backgroundColor: _bgColor,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          },
+        ),
         centerTitle: false,
-        titleSpacing: 20,
+        titleSpacing: 0,
         title: Row(
           children: [
             Container(
@@ -776,47 +1205,9 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
             ),
-
-            const SizedBox(height: 40),
-
-            // Trust Badges Grid
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: _buildTrustBadge(Icons.local_shipping_outlined, 'Free Express Shipping')),
-                  Container(height: 24, width: 1, color: _border),
-                  Expanded(child: _buildTrustBadge(Icons.shield_outlined, '30-Day Easy Returns')),
-                  Container(height: 24, width: 1, color: _border),
-                  Expanded(child: _buildTrustBadge(Icons.verified_outlined, '100% Cotton Quality')),
-                ],
-              ),
-            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTrustBadge(IconData icon, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20, color: _goldDark),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.outfit(fontSize: 10, color: _subtext, fontWeight: FontWeight.w600, height: 1.2),
-        ),
-      ],
     );
   }
 

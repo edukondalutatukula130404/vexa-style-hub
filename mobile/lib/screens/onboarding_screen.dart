@@ -89,39 +89,64 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top App Bar Controls (Logo Emblem & Standalone Skip Button)
+            // Top App Bar Controls (Back Button, Logo Emblem & Skip Button)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
-                          color: _gold.withAlpha(25),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _gold.withAlpha(120)),
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(9),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(25),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          'V',
-                          style: GoogleFonts.cinzel(
-                            color: _goldDark,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
+                        child: Center(
+                          child: Text(
+                            'V',
+                            style: GoogleFonts.cinzel(
+                              color: _gold,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 17,
+                              height: 1.1,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        'VEXA',
-                        style: GoogleFonts.cinzel(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
-                          fontSize: 16,
-                          color: _goldDark,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'V E X A',
+                            style: GoogleFonts.cinzel(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 4,
+                              fontSize: 16,
+                              color: _gold,
+                            ),
+                          ),
+                          Text(
+                            'WEAR CONFIDENCE',
+                            style: GoogleFonts.outfit(
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.8,
+                              color: _subtext,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

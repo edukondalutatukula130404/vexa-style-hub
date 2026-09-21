@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../config/api_config.dart';
 import '../models/item_model.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/order_service.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 import 'all_products_screen.dart';
@@ -48,20 +50,7 @@ Widget _productImage(
   );
 }
 
-// ── Static feature data (mirrors web) ─────────────────────────────────────
-const _features = [
-  (icon: Icons.checkroom_rounded, title: 'Premium Cotton Fabric', body: '240 GSM combed long-staple cotton.'),
-  (icon: Icons.straighten_rounded, title: 'Oversized Modern Fit', body: 'Drop shoulder, sculpted drape.'),
-  (icon: Icons.air_rounded, title: 'Soft & Breathable', body: 'Bio-washed for all-day comfort.'),
-  (icon: Icons.verified_rounded, title: 'Wrinkle Resistant', body: 'Holds its shape wash after wash.'),
-];
 
-const _services = [
-  (icon: Icons.chat_bubble_outline_rounded, title: 'WhatsApp Order', body: 'Order in one message'),
-  (icon: Icons.local_shipping_outlined, title: 'Fast Delivery', body: '2–4 day dispatch'),
-  (icon: Icons.currency_rupee_rounded, title: 'Cash on Delivery', body: 'Pay when it arrives'),
-  (icon: Icons.shield_outlined, title: 'Quality Guarantee', body: '30-day easy returns'),
-];
 
 const _promoBanners = [
   (
@@ -104,9 +93,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<ItemModel> _items = ApiService.getFallbackItems(); // show products immediately
   final bool _isLoading = false; // always ready — items pre-loaded from local assets
   final String _selectedCategory = 'All';
-  String _searchQuery = '';
+  final String _searchQuery = '';
   final Set<String> _favoriteIds = {};
-  int _currentTabIndex = 0;
+  int _currentTabIndex = 2; // Home tab active by default
   final List<CartItemData> _cartItems = [];
 
   // Notifications state
@@ -145,6 +134,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _bannerIndex = 0;
   Timer? _bannerTimer;
 
+  // Cached orders future to prevent auto-refresh when promo banner timer ticks
+  Future<List<OrderModel>>? _ordersFuture;
+
+  Future<void> _refreshOrders() async {
+    final future = OrderService.getOrders(email: 'admin@vexa.com');
+    setState(() {
+      _ordersFuture = future;
+    });
+    await future;
+  }
+
   // Main page scroll controller
   late final ScrollController _mainScrollController;
 
@@ -157,6 +157,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _mainScrollController = ScrollController();
     ApiConfig.baseUrlNotifier.addListener(_onServerUrlChanged);
     _loadUserAndItems();
+    _ordersFuture = OrderService.getOrders(email: 'admin@vexa.com');
 
     _tabAnimController = AnimationController(
       vsync: this,
@@ -187,6 +188,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   bool _isRealUser = false;
+  UserModel? _currentUser;
 
   void _onServerUrlChanged() {
     if (mounted) _loadUserAndItems();
@@ -218,6 +220,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final realUser = user != null && user.id != 'guest_user';
     if (mounted) {
       setState(() {
+        _currentUser = user;
         _isRealUser = realUser;
         if (user != null) {
           _updateUserNotifications(user);
@@ -251,12 +254,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int get _totalCartCount => _cartItems.fold(0, (s, c) => s + c.quantity);
 
   List<ItemModel> get _newArrivals {
+    final targetIds = {'vx-08', 'vx-12', 'vx-07', 'vx-04', 'vx-06'};
     final list = _items.where((it) =>
+      targetIds.contains(it.id.toLowerCase().trim()) ||
       it.collectionType.toLowerCase().contains('new') ||
       it.collectionType.toLowerCase().contains('drop')
     ).toList();
     if (list.isNotEmpty) return list;
-    return _items.take(2).toList();
+    return _items.take(5).toList();
   }
 
   List<ItemModel> get _filteredItems {
@@ -429,24 +434,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: CustomScrollView(
                 controller: _mainScrollController,
                 slivers: [
+                  // 0. GREETING HEADER
+                  SliverToBoxAdapter(child: _buildGreetingHeader()),
+
                   // 1. PROMO BANNER CAROUSEL
                   SliverToBoxAdapter(child: _buildPromoBannerCarousel()),
 
                   // 2. NEW ARRIVALS (horizontal scroll)
                   SliverToBoxAdapter(child: _buildNewArrivalsSection()),
 
-                  // 3. SEARCH + FEATURED CATALOG (Horizontal Side Scroll)
-                  SliverToBoxAdapter(child: _buildSearchBar()),
+                  // 3. FEATURED CATALOG (Horizontal Side Scroll)
                   SliverToBoxAdapter(child: _buildFeaturedCatalogHeader()),
                   SliverToBoxAdapter(child: _buildFeaturedCatalogHorizontalList()),
 
-                  // 4. FEATURES GRID (Engineered Excellence)
-                  SliverToBoxAdapter(child: _buildFeaturesSection()),
-
-                  // 5. SERVICES BAR (WhatsApp Order)
-                  SliverToBoxAdapter(child: _buildServicesBar()),
-
-                  // 6. JOIN VEXA CTA (Only shown in Guest mode)
+                  // 4. JOIN VEXA CTA (Only shown in Guest mode)
                   if (!_isRealUser) SliverToBoxAdapter(child: _buildJoinCta()),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -456,34 +457,96 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _openCartScreen() {
+    _navigateToScreen(
+      CartScreen(
+        cartItems: _cartItems,
+        onCartUpdated: () => setState(() {}),
+        onNavigateToProducts: () {
+          Navigator.pop(context);
+          setState(() => _currentTabIndex = 0);
+        },
+        onNavigateToOrders: () {
+          Navigator.pop(context);
+          setState(() => _currentTabIndex = 1);
+        },
+      ),
+    );
+  }
+
   // ── AppBar ─────────────────────────────────────────────────────────────
   AppBar _buildAppBar() {
     return AppBar(
       backgroundColor: _bgColor,
       elevation: 0,
-      automaticallyImplyLeading: false,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+        onPressed: () {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else if (_currentTabIndex != 2) {
+            setState(() => _currentTabIndex = 2);
+          } else {
+            SystemNavigator.pop();
+          }
+        },
+      ),
       centerTitle: false,
-      titleSpacing: 16,
+      titleSpacing: 0,
       title: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: _goldDark.withAlpha(50),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _gold.withAlpha(120)),
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(25),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Text('V', style: GoogleFonts.cinzel(color: _gold, fontWeight: FontWeight.w900, fontSize: 16)),
+            child: Center(
+              child: Text(
+                'V',
+                style: GoogleFonts.cinzel(
+                  color: _gold,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  height: 1.1,
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('VEXA', style: GoogleFonts.cinzel(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16, color: _gold)),
-              Text('WEAR CONFIDENCE', style: GoogleFonts.outfit(fontSize: 7, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: _subtext)),
+              Text(
+                'V E X A',
+                style: GoogleFonts.cinzel(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4.5,
+                  fontSize: 18,
+                  color: _gold,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                'WEAR CONFIDENCE',
+                style: GoogleFonts.outfit(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 2.2,
+                  color: _subtext,
+                ),
+              ),
             ],
           ),
         ],
@@ -551,6 +614,186 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+
+  // ── 0. GREETING HEADER ─────────────────────────────────────────────────
+  ({String tag, String title, String subtitle}) get _timeBasedWish {
+    final hour = DateTime.now().hour;
+    final userName = (_currentUser != null && _currentUser!.name.trim().isNotEmpty)
+        ? _currentUser!.name.trim().split(' ').first
+        : 'Collector';
+
+    if (hour >= 5 && hour < 12) {
+      return (
+        tag: 'GOOD MORNING ☀️',
+        title: _isRealUser ? 'Good Morning, $userName ☀️' : 'Good Morning ☀️',
+        subtitle: 'Start your day in signature 240 GSM luxury',
+      );
+    } else if (hour >= 12 && hour < 17) {
+      return (
+        tag: 'GOOD AFTERNOON 🌤️',
+        title: _isRealUser ? 'Good Afternoon, $userName 🌤️' : 'Good Afternoon 🌤️',
+        subtitle: 'Elevate your mid-day style & exclusive fits',
+      );
+    } else if (hour >= 17 && hour < 22) {
+      return (
+        tag: 'GOOD EVENING 🌙',
+        title: _isRealUser ? 'Good Evening, $userName 🌙' : 'Good Evening 🌙',
+        subtitle: 'Explore tonight\'s curated luxury drops',
+      );
+    } else {
+      return (
+        tag: 'GOOD NIGHT 🌌',
+        title: _isRealUser ? 'Good Night, $userName 🌌' : 'Good Night 🌌',
+        subtitle: 'Unwind with premium bio-washed essentials',
+      );
+    }
+  }
+
+  Widget _buildGreetingHeader() {
+    final wish = _timeBasedWish;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _gold.withAlpha(90), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(50),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: _gold.withAlpha(20),
+            blurRadius: 12,
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -25,
+            top: -25,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _gold.withAlpha(18),
+              ),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _gold.withAlpha(25),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: _gold.withAlpha(80)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: _gold,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            wish.tag,
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2,
+                              color: _gold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      wish.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cinzel(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withAlpha(140),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      wish.subtitle,
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        color: const Color(0xFF94A3B8),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_goldDark, _gold],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withAlpha(200), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _gold.withAlpha(120),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1175,41 +1418,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
 
-  // ── 3. FEATURES GRID ──────────────────────────────────────────────────
-  Widget _buildFeaturesSection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text('Engineered Excellence',
-              style: GoogleFonts.outfit(fontSize: 10, color: _gold, fontWeight: FontWeight.w700, letterSpacing: 3)),
-          const SizedBox(height: 6),
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(children: [
-              TextSpan(text: 'Crafted to the ', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
-              TextSpan(text: 'last stitch', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _gold)),
-            ]),
-          ),
-          const SizedBox(height: 4),
-          Container(height: 1, width: 120, color: _gold.withAlpha(60)),
-          const SizedBox(height: 16),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.55,
-            children: _features
-                .map((f) => _FeatureCard(icon: f.icon, title: f.title, body: f.body))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   // ── 4. PROMO BANNER CAROUSEL ──────────────────────────────────────────
   Widget _buildPromoBannerCarousel() {
@@ -1404,23 +1613,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── 6. SEARCH + CATEGORIES + CATALOG ──────────────────────────────────
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
-      child: TextField(
-        onChanged: (v) => setState(() => _searchQuery = v),
-        style: GoogleFonts.outfit(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: 'Search tees, tops, jackets...',
-          prefixIcon: const Icon(Icons.search_rounded, color: _subtext),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(icon: const Icon(Icons.close_rounded, color: _subtext), onPressed: () => setState(() => _searchQuery = ''))
-              : null,
-        ),
-      ),
-    );
-  }
+
 
 
 
@@ -1542,27 +1735,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   style: GoogleFonts.outfit(fontSize: 11, color: _subtext, decoration: TextDecoration.lineThrough)),
                             ],
                           ]),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 32,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _goldDark,
-                                padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () {
-                                _addToCart(item, item.color, 'M', 1);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                  content: Text('Added ${item.name} to cart'),
-                                  duration: const Duration(seconds: 1),
-                                  backgroundColor: _goldDark,
-                                ));
-                              },
-                              child: Text('Add to Cart', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -1576,54 +1748,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── 7. SERVICES BAR ────────────────────────────────────────────────────
-  Widget _buildServicesBar() {
-    return Container(
-      margin: const EdgeInsets.only(top: 32),
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      decoration: const BoxDecoration(
-        border: Border.symmetric(horizontal: BorderSide(color: _border)),
-        color: _cardBg,
-      ),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 3.2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 16,
-        children: _services
-            .map((s) => Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _gold.withAlpha(100)),
-                      ),
-                      child: Icon(s.icon, color: _gold, size: 18),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(s.title,
-                              style: GoogleFonts.outfit(fontSize: 11, color: _textDark, fontWeight: FontWeight.w700, letterSpacing: 0.2),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          Text(s.body, style: GoogleFonts.outfit(fontSize: 10, color: _subtext), maxLines: 1),
-                        ],
-                      ),
-                    ),
-                  ],
-                ))
-            .toList(),
-      ),
-    );
-  }
 
   // ── 8. JOIN VEXA CTA ────────────────────────────────────────────────────
   Widget _buildJoinCta() {
@@ -1693,41 +1817,876 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // ROOT BUILD
+  // MY ORDERS TAB VIEW
+  // ══════════════════════════════════════════════════════════════════════════
+  Widget _buildOrdersTab() {
+    return Scaffold(
+      backgroundColor: _bgColor,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else if (_currentTabIndex != 2) {
+              setState(() => _currentTabIndex = 2);
+            } else {
+              SystemNavigator.pop();
+            }
+          },
+        ),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
+              child: const Icon(Icons.inventory_2_outlined, color: _goldDark, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Text('MY ORDERS', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5)),
+          ],
+        ),
+      ),
+      body: RefreshIndicator(
+        color: _goldDark,
+        onRefresh: _refreshOrders,
+        child: FutureBuilder<List<OrderModel>>(
+          future: _ordersFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: _goldDark, strokeWidth: 2.5));
+            }
+
+            final orders = snapshot.data ?? [];
+            if (orders.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: const BoxDecoration(color: _surfaceBg, shape: BoxShape.circle),
+                            child: const Icon(Icons.shopping_bag_outlined, color: _subtext, size: 48),
+                          ),
+                          const SizedBox(height: 18),
+                          Text('No Orders Placed Yet', style: GoogleFonts.cinzel(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark)),
+                          const SizedBox(height: 8),
+                          Text('Order luxury garments to track live shipment status here.', textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
+                          const SizedBox(height: 24),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: _goldDark, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                            onPressed: () => setState(() => _currentTabIndex = 0),
+                            child: Text('BROWSE PRODUCTS', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: orders.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 14),
+              itemBuilder: (ctx, i) {
+                final order = orders[i];
+                final firstItem = order.items.isNotEmpty ? order.items.first : null;
+                final titleText = firstItem != null ? firstItem.name : 'VEXA Order';
+                final itemsCount = order.items.fold(0, (sum, item) => sum + item.quantity);
+                final itemsSummary = itemsCount == 1 ? '1 Item' : '$itemsCount Items';
+                final sizeSummary = firstItem != null ? 'Size ${firstItem.size}' : '';
+                final detailsSubtitle = sizeSummary.isNotEmpty ? '$itemsSummary · $sizeSummary' : itemsSummary;
+
+                return GestureDetector(
+                  onTap: () => _openHomeOrderDetailSheet(context, order),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _border),
+                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 6, offset: const Offset(0, 2))],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text(order.id, style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14, color: _textDark)),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(6)),
+                                  child: Text(order.paymentMethod, style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w600, color: _subtext)),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: order.statusColor.withAlpha(25),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: order.statusColor.withAlpha(80)),
+                              ),
+                              child: Text(order.status, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: order.statusColor)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: firstItem != null
+                                  ? (firstItem.image.startsWith('assets/')
+                                      ? Image.asset(firstItem.image, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom)))
+                                      : Image.network(firstItem.image, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom))))
+                                  : Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(titleText, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 2),
+                                  Text('$detailsSubtitle · ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                  const SizedBox(height: 4),
+                                  Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: _goldDark)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WISHLIST TAB VIEW
+  // ══════════════════════════════════════════════════════════════════════════
+  Widget _buildWishlistTab() {
+    final wishItems = _items.where((it) => _favoriteIds.contains(it.id)).toList();
+
+    return Scaffold(
+      backgroundColor: _bgColor,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else if (_currentTabIndex != 2) {
+              setState(() => _currentTabIndex = 2);
+            } else {
+              SystemNavigator.pop();
+            }
+          },
+        ),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: const Color(0xFFFF4757).withAlpha(25), shape: BoxShape.circle),
+              child: const Icon(Icons.favorite_rounded, color: Color(0xFFFF4757), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Text('MY WISHLIST', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5)),
+            const SizedBox(width: 6),
+            Text('(${wishItems.length})', style: GoogleFonts.outfit(fontSize: 13, color: _subtext, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+      body: wishItems.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: const BoxDecoration(color: _surfaceBg, shape: BoxShape.circle),
+                    child: const Icon(Icons.favorite_border_rounded, color: _subtext, size: 48),
+                  ),
+                  const SizedBox(height: 18),
+                  Text('Your Wishlist is Empty', style: GoogleFonts.cinzel(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark)),
+                  const SizedBox(height: 8),
+                  Text('Tap the heart icon on any product to save your favorite garments here.', textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: _goldDark, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                    onPressed: () => setState(() => _currentTabIndex = 0),
+                    child: Text('EXPLORE PRODUCTS', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
+                ],
+              ),
+            )
+          : GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.64,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+              ),
+              itemCount: wishItems.length,
+              itemBuilder: (ctx, i) {
+                final item = wishItems[i];
+                return Container(
+                  decoration: BoxDecoration(
+                    color: _cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _border),
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            GestureDetector(
+                              onTap: () => _openProductDetail(item),
+                              child: _productImage(item.image, width: double.infinity, height: double.infinity, fit: BoxFit.cover),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: GestureDetector(
+                                onTap: () => setState(() => _favoriteIds.remove(item.id)),
+                                child: const CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: Colors.white,
+                                  child: Icon(Icons.close_rounded, color: _textDark, size: 16),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark)),
+                            const SizedBox(height: 2),
+                            Text('₹${item.price.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: _goldDark)),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 32,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _goldDark,
+                                  elevation: 0,
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () {
+                                  _addToCart(item, item.colors.first, 'M', 1);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Added "${item.name}" to cart!'),
+                                      backgroundColor: _goldDark,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                child: Text('ADD TO CART', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  void _openHomeOrderDetailSheet(BuildContext context, OrderModel order) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isCancelled = order.status.toLowerCase() == 'cancelled';
+        final isDelivered = order.status.toLowerCase() == 'delivered';
+        final isShipped = order.status.toLowerCase() == 'shipped' || order.status.toLowerCase() == 'out for delivery';
+
+        return Container(
+          height: MediaQuery.of(ctx).size.height * 0.88,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              // Top Drag Handle & Luxury Header
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  border: Border(bottom: BorderSide(color: _border, width: 0.8)),
+                ),
+                child: Column(
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(color: _gold.withAlpha(120), borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _gold.withAlpha(25),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: _gold.withAlpha(60)),
+                                ),
+                                child: const Icon(Icons.inventory_2_rounded, color: _goldDark, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            'ORDER ${order.id}',
+                                            style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: order.statusColor.withAlpha(25),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: order.statusColor.withAlpha(90)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(width: 6, height: 6, decoration: BoxDecoration(color: order.statusColor, shape: BoxShape.circle)),
+                                              const SizedBox(width: 5),
+                                              Text(order.status.toUpperCase(), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: order.statusColor, letterSpacing: 0.5)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.access_time_rounded, size: 12, color: _subtext),
+                                        const SizedBox(width: 4),
+                                        Text('Placed on ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          decoration: const BoxDecoration(color: _surfaceBg, shape: BoxShape.circle),
+                          child: IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18, color: _textDark),
+                            onPressed: () => Navigator.pop(ctx),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Scrollable Body Content
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    // 1. LIVE SHIPMENT TRACKING CARD
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: _gold.withAlpha(40)),
+                        boxShadow: [
+                          BoxShadow(color: _gold.withAlpha(12), blurRadius: 16, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
+                                    child: const Icon(Icons.alt_route_rounded, color: _goldDark, size: 18),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text('LIVE SHIPMENT STATUS', style: GoogleFonts.cinzel(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1)),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(8)),
+                                child: Text('5 Steps', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext)),
+                              ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Divider(height: 1, color: _border),
+                          ),
+                          if (isCancelled) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withAlpha(25),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFEF4444).withAlpha(80)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 20),
+                                  const SizedBox(width: 8),
+                                  Text('Order Cancelled. Refund initiated.', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444))),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            _buildHomeTrackingStepRow(Icons.shopping_bag_outlined, '1', 'Order Placed & Confirmed', order.formattedDate, true, false, false),
+                            _buildHomeTrackingStepRow(Icons.verified_outlined, '2', 'Payment Verified', 'Payment via ${order.paymentMethod}', true, false, false),
+                            _buildHomeTrackingStepRow(Icons.inventory_2_outlined, '3', 'Garment QC & Customized Packaging', isShipped || isDelivered ? 'Inspection Passed' : 'In Progress at Warehouse', true, !isShipped && !isDelivered, false),
+                            _buildHomeTrackingStepRow(Icons.local_shipping_outlined, '4', 'Out for Delivery / Courier In Transit', isDelivered ? 'Handed to Express Courier' : (isShipped ? 'In Transit — Expected Today' : 'Scheduled'), isShipped || isDelivered, isShipped && !isDelivered, false),
+                            _buildHomeTrackingStepRow(Icons.home_outlined, '5', 'Delivered to Customer', isDelivered ? 'Successfully Delivered' : 'Pending', isDelivered, false, true),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 2. SHIPPING ADDRESS BLOCK
+                    Text('SHIPPING ADDRESS', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _border),
+                        boxShadow: [BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 8, offset: const Offset(0, 2))],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: _gold.withAlpha(20), shape: BoxShape.circle),
+                            child: const Icon(Icons.location_on_rounded, color: _goldDark, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(order.customerName, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark)),
+                                const SizedBox(height: 3),
+                                Text(order.shippingAddress, style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.35)),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.phone_outlined, size: 13, color: _goldDark),
+                                    const SizedBox(width: 5),
+                                    Text(order.phone, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 3. ITEMS IN ORDER SECTION
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('ITEMS IN ORDER (${order.items.length})', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
+                        Text('${order.items.fold(0, (sum, i) => sum + i.quantity)} total pcs', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ...order.items.map((item) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _border),
+                          boxShadow: [BoxShadow(color: Colors.black.withAlpha(3), blurRadius: 6, offset: const Offset(0, 2))],
+                        ),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                decoration: BoxDecoration(border: Border.all(color: _border)),
+                                child: item.image.startsWith('assets/')
+                                    ? Image.asset(item.image, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom)))
+                                    : Image.network(item.image, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom))),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.name, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(6)),
+                                        child: Text('Size ${item.size}', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: _textDark)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text('Qty: ${item.quantity}', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text('₹${(item.price * item.quantity).toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: _goldDark)),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 16),
+
+                    // 4. PAYMENT & RECEIPT SUMMARY CARD
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _surfaceBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _border),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.payment_rounded, size: 16, color: _subtext),
+                                  const SizedBox(width: 6),
+                                  Text('Payment Method', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: _border)),
+                                child: Text(order.paymentMethod, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _textDark)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.local_shipping_outlined, size: 16, color: Color(0xFF10B981)),
+                                  const SizedBox(width: 6),
+                                  Text('Shipping Fee', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                                ],
+                              ),
+                              Text('FREE Express', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Divider(height: 1, color: _border),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Total Amount Paid', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: _goldDark,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [BoxShadow(color: _goldDark.withAlpha(60), blurRadius: 8, offset: const Offset(0, 2))],
+                                ),
+                                child: Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHomeTrackingStepRow(IconData icon, String stepNum, String title, String subtitle, bool isCompleted, bool isCurrent, bool isLast) {
+    final activeColor = isCurrent ? const Color(0xFF2563EB) : _goldDark;
+    final stepBg = isCompleted
+        ? _goldDark
+        : isCurrent
+            ? activeColor
+            : _surfaceBg;
+    final stepIconColor = isCompleted || isCurrent ? Colors.white : _subtext;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: stepBg,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isCompleted ? _goldDark : isCurrent ? activeColor : _border,
+                  width: isCurrent ? 3 : 1.5,
+                ),
+                boxShadow: isCurrent
+                    ? [BoxShadow(color: activeColor.withAlpha(80), blurRadius: 8, spreadRadius: 1)]
+                    : null,
+              ),
+              child: Center(
+                child: isCompleted
+                    ? const Icon(Icons.check_rounded, color: Colors.white, size: 15)
+                    : Icon(icon, color: stepIconColor, size: 13),
+              ),
+            ),
+            if (!isLast)
+              Container(
+                width: 2,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: isCompleted ? _goldDark : _border,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: isCompleted || isCurrent ? FontWeight.bold : FontWeight.w500,
+                          color: isCompleted || isCurrent ? _textDark : _subtext,
+                        ),
+                      ),
+                    ),
+                    if (isCurrent)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: activeColor.withAlpha(20),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'IN PROGRESS',
+                          style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w800, color: activeColor),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(subtitle, style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ROOT BUILD (5 BOTTOM BAR TABS: Products, My Orders, Home, Wishlist, Profile)
   // ══════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bgColor,
-      body: IndexedStack(
-        index: _currentTabIndex,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else if (_currentTabIndex != 2) {
+          setState(() => _currentTabIndex = 2);
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: _bgColor,
+        body: Stack(
         children: [
-          _buildDiscoverTab(),
-          ProductsScreen(
-            items: _items,
-            onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
-            favoriteIds: _favoriteIds,
-            onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
-            showBackButton: false,
+          IndexedStack(
+            index: _currentTabIndex,
+            children: [
+              // 0: Products
+              ProductsScreen(
+                items: _items,
+                onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
+                favoriteIds: _favoriteIds,
+                onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
+                showBackButton: false,
+              ),
+              // 1: My Orders
+              _buildOrdersTab(),
+              // 2: Home
+              _buildDiscoverTab(),
+              // 3: Wishlist
+              _buildWishlistTab(),
+              // 4: Profile
+              ProfileScreen(
+                onNavigateToDiscover: () async {
+                  final user = await AuthService.getUser();
+                  final realUser = user != null && user.id != 'guest_user';
+                  setState(() {
+                    _currentTabIndex = 2; // Home tab
+                    _isRealUser = realUser;
+                  });
+                },
+              ),
+            ],
           ),
-          CartScreen(
-            cartItems: _cartItems,
-            onCartUpdated: () => setState(() {}),
-            onNavigateToProducts: () => setState(() => _currentTabIndex = 1),
-          ),
-          ProfileScreen(
-            onNavigateToDiscover: () async {
-              final user = await AuthService.getUser();
-              final realUser = user != null && user.id != 'guest_user';
-              setState(() {
-                _currentTabIndex = 0;
-                _isRealUser = realUser;
-              });
-            },
+
+          // Floating Cart Button at Bottom-Right (in place of mic symbol)
+          Positioned(
+            right: 18,
+            bottom: 18,
+            child: GestureDetector(
+              onTap: _openCartScreen,
+              child: Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [_goldDark, _gold],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _gold.withAlpha(140),
+                      blurRadius: 14,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 26),
+                    if (_totalCartCount > 0)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF4757),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                          child: Center(
+                            child: Text(
+                              '$_totalCartCount',
+                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, height: 1),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      bottomNavigationBar: (_currentTabIndex == 3 && !_isRealUser)
+      bottomNavigationBar: (_currentTabIndex == 4 && !_isRealUser)
           ? null
           : Container(
               decoration: const BoxDecoration(border: Border(top: BorderSide(color: _border, width: 1))),
@@ -1738,6 +2697,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   final realUser = user != null && user.id != 'guest_user';
                   setState(() {
                     _currentTabIndex = i;
+                    _currentUser = user;
                     _isRealUser = realUser;
                   });
                 },
@@ -1745,20 +2705,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 selectedItemColor: _gold,
                 unselectedItemColor: _subtext,
                 type: BottomNavigationBarType.fixed,
-                selectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
-                unselectedLabelStyle: GoogleFonts.outfit(fontSize: 11),
+                selectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 11),
+                unselectedLabelStyle: GoogleFonts.outfit(fontSize: 10),
                 items: [
-                  const BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore_rounded), label: 'Discover'),
-                  const BottomNavigationBarItem(icon: Icon(Icons.grid_view_outlined), activeIcon: Icon(Icons.grid_view_rounded), label: 'Products'),
-                  BottomNavigationBarItem(
-                    icon: Badge(label: Text('$_totalCartCount'), isLabelVisible: _totalCartCount > 0, backgroundColor: _goldDark, child: const Icon(Icons.shopping_bag_outlined)),
-                    activeIcon: Badge(label: Text('$_totalCartCount'), isLabelVisible: _totalCartCount > 0, backgroundColor: _goldDark, child: const Icon(Icons.shopping_bag_rounded)),
-                    label: 'Cart',
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.grid_view_outlined),
+                    activeIcon: Icon(Icons.grid_view_rounded),
+                    label: 'Products',
                   ),
-                  const BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), activeIcon: Icon(Icons.person_rounded), label: 'Profile'),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.inventory_2_outlined),
+                    activeIcon: Icon(Icons.inventory_2_rounded),
+                    label: 'My Orders',
+                  ),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.home_outlined),
+                    activeIcon: Icon(Icons.home_rounded),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Badge(
+                      label: Text('${_favoriteIds.length}'),
+                      isLabelVisible: _favoriteIds.isNotEmpty,
+                      backgroundColor: const Color(0xFFFF4757),
+                      child: const Icon(Icons.favorite_outline_rounded),
+                    ),
+                    activeIcon: Badge(
+                      label: Text('${_favoriteIds.length}'),
+                      isLabelVisible: _favoriteIds.isNotEmpty,
+                      backgroundColor: const Color(0xFFFF4757),
+                      child: const Icon(Icons.favorite_rounded),
+                    ),
+                    label: 'Wishlist',
+                  ),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.person_outline_rounded),
+                    activeIcon: Icon(Icons.person_rounded),
+                    label: 'Profile',
+                  ),
                 ],
               ),
             ),
+      ),
     );
   }
 }
@@ -1766,69 +2754,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 // ════════════════════════════════════════════════════════════════════════════
 // HELPER WIDGETS
 // ════════════════════════════════════════════════════════════════════════════
-
-class _FeatureCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String body;
-
-  const _FeatureCard({required this.icon, required this.title, required this.body});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _gold.withAlpha(60)),
-        boxShadow: [BoxShadow(color: _gold.withAlpha(10), blurRadius: 10)],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: _gold.withAlpha(25),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _gold.withAlpha(80)),
-            ),
-            child: Icon(icon, color: _gold, size: 18),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: _textDark,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 9, color: _subtext, height: 1.2),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 typedef _PromoBannerData = ({
   String tag,
@@ -1850,22 +2775,22 @@ class _PromoBannerCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 235,
+        height: 240,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _gold.withAlpha(80)),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _gold.withAlpha(120), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(20),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: Colors.black.withAlpha(40),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         clipBehavior: Clip.hardEdge,
         child: Stack(
           children: [
-            // Background image with custom alignment so model head & tee options are perfectly centered and framed
+            // Background image with custom alignment
             Positioned.fill(
               child: Image.asset(
                 banner.img,
@@ -1874,66 +2799,103 @@ class _PromoBannerCard extends StatelessWidget {
               ),
             ),
 
-          // Soft bottom shadow for button visibility
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 60,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withAlpha(140),
-                    Colors.transparent,
+            // Gradient Overlay for text contrast & legibility
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withAlpha(80),
+                      Colors.black.withAlpha(140),
+                      Colors.black.withAlpha(220),
+                    ],
+                    stops: const [0.0, 0.45, 1.0],
+                  ),
+                ),
+              ),
+            ),
+
+            // Properly Aligned Content Overlay (Title, Subtitle, CTA Button)
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      banner.title.replaceAll('\n', ' '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cinzel(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                        shadows: [
+                          Shadow(color: Colors.black.withAlpha(180), blurRadius: 6),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      banner.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _gold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // CTA Option Button
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_goldDark, _gold],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(80),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            banner.cta,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          const Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
-
-          // Only CTA Option Button at the bottom
-          Positioned(
-            left: 12,
-            bottom: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: _goldDark,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(60),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    banner.cta,
-                    style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  const Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // Typedef alias so SliverWidget compiles without issue

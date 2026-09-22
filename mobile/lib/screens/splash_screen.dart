@@ -2,7 +2,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../config/api_config.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import 'home_screen.dart';
+import 'login_screen.dart';
 import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -153,7 +156,24 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   Future<void> _initializeAndNavigate() async {
     ApiConfig.autoDiscoverBackend();
     await Future.delayed(const Duration(milliseconds: 2600));
-    _navigateToNextScreen(const OnboardingScreen());
+    await _checkAuthAndNavigate();
+  }
+
+  Future<void> _checkAuthAndNavigate() async {
+    final user = await AuthService.getUser();
+    if (!mounted) return;
+    if (user != null && user.id != 'guest_user') {
+      _navigateToNextScreen(const HomeScreen());
+    } else if (user != null && user.id == 'guest_user') {
+      final seen = await AuthService.isOnboardingSeen();
+      if (seen) {
+        _navigateToNextScreen(const HomeScreen());
+      } else {
+        _navigateToNextScreen(const OnboardingScreen());
+      }
+    } else {
+      _navigateToNextScreen(const LoginScreen());
+    }
   }
 
   @override
@@ -170,7 +190,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       backgroundColor: Colors.black,
       body: GestureDetector(
         onTap: () {
-          _navigateToNextScreen(const OnboardingScreen());
+          _checkAuthAndNavigate();
         },
         behavior: HitTestBehavior.opaque,
         child: AnimatedBuilder(

@@ -65,7 +65,7 @@ export function MobileBottomNav() {
         {({ isActive }) => (
           <>
             <div className="relative">
-              <ShoppingBag className={`size-5 transition-transform ${isActive ? "scale-110 text-[#B8860B]" : ""}`} />
+              <ShoppingBag className={`size-5 ${isActive ? "text-[#B8860B]" : ""}`} />
               {totalCartCount > 0 && (
                 <span className="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-[#B8860B] text-primary-foreground text-[9px] font-extrabold shadow font-mono">
                   {totalCartCount}

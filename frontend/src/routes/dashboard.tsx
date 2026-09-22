@@ -33,6 +33,17 @@ import {
   Home,
   Briefcase,
   Heart,
+  Wallet,
+  CreditCard,
+  QrCode,
+  Building2,
+  Shield,
+  Zap,
+  Clock,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Copy,
+  Check,
 } from "lucide-react";
 import { products, useProducts, SIZES, type Product } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
@@ -62,7 +73,18 @@ type OrderItem = {
   createdAt: string;
 };
 
-type TabType = "profile" | "orders" | "addresses" | "cart" | "wishlist" | "support" | "booking";
+export interface WalletTxn {
+  id: string;
+  type: "credit" | "debit";
+  title: string;
+  amount: number;
+  date: string;
+  method: string;
+  status: "Success" | "Processing" | "Failed";
+  txnId: string;
+}
+
+type TabType = "profile" | "wallet" | "orders" | "addresses" | "cart" | "wishlist" | "support" | "booking";
 
 export function UserDashboard() {
   const navigate = useNavigate();
@@ -94,7 +116,7 @@ export function UserDashboard() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && ["profile", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
+      if (tabParam && ["profile", "wallet", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
         return tabParam as TabType;
       }
     }
@@ -103,10 +125,87 @@ export function UserDashboard() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["profile", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
+    if (tabParam && ["profile", "wallet", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
       setActiveTab(tabParam as TabType);
     }
   }, [searchParams]);
+
+  // --- VEXA PAY WALLET & RAZORPAY GATEWAY STATE ---
+  const [walletBalance, setWalletBalance] = useState<number>(() => {
+    if (typeof window === "undefined") return 2500;
+    const saved = localStorage.getItem("vexa_wallet_balance");
+    return saved !== null ? parseFloat(saved) : 2500;
+  });
+
+  const [walletTransactions, setWalletTransactions] = useState<WalletTxn[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem("vexa_wallet_transactions");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error("Error parsing cached wallet transactions", e);
+      }
+    }
+    return [
+      {
+        id: "txn_101",
+        type: "credit",
+        title: "Razorpay Wallet Top-Up (Instant UPI)",
+        amount: 2500,
+        date: "22 Sep 2026, 11:15 AM",
+        method: "Razorpay Instant UPI",
+        status: "Success",
+        txnId: "pay_RZP_" + Math.random().toString(36).substring(2, 10).toUpperCase(),
+      },
+      {
+        id: "txn_100",
+        type: "credit",
+        title: "VEXA Luxury Welcome Credit Bonus",
+        amount: 500,
+        date: "20 Sep 2026, 10:30 AM",
+        method: "VEXA Promo Credit",
+        status: "Success",
+        txnId: "pay_RZP_WELCOME500",
+      },
+    ];
+  });
+
+  // Sync to local storage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_wallet_balance", walletBalance.toString());
+    }
+  }, [walletBalance]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_wallet_transactions", JSON.stringify(walletTransactions));
+    }
+  }, [walletTransactions]);
+
+  // Top-Up & Razorpay Modals State
+  const [showTopUpModal, setShowTopUpModal] = useState<boolean>(false);
+  const [topUpAmount, setTopUpAmount] = useState<number>(1000);
+  const [customTopUpInput, setCustomTopUpInput] = useState<string>("");
+
+  const [showRazorpayGatewayModal, setShowRazorpayGatewayModal] = useState<boolean>(false);
+  const [razorpayChannel, setRazorpayChannel] = useState<"upi" | "card" | "netbanking" | "wallet">("upi");
+  const [upiIdInput, setUpiIdInput] = useState<string>("customer@okaxis");
+  const [cardNumberInput, setCardNumberInput] = useState<string>("4532 •••• •••• 8892");
+  const [cardExpiryInput, setCardExpiryInput] = useState<string>("12/28");
+  const [cardCvvInput, setCardCvvInput] = useState<string>("778");
+  const [netbankingBank, setNetbankingBank] = useState<string>("HDFC Bank");
+  const [walletProvider, setWalletProvider] = useState<string>("Mobikwik Wallet");
+
+  const [razorpayProcessing, setRazorpayProcessing] = useState<boolean>(false);
+  const [razorpaySuccess, setRazorpaySuccess] = useState<boolean>(false);
+  const [currentRazorpayTxnId, setCurrentRazorpayTxnId] = useState<string>("");
+  const [copiedTxnId, setCopiedTxnId] = useState<string>("");
+
+  const [showSavedPaymentsModal, setShowSavedPaymentsModal] = useState<boolean>(false);
+  const [txnFilter, setTxnFilter] = useState<"all" | "credit" | "debit">("all");
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -1112,6 +1211,7 @@ export function UserDashboard() {
 
   const navItems = [
     { id: "profile", label: "My Profile", icon: UserIcon },
+    { id: "wallet", label: "VEXA Wallet", icon: Wallet },
     { id: "orders", label: "My Orders", icon: Package },
     { id: "cart", label: "My Cart", icon: ShoppingBag },
     { id: "wishlist", label: "My Wishlist", icon: Heart },

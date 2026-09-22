@@ -57,6 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final user = result['user'];
       final token = result['token'] ?? 'mock_token';
       await AuthService.saveSession(user, token);
+      await AuthService.setOnboardingSeen();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -458,18 +458,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _openCartScreen() {
-    _navigateToScreen(
-      CartScreen(
-        cartItems: _cartItems,
-        onCartUpdated: () => setState(() {}),
-        onNavigateToProducts: () {
-          Navigator.pop(context);
-          setState(() => _currentTabIndex = 0);
-        },
-        onNavigateToOrders: () {
-          Navigator.pop(context);
-          setState(() => _currentTabIndex = 1);
-        },
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => CartScreen(
+          cartItems: _cartItems,
+          onCartUpdated: () => setState(() {}),
+          onNavigateToProducts: () {
+            Navigator.pop(context);
+            setState(() => _currentTabIndex = 0);
+          },
+          onNavigateToOrders: () {
+            Navigator.pop(context);
+            setState(() => _currentTabIndex = 1);
+          },
+        ),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
       ),
     );
   }
@@ -1817,14 +1822,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // MY ORDERS TAB VIEW
   // ══════════════════════════════════════════════════════════════════════════
+  // MY ORDERS TAB VIEW (REDESIGNED LUXURY EXPERIENCE)
+  // ══════════════════════════════════════════════════════════════════════════
+  String _selectedOrderStatusFilter = 'All';
+  String _orderSearchQuery = '';
+
   Widget _buildOrdersTab() {
     return Scaffold(
       backgroundColor: _bgColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0.8,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
           onPressed: () {
@@ -1841,12 +1850,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
-              child: const Icon(Icons.inventory_2_outlined, color: _goldDark, size: 20),
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_goldDark, _gold],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: _gold.withAlpha(80),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 10),
-            Text('MY ORDERS', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'MY ORDERS',
+                  style: GoogleFonts.cinzel(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: _textDark,
+                    letterSpacing: 1.8,
+                  ),
+                ),
+                Text(
+                  'Live Courier Tracking & Order History',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: _subtext,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1857,66 +1901,71 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           future: _ordersFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: _goldDark, strokeWidth: 2.5));
-            }
-
-            final orders = snapshot.data ?? [];
-            if (orders.isEmpty) {
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.7,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: const BoxDecoration(color: _surfaceBg, shape: BoxShape.circle),
-                            child: const Icon(Icons.shopping_bag_outlined, color: _subtext, size: 48),
-                          ),
-                          const SizedBox(height: 18),
-                          Text('No Orders Placed Yet', style: GoogleFonts.cinzel(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark)),
-                          const SizedBox(height: 8),
-                          Text('Order luxury garments to track live shipment status here.', textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
-                          const SizedBox(height: 24),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: _goldDark, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                            onPressed: () => setState(() => _currentTabIndex = 0),
-                            child: Text('BROWSE PRODUCTS', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                          ),
-                        ],
-                      ),
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: _goldDark, strokeWidth: 2.5),
+                    SizedBox(height: 16),
+                    Text(
+                      'Fetching order history...',
+                      style: TextStyle(color: _subtext, fontSize: 13),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             }
 
-            return ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              itemCount: orders.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 14),
-              itemBuilder: (ctx, i) {
-                final order = orders[i];
-                final firstItem = order.items.isNotEmpty ? order.items.first : null;
-                final titleText = firstItem != null ? firstItem.name : 'VEXA Order';
-                final itemsCount = order.items.fold(0, (sum, item) => sum + item.quantity);
-                final itemsSummary = itemsCount == 1 ? '1 Item' : '$itemsCount Items';
-                final sizeSummary = firstItem != null ? 'Size ${firstItem.size}' : '';
-                final detailsSubtitle = sizeSummary.isNotEmpty ? '$itemsSummary · $sizeSummary' : itemsSummary;
+            final rawOrders = snapshot.data ?? [];
 
-                return GestureDetector(
-                  onTap: () => _openHomeOrderDetailSheet(context, order),
+            // Compute status counts for filter chips
+            final totalCount = rawOrders.length;
+            final processingCount = rawOrders.where((o) => o.status.toLowerCase().contains('process') || o.status.toLowerCase().contains('confirm')).length;
+            final shippedCount = rawOrders.where((o) => o.status.toLowerCase().contains('ship') || o.status.toLowerCase().contains('transit') || o.status.toLowerCase().contains('delivery')).length;
+            final deliveredCount = rawOrders.where((o) => o.status.toLowerCase().contains('deliver')).length;
+            final cancelledCount = rawOrders.where((o) => o.status.toLowerCase().contains('cancel')).length;
+
+            // Apply filters
+            final filteredOrders = rawOrders.where((order) {
+              final s = order.status.toLowerCase();
+              final matchesFilter = _selectedOrderStatusFilter == 'All' ||
+                  (_selectedOrderStatusFilter == 'Processing' && (s.contains('process') || s.contains('confirm'))) ||
+                  (_selectedOrderStatusFilter == 'Shipped' && (s.contains('ship') || s.contains('transit') || s.contains('delivery'))) ||
+                  (_selectedOrderStatusFilter == 'Delivered' && s.contains('deliver')) ||
+                  (_selectedOrderStatusFilter == 'Cancelled' && s.contains('cancel'));
+
+              final q = _orderSearchQuery.trim().toLowerCase();
+              final matchesSearch = q.isEmpty ||
+                  order.id.toLowerCase().contains(q) ||
+                  order.status.toLowerCase().contains(q) ||
+                  order.items.any((item) => item.name.toLowerCase().contains(q));
+
+              return matchesFilter && matchesSearch;
+            }).toList();
+
+            return CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // 1. HERO LUXURY HEADER BANNER
+                SliverToBoxAdapter(
                   child: Container(
-                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: _cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _border),
-                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 6, offset: const Offset(0, 2))],
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _gold.withAlpha(90), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(45),
+                          blurRadius: 16,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1924,62 +1973,730 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                Text(order.id, style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14, color: _textDark)),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(6)),
-                                  child: Text(order.paymentMethod, style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w600, color: _subtext)),
-                                ),
-                              ],
-                            ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: order.statusColor.withAlpha(25),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: order.statusColor.withAlpha(80)),
+                                color: _gold.withAlpha(25),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: _gold.withAlpha(80)),
                               ),
-                              child: Text(order.status, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: order.statusColor)),
+                              child: Text(
+                                'COUTURE DISPATCH',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 2,
+                                  color: _gold,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'EST. 2026',
+                              style: GoogleFonts.cinzel(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF94A3B8),
+                                letterSpacing: 1.5,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
+                        Text(
+                          'Order Tracking Hub',
+                          style: GoogleFonts.cinzel(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Track live 2–4 day express shipments, invoice receipts & delivery status.',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            color: const Color(0xFF94A3B8),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Stats counters row
                         Row(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: firstItem != null
-                                  ? (firstItem.image.startsWith('assets/')
-                                      ? Image.asset(firstItem.image, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom)))
-                                      : Image.network(firstItem.image, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom))))
-                                  : Container(width: 54, height: 54, color: _surfaceBg, child: const Icon(Icons.checkroom)),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(titleText, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  const SizedBox(height: 2),
-                                  Text('$detailsSubtitle · ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-                                  const SizedBox(height: 4),
-                                  Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: _goldDark)),
-                                ],
-                              ),
-                            ),
+                            _buildOrdersStatPill('Total', totalCount.toString(), Icons.inventory_2_outlined, _gold),
+                            const SizedBox(width: 8),
+                            _buildOrdersStatPill('In Transit', shippedCount.toString(), Icons.local_shipping_outlined, const Color(0xFF3B82F6)),
+                            const SizedBox(width: 8),
+                            _buildOrdersStatPill('Delivered', deliveredCount.toString(), Icons.check_circle_outline, const Color(0xFF10B981)),
                           ],
                         ),
                       ],
                     ),
                   ),
-                );
-              },
+                ),
+
+                // 2. SEARCH & FILTER TOOLBAR
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        // Search bar input
+                        Container(
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: _border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(5),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            onChanged: (val) => setState(() => _orderSearchQuery = val),
+                            style: GoogleFonts.outfit(fontSize: 13, color: _textDark),
+                            decoration: InputDecoration(
+                              hintText: 'Search by Order ID (e.g. #VX-8834) or item name...',
+                              hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: _subtext),
+                              prefixIcon: const Icon(Icons.search_rounded, color: _goldDark, size: 20),
+                              suffixIcon: _orderSearchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18, color: _subtext),
+                                      onPressed: () => setState(() => _orderSearchQuery = ''),
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Status filter chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildOrdersFilterChip('All', totalCount),
+                              _buildOrdersFilterChip('Processing', processingCount),
+                              _buildOrdersFilterChip('Shipped', shippedCount),
+                              _buildOrdersFilterChip('Delivered', deliveredCount),
+                              _buildOrdersFilterChip('Cancelled', cancelledCount),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 3. ORDERS LIST / EMPTY STATE
+                filteredOrders.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Container(
+                          margin: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: _border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(6),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(22),
+                                decoration: BoxDecoration(
+                                  color: _gold.withAlpha(20),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: _gold.withAlpha(60)),
+                                ),
+                                child: const Icon(Icons.local_shipping_outlined, color: _goldDark, size: 48),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                _orderSearchQuery.isNotEmpty || _selectedOrderStatusFilter != 'All'
+                                    ? 'No Matching Orders'
+                                    : 'No Orders Placed Yet',
+                                style: GoogleFonts.cinzel(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: _textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _orderSearchQuery.isNotEmpty || _selectedOrderStatusFilter != 'All'
+                                    ? 'Try changing your filter settings or search query to view other purchases.'
+                                    : 'Order luxury 240 GSM garments to track live shipment status here.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  color: _subtext,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              if (_orderSearchQuery.isNotEmpty || _selectedOrderStatusFilter != 'All')
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: _goldDark, width: 1.5),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedOrderStatusFilter = 'All';
+                                      _orderSearchQuery = '';
+                                    });
+                                  },
+                                  icon: const Icon(Icons.filter_alt_off_rounded, color: _goldDark, size: 18),
+                                  label: Text(
+                                    'Reset Filters',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: _goldDark,
+                                    ),
+                                  ),
+                                )
+                              else
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _goldDark,
+                                    padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    elevation: 3,
+                                  ),
+                                  onPressed: () => setState(() => _currentTabIndex = 0),
+                                  icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 18),
+                                  label: Text(
+                                    'BROWSE LUXURY CATALOG',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final order = filteredOrders[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: _buildRedesignedOrderCard(context, order),
+                              );
+                            },
+                            childCount: filteredOrders.length,
+                          ),
+                        ),
+                      ),
+              ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildOrdersStatPill(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withAlpha(30)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrdersFilterChip(String label, int count) {
+    final isSelected = _selectedOrderStatusFilter == label;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedOrderStatusFilter = label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? _goldDark : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? _goldDark : _border,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: _goldDark.withAlpha(60),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(4),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : _textDark,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withAlpha(40) : _surfaceBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : _subtext,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRedesignedOrderCard(BuildContext context, OrderModel order) {
+    final firstItem = order.items.isNotEmpty ? order.items.first : null;
+    final titleText = firstItem != null ? firstItem.name : 'VEXA Couture Order';
+    final itemsCount = order.items.fold(0, (sum, item) => sum + item.quantity);
+    final isCancelled = order.status.toLowerCase().contains('cancel');
+    final isDelivered = order.status.toLowerCase().contains('deliver');
+    final isShipped = order.status.toLowerCase().contains('ship') || order.status.toLowerCase().contains('transit') || order.status.toLowerCase().contains('out for delivery');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isShipped ? _gold.withAlpha(100) : _border,
+          width: isShipped ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(12),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Header Row (Order ID, Payment Method & Status Tag)
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFAFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border(bottom: BorderSide(color: _border, width: 0.8)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: order.id));
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Copied Order ID "${order.id}" to clipboard!'),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: _goldDark,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _gold.withAlpha(20),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _gold.withAlpha(80)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                order.id,
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  color: _goldDark,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.copy_rounded, size: 12, color: _goldDark),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _surfaceBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            order.paymentMethod,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: _subtext,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: order.statusColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: order.statusColor.withAlpha(90)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(color: order.statusColor, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        order.status.toUpperCase(),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: order.statusColor,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Main Product Overview Row
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _border),
+                      ),
+                      clipBehavior: Clip.hardEdge,
+                      child: firstItem != null
+                          ? (firstItem.image.startsWith('assets/')
+                              ? Image.asset(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)))
+                              : Image.network(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext))))
+                          : Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)),
+                    ),
+                    if (itemsCount > 1)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0F172A),
+                            borderRadius: BorderRadius.only(topLeft: Radius.circular(8), bottomRight: Radius.circular(14)),
+                          ),
+                          child: Text(
+                            '+${itemsCount - 1} more',
+                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titleText,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: _textDark,
+                          height: 1.25,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (firstItem != null && firstItem.size.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _gold.withAlpha(20),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Size ${firstItem.size}',
+                                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _goldDark),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            '$itemsCount ${itemsCount == 1 ? "item" : "items"}',
+                            style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_today_rounded, size: 12, color: _subtext),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    order.formattedDate,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '₹${order.totalAmount.toStringAsFixed(0)}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: _goldDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Horizontal Progress Step Indicator
+          if (!isCancelled) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1, color: _border),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildMiniStepDot('Placed', true, true),
+                      _buildMiniStepConnector(true),
+                      _buildMiniStepDot('QC / Prep', true, true),
+                      _buildMiniStepConnector(isShipped || isDelivered),
+                      _buildMiniStepDot('In Transit', isShipped || isDelivered, isShipped && !isDelivered),
+                      _buildMiniStepConnector(isDelivered),
+                      _buildMiniStepDot('Delivered', isDelivered, isDelivered),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                ],
+              ),
+            ),
+          ],
+
+          // Footer Actions Row
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFAFC),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+              border: Border(top: BorderSide(color: _border, width: 0.8)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _border),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      _showCustomTeeBottomSheet();
+                    },
+                    icon: const Icon(Icons.help_outline_rounded, size: 15, color: _subtext),
+                    label: Text(
+                      'Need Support',
+                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _subtext),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _goldDark,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => _openHomeOrderDetailSheet(context, order),
+                    icon: const Icon(Icons.alt_route_rounded, size: 15, color: Colors.white),
+                    label: Text(
+                      'Track Order',
+                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStepDot(String label, bool isDone, bool isActive) {
+    final dotColor = isDone ? (isActive ? const Color(0xFF3B82F6) : _goldDark) : _border;
+    return Column(
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: isDone ? dotColor : Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: dotColor, width: 2),
+            boxShadow: isActive
+                ? [BoxShadow(color: dotColor.withAlpha(80), blurRadius: 6)]
+                : null,
+          ),
+          child: isDone
+              ? const Center(child: Icon(Icons.check, size: 9, color: Colors.white))
+              : null,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 9,
+            fontWeight: isDone ? FontWeight.bold : FontWeight.normal,
+            color: isDone ? _textDark : _subtext,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStepConnector(bool isDone) {
+    return Expanded(
+      child: Container(
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 14),
+        color: isDone ? _goldDark : _border,
       ),
     );
   }
@@ -2480,6 +3197,58 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+
+                    // 5. ACTION BUTTONS (DOWNLOAD INVOICE & COURIER ASSIST)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: _goldDark, width: 1.2),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Tax Invoice for ${order.id} generated & saved to downloads! 📄'),
+                                  backgroundColor: _goldDark,
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.download_rounded, color: _goldDark, size: 18),
+                            label: Text(
+                              'Download Invoice',
+                              style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: _goldDark),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () {
+                              _showCustomTeeBottomSheet();
+                            },
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+                            label: Text(
+                              'Courier Support',
+                              style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
                   ],
                 ),
               ),

@@ -70,8 +70,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   }
 
   void _openProductDetail(ItemModel item) {
-    Navigator.push(
-      context,
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
           item: item,

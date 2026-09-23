@@ -256,15 +256,13 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                     ),
                                   ],
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    'V',
-                                    style: GoogleFonts.cinzel(
-                                      fontSize: 54,
-                                      fontWeight: FontWeight.w900,
-                                      color: const Color(0xFFB8860B),
-                                      height: 1.1,
-                                    ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: Image.asset(
+                                    'assets/images/vexa_logo.png',
+                                    width: 92,
+                                    height: 92,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
                               ),

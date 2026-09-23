@@ -80,11 +80,11 @@ export function Navbar() {
           {/* Brand Logo & Name (Optimized for Mobile Responsive) */}
           <Link to="/" className="group flex items-center gap-2.5 sm:gap-3 leading-none shrink-0">
             <img
-              src="/favicon.svg"
+              src="/vexa_logo.png"
               alt="VEXA Logo"
               loading="lazy"
               decoding="async"
-              className="size-7 sm:size-8 rounded-md transition-transform duration-300 group-hover:scale-105 shrink-0"
+              className="size-7 sm:size-8 rounded-md transition-transform duration-300 group-hover:scale-105 shrink-0 object-cover"
             />
             <div className="flex flex-col justify-center">
               <span className="font-display text-xl sm:text-2xl font-bold tracking-[0.28em] sm:tracking-[0.35em] text-gold-gradient leading-none">
@@ -201,7 +201,7 @@ export function Navbar() {
         {/* Drawer Header */}
         <div className="flex items-center justify-between border-b border-gold/30 p-5">
           <div className="flex items-center gap-2.5">
-            <img src="/favicon.svg" alt="VEXA" className="size-7 rounded-md" />
+            <img src="/vexa_logo.png" alt="VEXA" className="size-7 rounded-md object-cover" />
             <span className="font-display text-lg font-bold tracking-[0.25em] text-gold-gradient">
               VEXA
             </span>

@@ -6,7 +6,6 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
 const Color _goldDark = Color(0xFF8B6508);
-const Color _gold = Color(0xFFB8860B);
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -216,13 +215,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: _gold.withAlpha(25),
-                                  shape: BoxShape.circle,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.asset(
+                                  'assets/images/vexa_logo.png',
+                                  width: 24,
+                                  height: 24,
+                                  fit: BoxFit.cover,
                                 ),
-                                child: const Icon(Icons.checkroom_rounded, color: _goldDark, size: 18),
                               ),
                               const SizedBox(width: 8),
                               Text(

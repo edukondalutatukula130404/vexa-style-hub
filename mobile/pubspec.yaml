@@ -62,6 +62,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/images/vexa_logo.png
     - assets/images/hero_luxury_tshirt.png
     - assets/images/promo_banner_1.png
     - assets/images/promo_banner_2.png

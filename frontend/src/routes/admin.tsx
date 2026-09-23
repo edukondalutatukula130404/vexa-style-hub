@@ -28,7 +28,10 @@ import {
   Menu,
   Ticket,
   Star,
-  Settings
+  Settings,
+  Bell,
+  BellRing,
+  CheckCheck
 } from "lucide-react";
 import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
 import promoBanner1 from "@/assets/promo_banner_1.png";
@@ -95,9 +98,169 @@ export function Admin() {
   const { products: catalogProducts } = useProducts();
   const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "orders" | "add-item" | "categories" | "users" | "home-media" | "coupons" | "reviews" | "settings" | string>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const isExpanded = !sidebarCollapsed || sidebarHovered;
+
+  // Real-time Admin Notifications State
+  type NotificationItem = {
+    id: string;
+    title: string;
+    message: string;
+    time: string;
+    timestamp: number;
+    read: boolean;
+    type: "order" | "user" | "inventory" | "system";
+    targetTab?: string;
+  };
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("vexa_admin_notifications");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      {
+        id: "notif-1",
+        title: "New Order Booking",
+        message: "Order #VX-849202 placed by Kabir Mehta for ₹3,499",
+        time: "Just now",
+        timestamp: Date.now() - 1000 * 60 * 2,
+        read: false,
+        type: "order",
+        targetTab: "orders",
+      },
+      {
+        id: "notif-2",
+        title: "Low Inventory Alert",
+        message: "Emerald Acid Wash Boxy Tee is low in stock (14 items left)",
+        time: "12m ago",
+        timestamp: Date.now() - 1000 * 60 * 12,
+        read: false,
+        type: "inventory",
+        targetTab: "inventory",
+      },
+      {
+        id: "notif-3",
+        title: "New Registered User",
+        message: "Rohan Verma created an account on VEXA Style Hub",
+        time: "45m ago",
+        timestamp: Date.now() - 1000 * 60 * 45,
+        read: true,
+        type: "user",
+        targetTab: "users",
+      },
+    ];
+  });
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unreadNotifCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("vexa_admin_notifications", JSON.stringify(notifications));
+      } catch (e) {}
+    }
+  }, [notifications]);
+
+  // Realtime notification sync with new orders
+  useEffect(() => {
+    const handleNewOrderNotif = () => {
+      if (typeof window === "undefined") return;
+      try {
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        if (cached && cached.length > 0) {
+          const latest = cached[0];
+          const rawId = latest._id || latest.id || Date.now().toString();
+          const notifId = `notif-order-${rawId}`;
+          const shortCode = String(rawId).slice(-6).toUpperCase();
+
+          setNotifications((prev) => {
+            if (prev.some((n) => n.id === notifId)) return prev;
+            const newNotif: NotificationItem = {
+              id: notifId,
+              title: "⚡ Realtime Booking Received",
+              message: `New Order #${shortCode} placed by ${latest.userName || latest.userEmail || "Customer"} (₹${(latest.totalAmount || 1999).toLocaleString("en-IN")})`,
+              time: "Just now",
+              timestamp: Date.now(),
+              read: false,
+              type: "order",
+              targetTab: "orders",
+            };
+            return [newNotif, ...prev];
+          });
+        }
+      } catch (e) {
+        console.warn("Realtime order notification update error:", e);
+      }
+    };
+
+    window.addEventListener("vexa_orders_updated", handleNewOrderNotif);
+    return () => {
+      window.removeEventListener("vexa_orders_updated", handleNewOrderNotif);
+    };
+  }, []);
+
+  const handleMarkAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const handleClearNotifications = () => {
+    setNotifications([]);
+  };
+
+  const handleDeleteSingleNotification = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const handleRestoreSampleNotifications = () => {
+    setNotifications([
+      {
+        id: "notif-1",
+        title: "New Order Booking",
+        message: "Order #VX-849202 placed by Kabir Mehta for ₹3,499",
+        time: "Just now",
+        timestamp: Date.now() - 1000 * 60 * 2,
+        read: false,
+        type: "order",
+        targetTab: "orders",
+      },
+      {
+        id: "notif-2",
+        title: "Low Inventory Alert",
+        message: "Emerald Acid Wash Boxy Tee is low in stock (14 items left)",
+        time: "12m ago",
+        timestamp: Date.now() - 1000 * 60 * 12,
+        read: false,
+        type: "inventory",
+        targetTab: "inventory",
+      },
+      {
+        id: "notif-3",
+        title: "New Registered User",
+        message: "Rohan Verma created an account on VEXA Style Hub",
+        time: "45m ago",
+        timestamp: Date.now() - 1000 * 60 * 45,
+        read: true,
+        type: "user",
+        targetTab: "users",
+      },
+    ]);
+  };
+
+  const handleNotificationClick = (notif: NotificationItem) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
+    );
+    if (notif.targetTab) {
+      setActiveTab(notif.targetTab);
+    }
+    setNotifOpen(false);
+  };
 
   // Category Manager State
   const [categoriesList, setCategoriesList] = useState<string[]>(() => {
@@ -1009,9 +1172,11 @@ export function Admin() {
           <div className="lg:hidden w-full space-y-3 sticky top-2 z-30 bg-background/95 backdrop-blur-md pb-2">
             <div className="flex items-center justify-between rounded-xl border border-gold/40 bg-card p-4 shadow-sm">
               <div className="flex items-center gap-3 shrink-0">
-                <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
-                  V
-                </div>
+                <img
+                  src="/vexa_logo.png"
+                  alt="VEXA Logo"
+                  className="size-10 rounded-[10px] object-cover shadow-md border border-gold/40 shrink-0"
+                />
                 <div className="flex flex-col justify-center space-y-1">
                   <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none">
                     V E X A
@@ -1077,22 +1242,48 @@ export function Admin() {
             </div>
           </div>
 
-          {/* DESKTOP ADMIN SIDEBAR (>= lg): Permanently Fixed Panel (No Auto-Hide, No Hamburger) */}
-          <aside className="hidden lg:block fixed top-6 sm:top-8 bottom-6 sm:bottom-8 left-4 sm:left-6 z-50 w-[280px]">
+          {/* Mobile Overlay Backdrop */}
+          {!sidebarCollapsed && (
+            <div
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden transition-opacity"
+              onClick={() => setSidebarCollapsed(true)}
+            />
+          )}
+
+          {/* ADMIN SIDEBAR: Drawer on mobile, fixed panel on desktop, toggled via hamburger */}
+          <aside
+            className={`fixed top-4 sm:top-8 bottom-4 sm:bottom-8 left-4 sm:left-6 z-50 w-[280px] transition-all duration-300 ease-in-out ${
+              sidebarCollapsed
+                ? "-translate-x-[340px] opacity-0 pointer-events-none"
+                : "translate-x-0 opacity-100 pointer-events-auto"
+            }`}
+          >
             <div className="h-full rounded-2xl border border-gold/50 bg-card/95 backdrop-blur-xl p-5 shadow-2xl flex flex-col justify-between">
-              {/* Header Logo */}
-              <div className="flex items-center gap-3 border-b border-border pb-4 shrink-0">
-                <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
-                  V
+              {/* Header Logo & 3-Line Hamburger Icon Toggle */}
+              <div className="flex items-center justify-between border-b border-border pb-4 shrink-0">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <img
+                    src="/vexa_logo.png"
+                    alt="VEXA Logo"
+                    className="size-10 rounded-[10px] object-cover shadow-md border border-gold/40 shrink-0"
+                  />
+                  <div className="flex flex-col justify-center space-y-1 overflow-hidden">
+                    <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
+                      V E X A
+                    </span>
+                    <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
+                      WEAR CONFIDENCE
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col justify-center space-y-1 overflow-hidden">
-                  <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none truncate">
-                    V E X A
-                  </span>
-                  <span className="text-[8px] uppercase tracking-[0.28em] text-muted-foreground font-semibold leading-none truncate">
-                    WEAR CONFIDENCE
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="p-1.5 rounded-lg border border-gold/30 bg-surface hover:bg-gold/15 text-gold transition-colors cursor-pointer shrink-0"
+                  title="Hide Sidebar"
+                >
+                  <Menu className="size-5 text-gold" />
+                </button>
               </div>
 
               {/* Middle Scrollable Section Navigation List */}
@@ -1105,7 +1296,12 @@ export function Admin() {
                       key={t.id}
                       type="button"
                       title={t.label}
-                      onClick={() => setActiveTab(t.id as any)}
+                      onClick={() => {
+                        setActiveTab(t.id as any);
+                        if (window.innerWidth < 1024) {
+                          setSidebarCollapsed(true);
+                        }
+                      }}
                       className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
                         isSelected
                           ? "bg-gold text-primary-foreground shadow-goldy font-extrabold"
@@ -1137,14 +1333,200 @@ export function Admin() {
             </div>
           </aside>
 
-          {/* ADMIN CONTENT COLUMN: Fixed left margin keeps content aligned beside fixed sidebar */}
-          <div className="flex-1 min-w-0 flex flex-col w-full lg:ml-[304px]">
+          {/* ADMIN CONTENT COLUMN: Adjusts left margin dynamically when sidebar shows/hides */}
+          <div className={`flex-1 min-w-0 flex flex-col w-full transition-[margin] duration-300 ease-in-out ${sidebarCollapsed ? "lg:ml-0" : "lg:ml-[304px]"}`}>
             {/* MAIN CONTENT AREA */}
-            <main className="w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
+            <main className="relative w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
+              {/* 3-Lines Hamburger Icon Toggle Button when Sidebar is Collapsed (Top-Left Aligned) */}
+              {sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(false)}
+                  aria-label="Show Sidebar"
+                  className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30 flex items-center justify-center p-2.5 rounded-xl border border-gold/40 bg-surface/80 hover:bg-gold/15 text-gold transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
+                  title="Show Sidebar Menu"
+                >
+                  <Menu className="size-5 text-gold" />
+                </button>
+              )}
+              {/* REALTIME ADMIN NOTIFICATION BELL (Aligned Inside Main Card Header) */}
+              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setNotifOpen(!notifOpen)}
+                    aria-label="Admin Notifications"
+                    className="relative flex items-center justify-center p-2.5 rounded-xl border border-gold/40 bg-surface/80 hover:bg-gold/15 text-gold transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
+                    title="Realtime Notifications"
+                  >
+                    <Bell className="size-5 text-gold" />
+                    {unreadNotifCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-black text-destructive-foreground shadow-md animate-bounce">
+                        {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Realtime Notification Popover Dropdown */}
+                  {notifOpen && (
+                    <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 rounded-2xl border border-gold/50 bg-card/98 backdrop-blur-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200">
+                      {/* Header with READ ALL & DELETE ALL Buttons */}
+                      <div className="flex items-center justify-between border-b border-border/80 pb-3 gap-2">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <BellRing className="size-4 text-gold shrink-0 animate-pulse" />
+                          <h3 className="font-display text-xs sm:text-sm font-extrabold tracking-wider uppercase text-foreground truncate">
+                            Notifications
+                          </h3>
+                          {unreadNotifCount > 0 && (
+                            <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-extrabold text-gold border border-gold/40 shrink-0">
+                              {unreadNotifCount} New
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Top Action Controls: READ ALL & DELETE ALL */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={handleMarkAllRead}
+                            disabled={notifications.length === 0 || unreadNotifCount === 0}
+                            className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer ${
+                              unreadNotifCount > 0
+                                ? "bg-gold/15 text-gold border border-gold/40 hover:bg-gold hover:text-primary-foreground"
+                                : "text-muted-foreground/60 bg-surface/50 border border-border/50 cursor-not-allowed"
+                            }`}
+                            title="Mark all notifications as read"
+                          >
+                            <CheckCheck className="size-3" />
+                            <span>Read All</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleClearNotifications}
+                            disabled={notifications.length === 0}
+                            className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer ${
+                              notifications.length > 0
+                                ? "bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive hover:text-white"
+                                : "text-muted-foreground/60 bg-surface/50 border border-border/50 cursor-not-allowed"
+                            }`}
+                            title="Delete all notifications"
+                          >
+                            <Trash2 className="size-3" />
+                            <span>Delete All</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Notifications Scrollable List */}
+                      <div className="my-3 max-h-80 space-y-2 overflow-y-auto no-scrollbar pr-1">
+                        {notifications.length === 0 ? (
+                          <div className="py-8 text-center space-y-3">
+                            <Bell className="size-8 text-gold/40 mx-auto" />
+                            <p className="text-xs text-muted-foreground font-medium">
+                              No active notifications right now.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleRestoreSampleNotifications}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gold/40 bg-gold/10 text-gold font-bold text-[10px] uppercase tracking-wider hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-xs"
+                            >
+                              <RefreshCw className="size-3" />
+                              <span>Restore Demo Notifications</span>
+                            </button>
+                          </div>
+                        ) : (
+                          notifications.map((n) => {
+                            return (
+                              <div
+                                key={n.id}
+                                onClick={() => handleNotificationClick(n)}
+                                className={`group relative flex items-start gap-3 rounded-xl p-3 transition-all cursor-pointer border ${
+                                  !n.read
+                                    ? "border-gold/40 bg-gold/5 hover:bg-gold/15"
+                                    : "border-border/50 bg-card/50 hover:bg-surface"
+                                }`}
+                              >
+                                <div className={`mt-0.5 p-2 rounded-lg shrink-0 ${
+                                  n.type === "order"
+                                    ? "bg-amber-500/15 text-amber-500"
+                                    : n.type === "inventory"
+                                    ? "bg-rose-500/15 text-rose-500"
+                                    : "bg-blue-500/15 text-blue-500"
+                                }`}>
+                                  {n.type === "order" ? (
+                                    <ShoppingCart className="size-4" />
+                                  ) : n.type === "inventory" ? (
+                                    <Boxes className="size-4" />
+                                  ) : (
+                                    <Users className="size-4" />
+                                  )}
+                                </div>
+
+                                <div className="flex-1 space-y-1 min-w-0 pr-6">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <h4 className={`text-xs font-bold leading-tight truncate ${!n.read ? "text-gold" : "text-foreground"}`}>
+                                      {n.title}
+                                    </h4>
+                                    <span className="text-[9px] font-medium text-muted-foreground whitespace-nowrap">
+                                      {n.time}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                                    {n.message}
+                                  </p>
+                                </div>
+
+                                {/* Item Delete Button on Hover */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDeleteSingleNotification(e, n.id)}
+                                  className="absolute top-2.5 right-2.5 p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                  title="Delete notification"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground font-medium flex items-center gap-1.5 text-[10px]">
+                          <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Realtime Sync Active
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleMarkAllRead}
+                            disabled={notifications.length === 0 || unreadNotifCount === 0}
+                            className="text-gold hover:underline font-bold text-[10px] uppercase tracking-wider disabled:opacity-40 cursor-pointer"
+                          >
+                            Read All
+                          </button>
+                          <span className="text-border">•</span>
+                          <button
+                            type="button"
+                            onClick={handleClearNotifications}
+                            disabled={notifications.length === 0}
+                            className="text-destructive hover:underline font-bold text-[10px] uppercase tracking-wider disabled:opacity-40 cursor-pointer"
+                          >
+                            Delete All
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             {/* TAB: INVENTORY MANAGEMENT */}
             {activeTab === "inventory" && (
               <div className="space-y-8 animate-in fade-in duration-300">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4 transition-all ${sidebarCollapsed ? "pl-12 sm:pl-14" : ""}`}>
                   <div>
                     <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Stock Control Panel</span>
                     <h2 className="font-display text-2xl font-semibold text-foreground">Inventory & Warehouse Management</h2>
@@ -1377,7 +1759,7 @@ export function Admin() {
             {/* TAB 1: OVERVIEW */}
             {activeTab === "overview" && (
               <div className="space-y-8">
-                <div className="border-b border-border pb-4">
+                <div className={`border-b border-border pb-4 transition-all ${sidebarCollapsed ? "pl-12 sm:pl-14" : ""}`}>
                   <h2 className="font-display text-2xl font-semibold text-foreground">Analytics & Store Metrics</h2>
                   <p className="text-xs text-muted-foreground mt-1">Live metrics across sales, bookings, and inventory.</p>
                 </div>
@@ -1480,9 +1862,11 @@ export function Admin() {
                     {/* Printable Official Brand Logo Header */}
                     <div className="flex items-center justify-between border-b border-border pb-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-[10px] bg-black text-gold font-extrabold text-xl leading-none shadow-md border border-gold/40 shrink-0">
-                          V
-                        </div>
+                        <img
+                          src="/vexa_logo.png"
+                          alt="VEXA Logo"
+                          className="size-10 rounded-[10px] object-cover shadow-md border border-gold/40 shrink-0"
+                        />
                         <div className="flex flex-col justify-center space-y-0.5">
                           <span className="font-display text-base font-extrabold tracking-[0.25em] text-gold leading-none">
                             V E X A

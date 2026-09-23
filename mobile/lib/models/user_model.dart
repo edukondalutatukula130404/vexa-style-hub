@@ -1,6 +1,7 @@
 class UserModel {
   final String id;
   final String name;
+  final String companyName;
   final String email;
   final String role;
   final String? token;
@@ -9,6 +10,7 @@ class UserModel {
   UserModel({
     required this.id,
     required this.name,
+    this.companyName = 'VEXA Style Hub',
     required this.email,
     required this.role,
     this.token,
@@ -19,6 +21,7 @@ class UserModel {
     return UserModel(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? 'User',
+      companyName: json['companyName'] ?? json['company'] ?? 'VEXA Style Hub',
       email: json['email'] ?? '',
       role: json['role'] ?? 'user',
       token: token ?? json['token'],
@@ -30,6 +33,7 @@ class UserModel {
     return {
       '_id': id,
       'name': name,
+      'companyName': companyName,
       'email': email,
       'role': role,
       'token': token,

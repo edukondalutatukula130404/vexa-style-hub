@@ -41,6 +41,7 @@ class ProductsScreen extends StatefulWidget {
   final Set<String> favoriteIds;
   final Function(String id)? onToggleFavorite;
   final bool showBackButton;
+  final VoidCallback? onBackTap;
 
   const ProductsScreen({
     super.key,
@@ -48,7 +49,8 @@ class ProductsScreen extends StatefulWidget {
     this.onAddToCart,
     required this.favoriteIds,
     this.onToggleFavorite,
-    this.showBackButton = false,
+    this.showBackButton = true,
+    this.onBackTap,
   });
 
   @override
@@ -137,8 +139,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   void _openProductDetail(ItemModel item) {
-    Navigator.push(
-      context,
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
           item: item,
@@ -440,7 +441,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
         leading: widget.showBackButton
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  if (widget.onBackTap != null) {
+                    widget.onBackTap!();
+                  } else if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                },
               )
             : null,
         titleSpacing: widget.showBackButton ? 0 : 16,

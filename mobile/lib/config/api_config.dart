@@ -5,17 +5,26 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
+  /// PRODUCTION TOGGLE FLAG:
+  /// true  => Live Production Server (https://clothing.speshway.site/api) - Works on ANY network (4G, 5G, Cellular Data, Wi-Fi worldwide)
+  /// false => Local Development Server (http://192.168.1.31:5000/api or localhost / emulator)
+  static const bool isProduction = false;
+
+  static const String productionUrl = 'https://clothing.speshway.site/api';
   static const String localWifiUrl = 'http://192.168.1.31:5000/api';
   static const String _defaultAndroidUrl = 'http://10.0.2.2:5000/api';
-  static const String _defaultStandardUrl = 'http://127.0.0.1:5000/api';
+  static const String _defaultStandardUrl = productionUrl;
 
   static String _overrideBaseUrl = '';
   static String _discoveredBaseUrl = '';
 
   /// Reactive notifier to broadcast server URL updates to all UI components
-  static final ValueNotifier<String> baseUrlNotifier = ValueNotifier<String>(_defaultStandardUrl);
+  static final ValueNotifier<String> baseUrlNotifier = ValueNotifier<String>(
+    isProduction ? productionUrl : localWifiUrl,
+  );
 
   static const List<String> defaultCandidates = [
+    productionUrl,
     localWifiUrl,
     _defaultAndroidUrl,
     _defaultStandardUrl,
@@ -27,14 +36,14 @@ class ApiConfig {
   /// Cleans and normalizes any server input string into a valid API URL endpoint
   static String normalizeUrl(String input) {
     var raw = input.trim();
-    if (raw.isEmpty) return _defaultStandardUrl;
+    if (raw.isEmpty) return productionUrl;
 
     // Strip trailing slashes
     raw = raw.replaceAll(RegExp(r'/*$'), '');
 
     // Ensure scheme (http:// or https://)
     if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
-      raw = 'http://$raw';
+      raw = 'https://$raw';
     }
 
     // Append default port :5000 if raw has no port and is IP format (e.g. 192.168.x.x)
@@ -83,13 +92,13 @@ class ApiConfig {
     if (_overrideBaseUrl.isNotEmpty) {
       return _overrideBaseUrl;
     }
+    if (isProduction) {
+      return productionUrl;
+    }
     if (_discoveredBaseUrl.isNotEmpty) {
       return _discoveredBaseUrl;
     }
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return localWifiUrl;
-    }
-    return _defaultStandardUrl;
+    return localWifiUrl;
   }
 
   static void _notifyUrlChanged() {
@@ -181,4 +190,8 @@ class ApiConfig {
   // Catalog items and health check endpoints
   static String get itemsUrl => '$baseUrl/items';
   static String get healthUrl => '$baseUrl/health';
+
+  // Razorpay payment endpoints
+  static String get razorpayCreateOrderUrl => '$baseUrl/payment/create-order';
+  static String get razorpayVerifyPaymentUrl => '$baseUrl/payment/verify-payment';
 }

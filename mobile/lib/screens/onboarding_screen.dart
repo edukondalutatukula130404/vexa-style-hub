@@ -111,15 +111,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Text(
-                            'V',
-                            style: GoogleFonts.cinzel(
-                              color: _gold,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 17,
-                              height: 1.1,
-                            ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: Image.asset(
+                            'assets/images/vexa_logo.png',
+                            width: 34,
+                            height: 34,
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),

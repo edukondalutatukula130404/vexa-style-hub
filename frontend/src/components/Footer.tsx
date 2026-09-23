@@ -12,9 +12,12 @@ export function Footer() {
     <footer className="border-t border-border bg-surface/40">
       <div className="mx-auto grid max-w-7xl gap-8 sm:gap-12 px-5 py-12 sm:py-16 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
-            VEXA
-          </span>
+          <div className="flex items-center gap-2.5">
+            <img src="/vexa_logo.png" alt="VEXA Logo" className="size-8 rounded-md object-cover" />
+            <span className="font-display text-2xl tracking-[0.35em] text-gold-gradient">
+              VEXA
+            </span>
+          </div>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
             Premium oversized essentials, engineered from long-staple cotton and
             finished by hand. Wear confidence. Wear style.
@@ -99,8 +102,11 @@ export function Footer() {
       </div>
 
       <div className="py-6 text-center text-xs tracking-[0.15em] text-muted-foreground space-y-2">
-        <div className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[0.35em] text-gold-gradient py-1">
-          V E X A
+        <div className="flex items-center justify-center gap-3 py-1">
+          <img src="/vexa_logo.png" alt="VEXA Logo" className="size-9 sm:size-11 rounded-lg object-cover" />
+          <div className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[0.35em] text-gold-gradient">
+            V E X A
+          </div>
         </div>
         <p>© {new Date().getFullYear()} VEXA APPAREL — ALL RIGHTS RESERVED</p>
       </div>

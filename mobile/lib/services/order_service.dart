@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'auth_service.dart';
 
 class OrderItem {
   final String itemId;
@@ -133,6 +134,13 @@ class OrderModel {
 }
 
 class OrderService {
+  /// Notifier triggered whenever orders are created, updated, or cancelled
+  static final ValueNotifier<int> ordersChangeNotifier = ValueNotifier<int>(0);
+
+  static void notifyOrdersChanged() {
+    ordersChangeNotifier.value++;
+  }
+
   static final List<OrderModel> _inMemoryOrders = [
     OrderModel(
       id: '#VX-8834',
@@ -181,7 +189,12 @@ class OrderService {
   /// Retrieve all user orders (combining in-memory + backend API if accessible)
   static Future<List<OrderModel>> getOrders({String? email}) async {
     try {
-      final userEmail = email ?? 'admin@vexa.com';
+      String userEmail = (email != null && email.isNotEmpty) ? email : '';
+      if (userEmail.isEmpty) {
+        final user = await AuthService.getUser();
+        userEmail = user?.email ?? 'admin@vexa.com';
+      }
+
       final response = await http
           .get(Uri.parse('${ApiConfig.baseUrl}/orders/myorders?email=$userEmail'))
           .timeout(const Duration(seconds: 4));
@@ -226,7 +239,11 @@ class OrderService {
     String? email,
   }) async {
     final orderId = '#VX-${(1000 + _inMemoryOrders.length + DateTime.now().millisecond % 8999)}';
-    final userEmail = (email != null && email.isNotEmpty) ? email : 'admin@vexa.com';
+    String userEmail = (email != null && email.isNotEmpty) ? email : '';
+    if (userEmail.isEmpty) {
+      final user = await AuthService.getUser();
+      userEmail = user?.email ?? 'admin@vexa.com';
+    }
 
     final newOrder = OrderModel(
       id: orderId,
@@ -241,8 +258,11 @@ class OrderService {
       items: items,
     );
 
-    // Save to local in-memory list immediately
+    // Save to local in-memory list immediately at top of list
     _inMemoryOrders.insert(0, newOrder);
+
+    // Notify all listening UI components (My Orders screens, Profile, Home)
+    notifyOrdersChanged();
 
     // Sync to backend asynchronously
     try {
@@ -278,6 +298,8 @@ class OrderService {
         break;
       }
     }
+
+    notifyOrdersChanged();
 
     try {
       await http.put(

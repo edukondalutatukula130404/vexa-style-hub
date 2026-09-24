@@ -237,6 +237,18 @@ export function getProductImage(item: any): string {
   if (nameStr.includes("indigo") || nameStr.includes("midnight") || nameStr.includes("navy")) return navy;
   if (nameStr.includes("charcoal")) return charcoal;
 
+  const colorStr = (item.color || "").toLowerCase().trim();
+  if (colorStr.includes("emerald")) return emerald;
+  if (colorStr.includes("lavender") || colorStr.includes("lilac")) return lavender;
+  if (colorStr.includes("rust")) return rust;
+  if (colorStr.includes("sand") || colorStr.includes("desert") || colorStr.includes("beige")) return beige;
+  if (colorStr.includes("olive")) return olive;
+  if (colorStr.includes("gold") || colorStr.includes("cream")) return luxuryGold;
+  if (colorStr.includes("obsidian") || colorStr.includes("jet") || colorStr.includes("black")) return black;
+  if (colorStr.includes("ivory") || colorStr.includes("white")) return white;
+  if (colorStr.includes("midnight") || colorStr.includes("navy")) return navy;
+  if (colorStr.includes("charcoal") || colorStr.includes("grey")) return charcoal;
+
   const imgStr = (item.image || "").toLowerCase().trim();
   if (imgStr.includes("emerald")) return emerald;
   if (imgStr.includes("lavender")) return lavender;
@@ -249,7 +261,17 @@ export function getProductImage(item: any): string {
   if (imgStr.includes("navy") || imgStr.includes("indigo")) return navy;
   if (imgStr.includes("charcoal")) return charcoal;
 
-  if (item.image && typeof item.image === "string" && item.image.trim() && !item.image.includes("unsplash.com") && !item.image.startsWith("assets/")) {
+  if (
+    item.image &&
+    typeof item.image === "string" &&
+    item.image.trim() &&
+    !item.image.includes("unsplash.com") &&
+    !item.image.startsWith("assets/") &&
+    (item.image.startsWith("http://") ||
+      item.image.startsWith("https://") ||
+      item.image.startsWith("data:") ||
+      item.image.startsWith("/"))
+  ) {
     return item.image;
   }
 

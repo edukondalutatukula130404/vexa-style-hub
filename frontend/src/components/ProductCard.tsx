@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Star, ShoppingBag, Eye, X, Check, ArrowRight, Minus, Plus, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { SIZES, getVariantStock, type Product } from "@/lib/products";
+import { SIZES, getVariantStock, type Product, getProductImage } from "@/lib/products";
+import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
 import { useAuth } from "@/lib/auth";
 import { addToCart } from "@/lib/cart";
 import { useWishlist, toggleWishlist } from "@/lib/wishlist";
@@ -58,12 +59,15 @@ export function ProductCard({ product }: { product: Product }) {
       >
         <div className="relative overflow-hidden shrink-0 aspect-[4/5] w-full bg-surface">
           <img
-            src={product.image}
+            src={getProductImage(product)}
             alt={`${product.name} in ${product.color}`}
             loading="lazy"
             decoding="async"
             width={900}
             height={1100}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = heroLuxuryImg;
+            }}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
 
@@ -179,8 +183,11 @@ export function ProductCard({ product }: { product: Product }) {
                 {/* Product Image */}
                 <div className="relative overflow-hidden rounded-lg border border-border">
                   <img
-                    src={product.image}
+                    src={getProductImage(product)}
                     alt={product.name}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = heroLuxuryImg;
+                    }}
                     className="h-80 sm:h-96 w-full object-cover"
                   />
                   <span className="absolute left-3 top-3 rounded-full border border-gold/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] uppercase tracking-wider text-[#1c1917] font-extrabold shadow-md">

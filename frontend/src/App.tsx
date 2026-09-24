@@ -4,6 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { MobileFrameWrapper } from "@/components/MobileFrameWrapper";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { vexaSocket } from "@/lib/socket";
 
 // Route Pages
 import { Home } from "@/routes/index";
@@ -31,6 +32,10 @@ function ScrollToTop() {
 
 function Layout() {
   const location = useLocation();
+
+  useEffect(() => {
+    vexaSocket.connect();
+  }, []);
   const hideFooter =
     location.pathname === "/dashboard" ||
     location.pathname === "/admin" ||

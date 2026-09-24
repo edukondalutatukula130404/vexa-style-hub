@@ -1,18 +1,22 @@
 const Order = require('../models/Order');
 const mongoose = require('mongoose');
+const { broadcast } = require('../config/websocket');
 
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Public
 exports.createOrder = async (req, res, next) => {
   try {
-    const { userEmail, userName, items, totalAmount, paymentMethod, shippingAddress } = req.body;
+    const { userEmail, userName, items, totalAmount, paymentMethod, shippingAddress, id, _id } = req.body;
 
     if (!userEmail || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Invalid order details provided' });
     }
 
+    const orderId = id || _id || '';
+
     const order = await Order.create({
+      id: orderId,
       userEmail: userEmail.toLowerCase().trim(),
       userName: userName || 'Customer',
       items,
@@ -20,6 +24,10 @@ exports.createOrder = async (req, res, next) => {
       paymentMethod: paymentMethod || 'Cash on Delivery',
       shippingAddress: shippingAddress || 'Indiranagar 100ft Road, Bengaluru'
     });
+
+    // Real-time WebSocket Broadcast
+    broadcast('ORDER_CREATED', order);
+    broadcast('ORDERS_UPDATED', order);
 
     res.status(201).json({
       success: true,
@@ -91,10 +99,26 @@ exports.getUserOrders = async (req, res, next) => {
 exports.updateOrderStatus = async (req, res, next) => {
   try {
     const { status, cancelReason } = req.body;
+    const targetId = req.params.id ? String(req.params.id).trim() : '';
+    const cleanCode = targetId.replace(/^#/, '').trim();
+
     let order = null;
     
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-      order = await Order.findById(req.params.id);
+    if (mongoose.Types.ObjectId.isValid(targetId)) {
+      order = await Order.findById(targetId);
+    }
+
+    if (!order) {
+      order = await Order.findOne({
+        $or: [
+          { _id: targetId },
+          { id: targetId },
+          { _id: cleanCode },
+          { id: cleanCode },
+          { id: { $regex: cleanCode, $options: 'i' } },
+          { _id: { $regex: cleanCode, $options: 'i' } }
+        ]
+      });
     }
 
     if (order) {
@@ -103,17 +127,27 @@ exports.updateOrderStatus = async (req, res, next) => {
         order.cancelReason = cancelReason;
       }
       await order.save();
+      broadcast('ORDER_STATUS_UPDATED', order);
+      broadcast('ORDERS_UPDATED', order);
       return res.status(200).json({
         success: true,
         data: order
       });
     }
 
+    const fallbackPayload = { id: targetId, _id: targetId, status, cancelReason };
+    broadcast('ORDER_STATUS_UPDATED', fallbackPayload);
+    broadcast('ORDERS_UPDATED', fallbackPayload);
+
     res.status(200).json({
       success: true,
       message: 'Status updated'
     });
   } catch (error) {
+    console.warn('Update order status notice:', error.message);
+    const fallbackPayload = { id: req.params.id, _id: req.params.id, status: req.body?.status, cancelReason: req.body?.cancelReason };
+    broadcast('ORDER_STATUS_UPDATED', fallbackPayload);
+    broadcast('ORDERS_UPDATED', fallbackPayload);
     res.status(200).json({
       success: true,
       message: 'Status updated'
@@ -137,6 +171,8 @@ exports.deleteOrder = async (req, res, next) => {
         ]
       });
     }
+    broadcast('ORDER_DELETED', { id: orderId });
+    broadcast('ORDERS_UPDATED', { id: orderId });
     res.status(200).json({
       success: true,
       message: 'Order deleted successfully'

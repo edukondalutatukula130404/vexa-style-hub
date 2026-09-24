@@ -85,23 +85,25 @@ const ensurePortFree = (port) => {
   }
 };
 
-ensurePortFree(PORT);
+const { initWebSocket } = require('./config/websocket');
 
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+function startServer() {
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+    initWebSocket(server);
+  });
 
-// Ready: VEXA MERN Stack Server
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.warn(`⚠️ Port ${PORT} busy. Clearing stale process...`);
-    ensurePortFree(PORT);
-    setTimeout(() => {
-      app.listen(PORT, () => {
-        console.log(`🚀 Server restarted cleanly on port ${PORT}`);
-      });
-    }, 1000);
-  } else {
-    console.error('Server error:', err);
-  }
-});
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`⚠️ Port ${PORT} busy. Clearing stale process...`);
+      ensurePortFree(PORT);
+      setTimeout(() => {
+        startServer();
+      }, 1000);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+}
+
+startServer();

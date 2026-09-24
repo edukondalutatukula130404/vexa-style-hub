@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'config/api_config.dart';
+import 'services/websocket_service.dart';
 import 'screens/cart_screen.dart';
 import 'screens/forget_password_screen.dart';
 import 'screens/home_screen.dart';
@@ -14,6 +15,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize ApiConfig asynchronously
   ApiConfig.init();
+  // Initialize Realtime WebSocket Connection for immediate data updates without refresh
+  VexaWebSocketService().connect();
   runApp(const VexaMobileApp());
 }
 

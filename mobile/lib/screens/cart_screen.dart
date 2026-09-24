@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/item_model.dart';
@@ -872,8 +873,9 @@ class _CartScreenState extends State<CartScreen> {
           String razorpayOrderId = '';
           String currentPaymentId = 'pay_${DateTime.now().millisecondsSinceEpoch.toString().substring(3)}';
 
-          // Countdown timer state (11:54)
+          // Countdown timer state (11:54 dynamic countdown)
           int timerSeconds = 714; // 11 min 54 sec
+          Timer? countTimer;
 
           // Controllers for Card details
           final cardNumberCtrl = TextEditingController(text: '4532 8892 1092 8892');
@@ -881,13 +883,31 @@ class _CartScreenState extends State<CartScreen> {
           final cardCvvCtrl = TextEditingController(text: '778');
           final cardHolderCtrl = TextEditingController(text: customerName.isNotEmpty ? customerName : 'John Doe');
 
-          return Scaffold(
-            backgroundColor: step == 4 ? const Color(0xFF00A859) : const Color(0xFFD8B475),
-            body: SafeArea(
-              top: true,
-              bottom: true,
-              child: StatefulBuilder(
-                builder: (ctx, setGateState) {
+          return PopScope(
+            onPopInvokedWithResult: (didPop, result) {
+              countTimer?.cancel();
+            },
+            child: Scaffold(
+              backgroundColor: step == 4 ? const Color(0xFF00A859) : const Color(0xFFD8B475),
+              body: SafeArea(
+                top: true,
+                bottom: true,
+                child: StatefulBuilder(
+                  builder: (ctx, setGateState) {
+                    // Start countdown timer if not already running
+                    countTimer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+                      if (pageCtx.mounted) {
+                        if (timerSeconds > 0) {
+                          setGateState(() {
+                            timerSeconds--;
+                          });
+                        } else {
+                          t.cancel();
+                        }
+                      } else {
+                        t.cancel();
+                      }
+                    });
                   // Trigger Razorpay Order Creation via backend on launch
                   if (razorpayOrderId.isEmpty) {
                     ApiService.createRazorpayOrder(amount: amount).then((res) {
@@ -1748,10 +1768,11 @@ class _CartScreenState extends State<CartScreen> {
                 },
               ),
             ),
-          );
-        },
-      ),
-    );
+          ),
+        );
+      },
+    ),
+  );
   }
 
   Widget _buildMiniAppBadge(String label, Color bg) {

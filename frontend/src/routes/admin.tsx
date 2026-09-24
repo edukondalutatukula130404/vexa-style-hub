@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   IndianRupee,
   ShoppingCart,
@@ -31,15 +31,18 @@ import {
   Settings,
   Bell,
   BellRing,
-  CheckCheck
+  CheckCheck,
+  Megaphone,
+  Send
 } from "lucide-react";
 import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
 import promoBanner1 from "@/assets/promo_banner_1.png";
 import promoBanner2 from "@/assets/promo_banner_2.png";
-import { products, type Product, useProducts } from "@/lib/products";
+import { products, type Product, useProducts, getProductImage } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL } from "@/lib/auth";
 import { Footer } from "@/components/Footer";
+import { vexaSocket } from "@/lib/socket";
 
 type OrderItem = {
   _id: string;
@@ -156,7 +159,61 @@ export function Admin() {
   });
 
   const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const unreadNotifCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  // Track known order IDs so polling can detect brand-new orders and fire toast/notification
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const isFirstFetchRef = useRef(true);
+
+
+  // Admin Broadcast Message Modal State
+  const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState("Flash Drop Live! ⚡");
+  const [broadcastBody, setBroadcastBody] = useState("Urban Silhouette 240 GSM bio-washed collection drop is now live. Claim yours today!");
+
+  const handleSendBroadcastNotification = () => {
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) return;
+
+    const payload = {
+      title: broadcastTitle.trim(),
+      body: broadcastBody.trim(),
+      message: broadcastBody.trim(),
+      time: "Just now",
+      timestamp: Date.now(),
+    };
+
+    vexaSocket.send("ADMIN_MESSAGE", payload);
+    vexaSocket.send("ANNOUNCEMENT", payload);
+
+    const newNotif: NotificationItem = {
+      id: `notif-broadcast-${Date.now()}`,
+      title: broadcastTitle.trim(),
+      message: broadcastBody.trim(),
+      time: "Just now",
+      timestamp: Date.now(),
+      read: false,
+      type: "system",
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+    setBroadcastModalOpen(false);
+  };
+
+  // Click outside to close notifications popover card
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+
+    if (notifOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [notifOpen]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -166,24 +223,55 @@ export function Admin() {
     }
   }, [notifications]);
 
+  // Audio synthesizer chime for admin notifications
+  const playNotifChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.45);
+      }
+    } catch (e) {}
+  };
+
   // Realtime notification sync with new orders
   useEffect(() => {
-    const handleNewOrderNotif = () => {
+    const handleNewOrderNotif = (event?: any) => {
       if (typeof window === "undefined") return;
       try {
-        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
-        if (cached && cached.length > 0) {
-          const latest = cached[0];
-          const rawId = latest._id || latest.id || Date.now().toString();
+        let orderData = event?.detail;
+
+        if (!orderData || (!orderData._id && !orderData.id)) {
+          const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+          if (cached && cached.length > 0) {
+            orderData = cached[0];
+          }
+        }
+
+        if (orderData && (orderData._id || orderData.id)) {
+          const rawId = orderData._id || orderData.id || Date.now().toString();
           const notifId = `notif-order-${rawId}`;
-          const shortCode = String(rawId).slice(-6).toUpperCase();
+          const shortCode = String(rawId).slice(-8).toUpperCase();
+          const customerName = orderData.userName || orderData.userEmail || "Customer";
+          const amount = Number(orderData.totalAmount) || 0;
+          const itemsCount = Array.isArray(orderData.items) ? orderData.items.length : 1;
 
           setNotifications((prev) => {
             if (prev.some((n) => n.id === notifId)) return prev;
             const newNotif: NotificationItem = {
               id: notifId,
               title: "⚡ Realtime Booking Received",
-              message: `New Order #${shortCode} placed by ${latest.userName || latest.userEmail || "Customer"} (₹${(latest.totalAmount || 1999).toLocaleString("en-IN")})`,
+              message: `New Order #${shortCode} placed by ${customerName} for ₹${amount.toLocaleString("en-IN")} (${itemsCount} item${itemsCount > 1 ? "s" : ""})`,
               time: "Just now",
               timestamp: Date.now(),
               read: false,
@@ -192,15 +280,33 @@ export function Admin() {
             };
             return [newNotif, ...prev];
           });
+
+          // Play Audio Chime
+          playNotifChime();
+
+          // Refresh orders list state automatically in real time
+          fetchOrders();
         }
       } catch (e) {
         console.warn("Realtime order notification update error:", e);
       }
     };
 
+    const handleWsMessage = (e: any) => {
+      const payload = e?.detail;
+      if (payload && (payload.type === "ORDER_CREATED" || payload.type === "ORDERS_UPDATED")) {
+        if (payload.data) {
+          handleNewOrderNotif({ detail: payload.data });
+        }
+      }
+    };
+
     window.addEventListener("vexa_orders_updated", handleNewOrderNotif);
+    window.addEventListener("vexa_ws_message", handleWsMessage);
+
     return () => {
       window.removeEventListener("vexa_orders_updated", handleNewOrderNotif);
+      window.removeEventListener("vexa_ws_message", handleWsMessage);
     };
   }, []);
 
@@ -961,55 +1067,118 @@ export function Admin() {
         } catch (e) {}
       }
 
-      setOrders(() => {
-        const map = new Map();
+      // Build the merged order map
+      const map = new Map<string, OrderItem>();
 
-        // 1. Add all backend API orders
-        fetchedList.forEach((item) => {
-          const key = item._id || (item as any).id;
-          const shortCode = String(key || "").slice(-8).toUpperCase();
-          if (key && !deletedIds.includes(key) && !deletedIds.includes(shortCode)) {
-            map.set(key, item);
-          }
-        });
-
-        // 2. Overlay cached demo orders & user status updates (matched by ID, booking code, or email+amount)
-        cachedDemoOrders.forEach((cached) => {
-          const cachedKey = cached._id || (cached as any).id;
-          const cachedShort = String(cachedKey || "").slice(-8).toUpperCase();
-
-          if (cachedKey && !deletedIds.includes(cachedKey) && !deletedIds.includes(cachedShort)) {
-            let matchedKey = cachedKey;
-            for (const [k, existingObj] of map.entries()) {
-              const existingShort = String(existingObj._id || existingObj.id || "").slice(-8).toUpperCase();
-              if (
-                k === cachedKey ||
-                existingShort === cachedShort ||
-                (existingObj.userEmail &&
-                  cached.userEmail &&
-                  existingObj.userEmail.toLowerCase().trim() === cached.userEmail.toLowerCase().trim() &&
-                  existingObj.totalAmount === cached.totalAmount)
-              ) {
-                matchedKey = k;
-                break;
-              }
-            }
-
-            const existing = map.get(matchedKey);
-            if (existing) {
-              map.set(matchedKey, {
-                ...existing,
-                status: cached.status || existing.status,
-                cancelReason: cached.cancelReason || (existing as any).cancelReason,
-              });
-            } else {
-              map.set(cachedKey, cached);
-            }
-          }
-        });
-
-        return Array.from(map.values());
+      fetchedList.forEach((item) => {
+        const key = item._id || (item as any).id;
+        const shortCode = String(key || "").slice(-8).toUpperCase();
+        if (key && !deletedIds.includes(key) && !deletedIds.includes(shortCode)) {
+          map.set(key, item);
+        }
       });
+
+      cachedDemoOrders.forEach((cached) => {
+        const cachedKey = cached._id || (cached as any).id;
+        const cachedShort = String(cachedKey || "").slice(-8).toUpperCase();
+
+        if (cachedKey && !deletedIds.includes(cachedKey) && !deletedIds.includes(cachedShort)) {
+          let matchedKey = cachedKey;
+          for (const [k, existingObj] of map.entries()) {
+            const existingShort = String(existingObj._id || existingObj.id || "").slice(-8).toUpperCase();
+            if (
+              k === cachedKey ||
+              existingShort === cachedShort ||
+              (existingObj.userEmail &&
+                cached.userEmail &&
+                existingObj.userEmail.toLowerCase().trim() === cached.userEmail.toLowerCase().trim() &&
+                existingObj.totalAmount === cached.totalAmount)
+            ) {
+              matchedKey = k;
+              break;
+            }
+          }
+
+          const existing = map.get(matchedKey);
+          if (existing) {
+            map.set(matchedKey, {
+              ...existing,
+              status: cached.status || existing.status,
+              cancelReason: cached.cancelReason || (existing as any).cancelReason,
+            });
+          } else {
+            map.set(cachedKey, cached);
+          }
+        }
+      });
+
+      const allOrders = Array.from(map.values());
+      setOrders(allOrders);
+
+      // ─── PERMANENT NOTIFICATION FIX ─────────────────────────────────────────
+      // Compare fetched orders against known IDs. Any brand-new ID triggers
+      // a toast + bell notification. This works even if WebSocket is down.
+      // Skip first fetch (page load) to avoid notifying for pre-existing orders.
+      if (!isFirstFetchRef.current) {
+        allOrders.forEach((ord) => {
+          const rawId = ord._id || (ord as any).id || "";
+          if (!rawId) return;
+          if (!knownOrderIdsRef.current.has(rawId)) {
+            // This is a NEW order detected by polling!
+            knownOrderIdsRef.current.add(rawId);
+            const notifId = `notif-order-${rawId}`;
+            const shortCode = String(rawId).slice(-8).toUpperCase();
+            const customerName = ord.userName || ord.userEmail || "Customer";
+            const amount = Number(ord.totalAmount) || 0;
+            const itemsCount = Array.isArray(ord.items) ? ord.items.length : 1;
+
+            setNotifications((prev) => {
+              if (prev.some((n) => n.id === notifId)) return prev;
+              const newNotif: NotificationItem = {
+                id: notifId,
+                title: "⚡ New Order Received!",
+                message: `Order #${shortCode} by ${customerName} — ₹${amount.toLocaleString("en-IN")} (${itemsCount} item${itemsCount > 1 ? "s" : ""})`,
+                time: "Just now",
+                timestamp: Date.now(),
+                read: false,
+                type: "order",
+                targetTab: "orders",
+              };
+              return [newNotif, ...prev];
+            });
+
+            // Fire audio chime
+            try {
+              const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+              if (AudioCtx) {
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.45);
+              }
+            } catch (_) {}
+
+
+          }
+        });
+      } else {
+        // First fetch: just populate known IDs silently, don't notify
+        isFirstFetchRef.current = false;
+        allOrders.forEach((ord) => {
+          const rawId = ord._id || (ord as any).id || "";
+          if (rawId) knownOrderIdsRef.current.add(rawId);
+        });
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
     } catch (err) {
       console.warn("Error fetching admin orders:", err);
     } finally {
@@ -1037,15 +1206,27 @@ export function Admin() {
   useEffect(() => {
     fetchOrders();
     fetchUsers();
-    const handleOrdersUpdated = () => {
-      fetchOrders();
+
+    // Listen to WebSocket events AND local custom events
+    const handleOrdersUpdated = () => { fetchOrders(); };
+    const handleWsMsg = (e: any) => {
+      const t = e?.detail?.type;
+      if (t === "ORDER_CREATED" || t === "ORDERS_UPDATED" || t === "ORDER_STATUS_UPDATED") {
+        fetchOrders();
+      }
     };
+
     window.addEventListener("vexa_orders_updated", handleOrdersUpdated);
+    window.addEventListener("vexa_ws_message", handleWsMsg);
+
+    // Poll every 2 seconds — fetchOrders() now detects new orders and fires toast/notification
     const interval = setInterval(() => {
       fetchOrders();
-    }, 4000);
+    }, 2000);
+
     return () => {
       window.removeEventListener("vexa_orders_updated", handleOrdersUpdated);
+      window.removeEventListener("vexa_ws_message", handleWsMsg);
       clearInterval(interval);
     };
   }, []);
@@ -1122,16 +1303,24 @@ export function Admin() {
   };
 
   const handleUpdateStatus = async (orderId: string, newStatus: string, cancelReason = "") => {
+    const cleanTargetId = String(orderId).replace(/^#/, "").toUpperCase();
+
     setOrders((prev) =>
-      prev.map((o) =>
-        o._id === orderId || o.id === orderId
-          ? { ...o, status: newStatus as any, cancelReason }
-          : o
-      )
+      prev.map((o) => {
+        const oId = String(o._id || o.id || "").toUpperCase();
+        const oShort = oId.slice(-8);
+        if (o._id === orderId || o.id === orderId || oId === cleanTargetId || oShort === cleanTargetId) {
+          return { ...o, status: newStatus as any, cancelReason };
+        }
+        return o;
+      })
     );
 
-    if (selectedOrderDetails && (selectedOrderDetails._id === orderId || (selectedOrderDetails as any).id === orderId)) {
-      setSelectedOrderDetails((prev) => (prev ? { ...prev, status: newStatus as any, cancelReason } : null));
+    if (selectedOrderDetails) {
+      const selId = String(selectedOrderDetails._id || (selectedOrderDetails as any).id || "").toUpperCase();
+      if (selectedOrderDetails._id === orderId || selId === cleanTargetId || selId.slice(-8) === cleanTargetId) {
+        setSelectedOrderDetails((prev) => (prev ? { ...prev, status: newStatus as any, cancelReason } : null));
+      }
     }
 
     setStatusUpdatedMsg(`Booking #${String(orderId).slice(-8).toUpperCase()} status updated to "${newStatus}"!`);
@@ -1141,9 +1330,13 @@ export function Admin() {
     if (typeof window !== "undefined") {
       try {
         const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
-        const updated = cached.map((o: any) =>
-          o._id === orderId || o.id === orderId ? { ...o, status: newStatus, cancelReason } : o
-        );
+        const updated = cached.map((o: any) => {
+          const oId = String(o._id || o.id || "").toUpperCase();
+          if (o._id === orderId || o.id === orderId || oId === cleanTargetId || oId.slice(-8) === cleanTargetId) {
+            return { ...o, status: newStatus, cancelReason };
+          }
+          return o;
+        });
         localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
         window.dispatchEvent(new Event("vexa_orders_updated"));
       } catch (e) {
@@ -1157,6 +1350,8 @@ export function Admin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus, cancelReason }),
       });
+      vexaSocket.send("ORDER_STATUS_UPDATED", { id: orderId, _id: orderId, status: newStatus, cancelReason });
+      vexaSocket.send("ORDERS_UPDATED", { id: orderId, _id: orderId, status: newStatus, cancelReason });
     } catch (err) {
       console.warn("Status update error:", err);
     }
@@ -1165,9 +1360,8 @@ export function Admin() {
   const maxSales = Math.max(...sales);
 
   return (
-    <div className="admin-page-root no-scrollbar min-h-screen bg-background pt-6 sm:pt-8 pb-12 overflow-x-hidden">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="relative flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
+    <div className="admin-page-root no-scrollbar min-h-screen bg-background overflow-x-hidden">
+      <div className="relative w-full min-h-screen flex flex-col lg:flex-row items-start">
           {/* MOBILE ADMIN HEADER (< lg) */}
           <div className="lg:hidden w-full space-y-3 sticky top-2 z-30 bg-background/95 backdrop-blur-md pb-2">
             <div className="flex items-center justify-between rounded-xl border border-gold/40 bg-card p-4 shadow-sm">
@@ -1250,15 +1444,15 @@ export function Admin() {
             />
           )}
 
-          {/* ADMIN SIDEBAR: Drawer on mobile, fixed panel on desktop, toggled via hamburger */}
+          {/* ADMIN SIDEBAR: Full height panel from top to bottom attached to left edge */}
           <aside
-            className={`fixed top-4 sm:top-8 bottom-4 sm:bottom-8 left-4 sm:left-6 z-50 w-[280px] transition-all duration-300 ease-in-out ${
+            className={`fixed top-0 bottom-0 left-0 z-50 w-[280px] h-screen transition-all duration-300 ease-in-out ${
               sidebarCollapsed
-                ? "-translate-x-[340px] opacity-0 pointer-events-none"
+                ? "-translate-x-full opacity-0 pointer-events-none"
                 : "translate-x-0 opacity-100 pointer-events-auto"
             }`}
           >
-            <div className="h-full rounded-2xl border border-gold/50 bg-card/95 backdrop-blur-xl p-5 shadow-2xl flex flex-col justify-between">
+            <div className="h-full border-r border-gold/40 bg-card/98 backdrop-blur-xl p-5 sm:p-6 shadow-2xl flex flex-col justify-between rounded-none">
               {/* Header Logo & 3-Line Hamburger Icon Toggle */}
               <div className="flex items-center justify-between border-b border-border pb-4 shrink-0">
                 <div className="flex items-center gap-3 overflow-hidden">
@@ -1334,199 +1528,186 @@ export function Admin() {
           </aside>
 
           {/* ADMIN CONTENT COLUMN: Adjusts left margin dynamically when sidebar shows/hides */}
-          <div className={`flex-1 min-w-0 flex flex-col w-full transition-[margin] duration-300 ease-in-out ${sidebarCollapsed ? "lg:ml-0" : "lg:ml-[304px]"}`}>
-            {/* MAIN CONTENT AREA */}
-            <main className="relative w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
-              {/* 3-Lines Hamburger Icon Toggle Button when Sidebar is Collapsed (Top-Left Aligned) */}
-              {sidebarCollapsed && (
-                <button
-                  type="button"
-                  onClick={() => setSidebarCollapsed(false)}
-                  aria-label="Show Sidebar"
-                  className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30 flex items-center justify-center p-2.5 rounded-xl border border-gold/40 bg-surface/80 hover:bg-gold/15 text-gold transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
-                  title="Show Sidebar Menu"
-                >
-                  <Menu className="size-5 text-gold" />
-                </button>
-              )}
-              {/* REALTIME ADMIN NOTIFICATION BELL (Aligned Inside Main Card Header) */}
-              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30">
-                <div className="relative">
+          <div className={`flex-1 min-w-0 flex flex-col w-full min-h-screen p-4 sm:p-6 lg:p-8 transition-[margin] duration-300 ease-in-out ${sidebarCollapsed ? "lg:ml-0" : "lg:ml-[280px]"}`}>
+            {/* TOP BAR: Hamburger menu (if sidebar collapsed) on left, Notification Bell on right */}
+            <div className="w-full flex items-center justify-between gap-4 mb-4 shrink-0">
+              <div>
+                {sidebarCollapsed && (
                   <button
                     type="button"
-                    onClick={() => setNotifOpen(!notifOpen)}
-                    aria-label="Admin Notifications"
-                    className="relative flex items-center justify-center p-2.5 rounded-xl border border-gold/40 bg-surface/80 hover:bg-gold/15 text-gold transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
-                    title="Realtime Notifications"
+                    onClick={() => setSidebarCollapsed(false)}
+                    aria-label="Show Sidebar"
+                    className="flex items-center justify-center p-2.5 rounded-xl border border-gold/40 bg-card hover:bg-gold/15 text-gold transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm shrink-0"
+                    title="Show Sidebar Menu"
                   >
-                    <Bell className="size-5 text-gold" />
-                    {unreadNotifCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-black text-destructive-foreground shadow-md animate-bounce">
-                        {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
-                      </span>
-                    )}
+                    <Menu className="size-5 text-gold" />
                   </button>
+                )}
+              </div>
 
-                  {/* Realtime Notification Popover Dropdown */}
-                  {notifOpen && (
-                    <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 rounded-2xl border border-gold/50 bg-card/98 backdrop-blur-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200">
-                      {/* Header with READ ALL & DELETE ALL Buttons */}
-                      <div className="flex items-center justify-between border-b border-border/80 pb-3 gap-2">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <BellRing className="size-4 text-gold shrink-0 animate-pulse" />
-                          <h3 className="font-display text-xs sm:text-sm font-extrabold tracking-wider uppercase text-foreground truncate">
-                            Notifications
-                          </h3>
-                          {unreadNotifCount > 0 && (
-                            <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-extrabold text-gold border border-gold/40 shrink-0">
-                              {unreadNotifCount} New
-                            </span>
-                          )}
-                        </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* REALTIME BROADCAST MESSAGE BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => setBroadcastModalOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                  title="Send Live Realtime Broadcast Message to Mobile App"
+                >
+                  <Megaphone className="size-4 animate-bounce text-gold hover:text-primary-foreground" />
+                  <span className="hidden sm:inline">Broadcast Message</span>
+                </button>
 
-                        {/* Top Action Controls: READ ALL & DELETE ALL */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={handleMarkAllRead}
-                            disabled={notifications.length === 0 || unreadNotifCount === 0}
-                            className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer ${
-                              unreadNotifCount > 0
-                                ? "bg-gold/15 text-gold border border-gold/40 hover:bg-gold hover:text-primary-foreground"
-                                : "text-muted-foreground/60 bg-surface/50 border border-border/50 cursor-not-allowed"
-                            }`}
-                            title="Mark all notifications as read"
-                          >
-                            <CheckCheck className="size-3" />
-                            <span>Read All</span>
-                          </button>
+                {/* REALTIME ADMIN NOTIFICATION BELL */}
+              <div ref={notifRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen(!notifOpen)}
+                  aria-label="Admin Notifications"
+                  className="relative flex items-center justify-center p-2.5 rounded-xl border border-gold/40 bg-card/90 hover:bg-gold/15 text-gold transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
+                  title="Realtime Notifications"
+                >
+                  <Bell className="size-5 text-gold" />
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-black text-destructive-foreground shadow-md animate-bounce">
+                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
 
-                          <button
-                            type="button"
-                            onClick={handleClearNotifications}
-                            disabled={notifications.length === 0}
-                            className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer ${
-                              notifications.length > 0
-                                ? "bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive hover:text-white"
-                                : "text-muted-foreground/60 bg-surface/50 border border-border/50 cursor-not-allowed"
-                            }`}
-                            title="Delete all notifications"
-                          >
-                            <Trash2 className="size-3" />
-                            <span>Delete All</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Notifications Scrollable List */}
-                      <div className="my-3 max-h-80 space-y-2 overflow-y-auto no-scrollbar pr-1">
-                        {notifications.length === 0 ? (
-                          <div className="py-8 text-center space-y-3">
-                            <Bell className="size-8 text-gold/40 mx-auto" />
-                            <p className="text-xs text-muted-foreground font-medium">
-                              No active notifications right now.
-                            </p>
-                            <button
-                              type="button"
-                              onClick={handleRestoreSampleNotifications}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gold/40 bg-gold/10 text-gold font-bold text-[10px] uppercase tracking-wider hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-xs"
-                            >
-                              <RefreshCw className="size-3" />
-                              <span>Restore Demo Notifications</span>
-                            </button>
-                          </div>
-                        ) : (
-                          notifications.map((n) => {
-                            return (
-                              <div
-                                key={n.id}
-                                onClick={() => handleNotificationClick(n)}
-                                className={`group relative flex items-start gap-3 rounded-xl p-3 transition-all cursor-pointer border ${
-                                  !n.read
-                                    ? "border-gold/40 bg-gold/5 hover:bg-gold/15"
-                                    : "border-border/50 bg-card/50 hover:bg-surface"
-                                }`}
-                              >
-                                <div className={`mt-0.5 p-2 rounded-lg shrink-0 ${
-                                  n.type === "order"
-                                    ? "bg-amber-500/15 text-amber-500"
-                                    : n.type === "inventory"
-                                    ? "bg-rose-500/15 text-rose-500"
-                                    : "bg-blue-500/15 text-blue-500"
-                                }`}>
-                                  {n.type === "order" ? (
-                                    <ShoppingCart className="size-4" />
-                                  ) : n.type === "inventory" ? (
-                                    <Boxes className="size-4" />
-                                  ) : (
-                                    <Users className="size-4" />
-                                  )}
-                                </div>
-
-                                <div className="flex-1 space-y-1 min-w-0 pr-6">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <h4 className={`text-xs font-bold leading-tight truncate ${!n.read ? "text-gold" : "text-foreground"}`}>
-                                      {n.title}
-                                    </h4>
-                                    <span className="text-[9px] font-medium text-muted-foreground whitespace-nowrap">
-                                      {n.time}
-                                    </span>
-                                  </div>
-                                  <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                                    {n.message}
-                                  </p>
-                                </div>
-
-                                {/* Item Delete Button on Hover */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleDeleteSingleNotification(e, n.id)}
-                                  className="absolute top-2.5 right-2.5 p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-                                  title="Delete notification"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
-                              </div>
-                            );
-                          })
+                {/* Realtime Notification Popover Dropdown */}
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 rounded-2xl border border-gold/50 bg-card/98 backdrop-blur-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200">
+                    {/* Header with READ ALL & DELETE ALL Buttons */}
+                    <div className="flex items-center justify-between border-b border-border/80 pb-3 gap-2">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <BellRing className="size-4 text-gold shrink-0 animate-pulse" />
+                        <h3 className="font-display text-xs sm:text-sm font-extrabold tracking-wider uppercase text-foreground truncate">
+                          Notifications
+                        </h3>
+                        {unreadNotifCount > 0 && (
+                          <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-extrabold text-gold border border-gold/40 shrink-0">
+                            {unreadNotifCount} New
+                          </span>
                         )}
                       </div>
 
-                      {/* Footer */}
-                      <div className="pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground font-medium flex items-center gap-1.5 text-[10px]">
-                          <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                          Realtime Sync Active
-                        </span>
+                      {/* Top Action Controls: READ ALL & DELETE ALL */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleMarkAllRead}
+                          disabled={notifications.length === 0 || unreadNotifCount === 0}
+                          className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer ${
+                            unreadNotifCount > 0
+                              ? "bg-gold/15 text-gold border border-gold/40 hover:bg-gold hover:text-primary-foreground"
+                              : "text-muted-foreground/60 bg-surface/50 border border-border/50 cursor-not-allowed"
+                          }`}
+                          title="Mark all notifications as read"
+                        >
+                          <CheckCheck className="size-3" />
+                          <span>Read All</span>
+                        </button>
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleMarkAllRead}
-                            disabled={notifications.length === 0 || unreadNotifCount === 0}
-                            className="text-gold hover:underline font-bold text-[10px] uppercase tracking-wider disabled:opacity-40 cursor-pointer"
-                          >
-                            Read All
-                          </button>
-                          <span className="text-border">•</span>
-                          <button
-                            type="button"
-                            onClick={handleClearNotifications}
-                            disabled={notifications.length === 0}
-                            className="text-destructive hover:underline font-bold text-[10px] uppercase tracking-wider disabled:opacity-40 cursor-pointer"
-                          >
-                            Delete All
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearNotifications}
+                          disabled={notifications.length === 0}
+                          className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer ${
+                            notifications.length > 0
+                              ? "bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive hover:text-white"
+                              : "text-muted-foreground/60 bg-surface/50 border border-border/50 cursor-not-allowed"
+                          }`}
+                          title="Delete all notifications"
+                        >
+                          <Trash2 className="size-3" />
+                          <span>Delete All</span>
+                        </button>
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* Notifications Scrollable List */}
+                    <div className="my-3 max-h-80 space-y-2 overflow-y-auto no-scrollbar pr-1">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center space-y-3">
+                          <Bell className="size-8 text-gold/40 mx-auto" />
+                          <p className="text-xs text-muted-foreground font-medium">
+                            No active notifications right now.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleRestoreSampleNotifications}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gold/40 bg-gold/10 text-gold font-bold text-[10px] uppercase tracking-wider hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-xs"
+                          >
+                            <RefreshCw className="size-3" />
+                            <span>Restore Demo Notifications</span>
+                          </button>
+                        </div>
+                      ) : (
+                        notifications.map((n) => {
+                          return (
+                            <div
+                              key={n.id}
+                              onClick={() => handleNotificationClick(n)}
+                              className={`group relative flex items-start gap-3 rounded-xl p-3 transition-all cursor-pointer border ${
+                                !n.read
+                                  ? "border-gold/40 bg-gold/5 hover:bg-gold/15"
+                                  : "border-border/50 bg-card/50 hover:bg-surface"
+                              }`}
+                            >
+                              <div className={`mt-0.5 p-2 rounded-lg shrink-0 ${
+                                n.type === "order"
+                                  ? "bg-amber-500/15 text-amber-500"
+                                  : n.type === "inventory"
+                                  ? "bg-rose-500/15 text-rose-500"
+                                  : "bg-blue-500/15 text-blue-500"
+                              }`}>
+                                {n.type === "order" ? (
+                                  <ShoppingCart className="size-4" />
+                                ) : n.type === "inventory" ? (
+                                  <Boxes className="size-4" />
+                                ) : (
+                                  <Users className="size-4" />
+                                )}
+                              </div>
+
+                              <div className="flex-1 space-y-1 min-w-0 pr-6">
+                                <div className="flex items-center justify-between gap-2">
+                                  <h4 className={`text-xs font-bold leading-tight truncate ${!n.read ? "text-gold" : "text-foreground"}`}>
+                                    {n.title}
+                                  </h4>
+                                  <span className="text-[9px] font-medium text-muted-foreground whitespace-nowrap">
+                                    {n.time}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                                  {n.message}
+                                </p>
+                              </div>
+
+                              {/* Item Delete Button on Hover */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteSingleNotification(e, n.id)}
+                                className="absolute top-2.5 right-2.5 p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                title="Delete notification"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            {/* TAB: INVENTORY MANAGEMENT */}
+            </div>
+
+            {/* MAIN CONTENT AREA */}
+            <main className="relative w-full flex-1 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-8 shadow-sm">
             {activeTab === "inventory" && (
               <div className="space-y-8 animate-in fade-in duration-300">
-                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4 transition-all ${sidebarCollapsed ? "pl-12 sm:pl-14" : ""}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
                   <div>
                     <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Stock Control Panel</span>
                     <h2 className="font-display text-2xl font-semibold text-foreground">Inventory & Warehouse Management</h2>
@@ -1598,8 +1779,11 @@ export function Admin() {
                         >
                           <div className="flex items-center gap-4">
                             <img
-                              src={item.image}
+                              src={getProductImage(item)}
                               alt={item.name}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = heroLuxuryImg;
+                              }}
                               className="size-16 rounded-lg object-cover border border-border shrink-0"
                             />
                             <div>
@@ -1759,7 +1943,7 @@ export function Admin() {
             {/* TAB 1: OVERVIEW */}
             {activeTab === "overview" && (
               <div className="space-y-8">
-                <div className={`border-b border-border pb-4 transition-all ${sidebarCollapsed ? "pl-12 sm:pl-14" : ""}`}>
+                <div className="border-b border-border pb-4">
                   <h2 className="font-display text-2xl font-semibold text-foreground">Analytics & Store Metrics</h2>
                   <p className="text-xs text-muted-foreground mt-1">Live metrics across sales, bookings, and inventory.</p>
                 </div>
@@ -1974,8 +2158,11 @@ export function Admin() {
                           >
                             <div className="flex items-center gap-4">
                               <img
-                                src={item?.image || ""}
+                                src={getProductImage(item)}
                                 alt={item?.name || "Product"}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = heroLuxuryImg;
+                                }}
                                 className="size-14 rounded-lg object-cover border border-border shrink-0"
                               />
                               <div>
@@ -2176,17 +2363,14 @@ export function Admin() {
                                 className="flex items-center justify-between gap-4 rounded-lg border border-border/70 bg-surface/50 p-3 text-xs cursor-pointer hover:border-gold hover:bg-gold/10 transition-all group"
                               >
                                 <div className="flex items-center gap-3">
-                                  {item && item.image ? (
-                                    <img
-                                      src={item.image}
-                                      alt={item.name || "Item"}
-                                      className="size-12 rounded-md object-cover border border-border shrink-0 group-hover:scale-105 transition-transform"
-                                    />
-                                  ) : (
-                                    <div className="size-12 rounded-md bg-gold/10 border border-gold/30 flex items-center justify-center text-gold font-bold text-[10px]">
-                                      TEE
-                                    </div>
-                                  )}
+                                  <img
+                                    src={getProductImage(item)}
+                                    alt={item?.name || "Item"}
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = heroLuxuryImg;
+                                    }}
+                                    className="size-12 rounded-md object-cover border border-border shrink-0 group-hover:scale-105 transition-transform"
+                                  />
                                   <div>
                                     <h5 className="font-display font-semibold text-foreground group-hover:text-gold transition-colors">{item?.name || "Oversized Tee"}</h5>
                                     <p className="text-[11px] text-muted-foreground">
@@ -3381,7 +3565,6 @@ export function Admin() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* REGISTERED USER DETAILS MODAL POPUP */}
       {selectedUserDetails && (
@@ -3589,6 +3772,76 @@ export function Admin() {
           </div>
         </div>
       )}
+
+      {/* REALTIME BROADCAST NOTIFICATION MODAL */}
+      {broadcastModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border border-gold/50 bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2 text-gold">
+                <Megaphone className="size-5" />
+                <h3 className="font-display text-base font-bold uppercase tracking-wider">
+                  Broadcast Realtime Message
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBroadcastModalOpen(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-1 block">
+                  Notification Title
+                </label>
+                <input
+                  type="text"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  placeholder="e.g. Flash Drop Live! ⚡"
+                  className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm font-semibold text-foreground focus:border-gold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-1 block">
+                  Message Body
+                </label>
+                <textarea
+                  rows={3}
+                  value={broadcastBody}
+                  onChange={(e) => setBroadcastBody(e.target.value)}
+                  placeholder="Enter message body for mobile users..."
+                  className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground focus:border-gold focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-border/80 pt-4">
+              <button
+                type="button"
+                onClick={() => setBroadcastModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-surface rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSendBroadcastNotification}
+                className="flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold uppercase tracking-wider bg-gold text-primary-foreground hover:bg-gold-dark rounded-xl shadow-goldy transition-all cursor-pointer hover:scale-105 active:scale-95"
+              >
+                <Send className="size-4" />
+                Send Live Alert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

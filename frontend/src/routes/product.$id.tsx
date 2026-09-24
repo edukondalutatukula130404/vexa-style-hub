@@ -530,6 +530,9 @@ export function ProductDetailPage() {
                 key={selectedImage}
                 src={selectedImage}
                 alt={`${product.name} in ${selectedColor.name}`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = heroLuxuryImg;
+                }}
                 className="h-[480px] sm:h-[580px] w-full object-cover object-top transition-all duration-700 group-hover:scale-105 animate-in fade-in duration-300"
               />
               <span className="absolute left-5 top-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-md z-10">

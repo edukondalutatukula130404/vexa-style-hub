@@ -24,13 +24,12 @@ class ApiConfig {
   );
 
   static const List<String> defaultCandidates = [
-    productionUrl,
     localWifiUrl,
-    _defaultAndroidUrl,
-    _defaultStandardUrl,
     'http://localhost:5000/api',
+    _defaultAndroidUrl,
     'http://192.168.1.100:5000/api',
     'http://192.168.0.100:5000/api',
+    productionUrl,
   ];
 
   /// Cleans and normalizes any server input string into a valid API URL endpoint
@@ -194,4 +193,13 @@ class ApiConfig {
   // Razorpay payment endpoints
   static String get razorpayCreateOrderUrl => '$baseUrl/payment/create-order';
   static String get razorpayVerifyPaymentUrl => '$baseUrl/payment/verify-payment';
+
+  // Realtime WebSocket endpoint
+  static String get wsUrl {
+    final clean = baseUrl.replaceAll(RegExp(r'/api$'), '');
+    if (clean.startsWith('https://')) {
+      return clean.replaceFirst('https://', 'wss://');
+    }
+    return clean.replaceFirst('http://', 'ws://');
+  }
 }

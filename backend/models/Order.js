@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema(
   {
+    id: {
+      type: String,
+      default: ''
+    },
     userEmail: {
       type: String,
       required: [true, 'Please add user email']

@@ -13,7 +13,9 @@ export type AuthUser = {
 export const API_URL =
   (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL)
     ? import.meta.env.VITE_API_URL
-    : "https://clothing.speshway.site/api";
+    : typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname || "localhost"}:5000/api`
+    : "http://localhost:5000/api";
 
 export function getAuthUser(): AuthUser | null {
   if (typeof window === "undefined") return null;

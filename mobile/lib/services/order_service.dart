@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import 'auth_service.dart';
+import 'notification_service.dart';
+import 'websocket_service.dart';
 
 class OrderItem {
   final String itemId;
@@ -117,8 +120,16 @@ class OrderModel {
       parsedDate = DateTime.now();
     }
 
+    final String parsedId = (json['id'] != null && json['id'].toString().isNotEmpty)
+        ? json['id'].toString()
+        : (json['_id'] != null
+            ? (json['_id'].toString().startsWith('#')
+                ? json['_id'].toString()
+                : '#VX-${json['_id'].toString().substring(0, json['_id'].toString().length > 6 ? 6 : json['_id'].toString().length).toUpperCase()}')
+            : '#VX-1001');
+
     return OrderModel(
-      id: json['id'] ?? (json['_id'] != null ? '#VX-${json['_id'].toString().substring(0, 6).toUpperCase()}' : '#VX-1001'),
+      id: parsedId,
       customerName: json['userName'] ?? json['customer'] ?? 'Valued Customer',
       shippingAddress: json['shippingAddress'] ?? json['address'] ?? 'Indiranagar 100ft Road, Bengaluru',
       phone: json['phone'] ?? '+91 98765 43210',
@@ -136,9 +147,61 @@ class OrderModel {
 class OrderService {
   /// Notifier triggered whenever orders are created, updated, or cancelled
   static final ValueNotifier<int> ordersChangeNotifier = ValueNotifier<int>(0);
+  static Timer? _pollingTimer;
 
   static void notifyOrdersChanged() {
     ordersChangeNotifier.value++;
+  }
+
+  /// Automatic periodic polling disabled to prevent unnecessary screen refreshing; real-time events handled via WebSocket.
+  static void startAutoPoll({String? email}) {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  static void stopAutoPoll() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  /// Update order status locally in memory and notify listeners
+  static void updateOrderStatusLocally(
+    String orderId,
+    String newStatus, {
+    String? cancelReason,
+    BuildContext? context,
+  }) {
+    final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+
+    for (var order in _inMemoryOrders) {
+      final cleanOrd = order.id.replaceAll('#', '').toLowerCase().trim();
+      if (order.id == orderId ||
+          cleanOrd == cleanTarget ||
+          (cleanTarget.length >= 4 && cleanOrd.contains(cleanTarget)) ||
+          (cleanOrd.length >= 4 && cleanTarget.contains(cleanOrd)) ||
+          cleanOrd.endsWith(cleanTarget) ||
+          cleanTarget.endsWith(cleanOrd)) {
+        order.status = newStatus;
+        if (cancelReason != null && cancelReason.isNotEmpty) {
+          order.cancelReason = cancelReason;
+        }
+      }
+    }
+
+    final isCancelled = newStatus.toLowerCase() == 'cancelled';
+    NotificationService.addNotification(
+      title: isCancelled ? 'Order Cancelled ❌' : 'Order Status Update 🚚',
+      body: isCancelled
+          ? 'Order $orderId has been cancelled.${cancelReason != null && cancelReason.isNotEmpty ? " Reason: $cancelReason" : ""}'
+          : 'Order $orderId status changed to "$newStatus"${cancelReason != null && cancelReason.isNotEmpty ? " ($cancelReason)" : ""}.',
+      icon: isCancelled ? Icons.cancel_rounded : Icons.local_shipping_rounded,
+      color: isCancelled ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+      type: isCancelled ? 'ORDER_CANCELLED' : 'ORDER_STATUS_UPDATED',
+      data: {'orderId': orderId, 'status': newStatus, 'cancelReason': cancelReason},
+      context: context,
+    );
+
+    notifyOrdersChanged();
   }
 
   static final List<OrderModel> _inMemoryOrders = [
@@ -205,13 +268,33 @@ class OrderService {
           final List serverData = body['data'];
           final serverOrders = serverData.map((j) => OrderModel.fromJson(j)).toList();
 
-          // Merge server orders with local in-memory orders, eliminating duplicates by ID
+          // Merge server orders with local in-memory orders, matching by ID or details
           final Map<String, OrderModel> merged = {};
           for (var o in _inMemoryOrders) {
             merged[o.id] = o;
           }
-          for (var o in serverOrders) {
-            merged[o.id] = o;
+          for (var s in serverOrders) {
+            final sClean = s.id.replaceAll('#', '').toLowerCase().trim();
+            bool matchedInMemory = false;
+
+            for (var mem in _inMemoryOrders) {
+              final memClean = mem.id.replaceAll('#', '').toLowerCase().trim();
+              if (mem.id == s.id ||
+                  memClean == sClean ||
+                  (sClean.length >= 4 && memClean.contains(sClean)) ||
+                  (memClean.length >= 4 && sClean.contains(memClean)) ||
+                  (mem.customerName.toLowerCase() == s.customerName.toLowerCase() && (mem.totalAmount - s.totalAmount).abs() < 1.0)) {
+                mem.status = s.status;
+                if (s.cancelReason != null && s.cancelReason!.isNotEmpty) {
+                  mem.cancelReason = s.cancelReason;
+                }
+                merged[mem.id] = s;
+                matchedInMemory = true;
+              }
+            }
+            if (!matchedInMemory) {
+              merged[s.id] = s;
+            }
           }
 
           final result = merged.values.toList();
@@ -227,7 +310,7 @@ class OrderService {
     return List.from(_inMemoryOrders);
   }
 
-  /// Create and register a new order
+  /// Create and register a new order — broadcasts in real-time to Admin Dashboard
   static Future<OrderModel> createOrder({
     required String customerName,
     required String shippingAddress,
@@ -237,12 +320,13 @@ class OrderService {
     required String couponApplied,
     required List<OrderItem> items,
     String? email,
+    BuildContext? context,
   }) async {
     final orderId = '#VX-${(1000 + _inMemoryOrders.length + DateTime.now().millisecond % 8999)}';
     String userEmail = (email != null && email.isNotEmpty) ? email : '';
     if (userEmail.isEmpty) {
       final user = await AuthService.getUser();
-      userEmail = user?.email ?? 'admin@vexa.com';
+      userEmail = user?.email ?? 'mobile@vexa.com';
     }
 
     final newOrder = OrderModel(
@@ -253,44 +337,73 @@ class OrderService {
       paymentMethod: paymentMethod,
       totalAmount: totalAmount,
       couponApplied: couponApplied,
-      status: 'Confirmed',
+      status: 'Processing',
       createdAt: DateTime.now(),
       items: items,
     );
 
-    // Save to local in-memory list immediately at top of list
+    // 1. Save to local in-memory list immediately
     _inMemoryOrders.insert(0, newOrder);
 
-    // Notify all listening UI components (My Orders screens, Profile, Home)
+    // 2. Add notification and notify all listening UI components
+    NotificationService.addNotification(
+      title: 'Order Confirmed! 📦',
+      body: 'Your order $orderId for ₹${totalAmount.toStringAsFixed(0)} was placed successfully. Track package in your profile.',
+      icon: Icons.check_circle_rounded,
+      color: const Color(0xFF10B981),
+      type: 'ORDER_PLACED',
+      data: {'orderId': orderId},
+      context: (context != null && context.mounted) ? context : null,
+    );
+
     notifyOrdersChanged();
 
-    // Sync to backend asynchronously
-    try {
-      final body = {
-        'userEmail': userEmail,
-        'userName': customerName,
-        'shippingAddress': shippingAddress,
-        'phone': phone,
-        'paymentMethod': paymentMethod,
-        'totalAmount': totalAmount,
-        'couponApplied': couponApplied,
-        'items': items.map((i) => i.toJson()).toList(),
-      };
+    // 3. Build full order payload for broadcast
+    final orderPayload = {
+      '_id': orderId,
+      'id': orderId,
+      'userEmail': userEmail,
+      'userName': newOrder.customerName,
+      'shippingAddress': newOrder.shippingAddress,
+      'phone': phone,
+      'paymentMethod': paymentMethod,
+      'totalAmount': totalAmount,
+      'couponApplied': couponApplied,
+      'status': 'Processing',
+      'createdAt': DateTime.now().toIso8601String(),
+      'items': items.map((i) => i.toJson()).toList(),
+    };
 
-      await http.post(
+    // 4. PRIMARY PATH: POST to backend REST API
+    bool backendSuccess = false;
+    try {
+      final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/orders'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 4));
+        body: jsonEncode(orderPayload),
+      ).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        backendSuccess = true;
+        debugPrint('✅ [OrderService] Order synced to backend — WebSocket broadcast triggered automatically.');
+      }
     } catch (e) {
-      debugPrint('Sync order to backend note: $e');
+      debugPrint('⚠️ [OrderService] Backend POST failed: $e');
     }
+
+    if (!backendSuccess) {
+      debugPrint('⚡ [OrderService] Backend unreachable — sending ORDER_CREATED directly via WebSocket.');
+    }
+    
+    // Always send via WebSocket as extra guarantee
+    VexaWebSocketService().send('ORDER_CREATED', orderPayload);
+    VexaWebSocketService().send('ORDERS_UPDATED', orderPayload);
 
     return newOrder;
   }
 
   /// Cancel an order
-  static Future<bool> cancelOrder(String orderId, String reason) async {
+  static Future<bool> cancelOrder(String orderId, String reason, {BuildContext? context}) async {
     for (var order in _inMemoryOrders) {
       if (order.id == orderId) {
         order.status = 'Cancelled';
@@ -299,7 +412,28 @@ class OrderService {
       }
     }
 
+    NotificationService.addNotification(
+      title: 'Order Cancelled ❌',
+      body: 'Order $orderId has been cancelled. Reason: $reason',
+      icon: Icons.cancel_rounded,
+      color: const Color(0xFFEF4444),
+      type: 'ORDER_CANCELLED',
+      data: {'orderId': orderId, 'cancelReason': reason},
+      context: context,
+    );
+
     notifyOrdersChanged();
+
+    final cancelPayload = {
+      '_id': orderId,
+      'id': orderId,
+      'status': 'Cancelled',
+      'cancelReason': reason,
+    };
+
+    VexaWebSocketService().send('ORDER_CANCELLED', cancelPayload);
+    VexaWebSocketService().send('ORDER_STATUS_UPDATED', cancelPayload);
+    VexaWebSocketService().send('ORDERS_UPDATED', cancelPayload);
 
     try {
       await http.put(

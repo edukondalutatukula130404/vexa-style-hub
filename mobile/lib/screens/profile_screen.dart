@@ -7,6 +7,8 @@ import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
+import 'cart_screen.dart';
+import 'order_tracking_screen.dart';
 
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
@@ -1912,9 +1914,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (modalCtx, setModalState) {
           Future<void> refreshOrdersModal() async {
             final f = OrderService.getOrders(email: _currentUser?.email);
-            setModalState(() {
-              ordersFuture = f;
-            });
+            if (modalCtx.mounted) {
+              setModalState(() {
+                ordersFuture = f;
+              });
+            }
             await f;
           }
 
@@ -2076,7 +2080,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             const SizedBox(height: 2),
                                             Text('$detailsSubtitle · ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
                                             const SizedBox(height: 4),
-                                            Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: _goldDark)),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: _goldDark)),
+                                                ElevatedButton.icon(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: _goldDark,
+                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                    elevation: 1,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  onPressed: () {
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: order)),
+                                                    );
+                                                  },
+                                                  icon: const Icon(Icons.alt_route_rounded, size: 13, color: Colors.white),
+                                                  label: Text('Track Order', style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                                                ),
+                                              ],
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -2184,79 +2209,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Container(
-                        decoration: const BoxDecoration(color: _surfaceBg, shape: BoxShape.circle),
-                        child: IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 18, color: _textDark),
-                          onPressed: () => Navigator.pop(ctx),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
                 body: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    // 1. Live Step Progress Tracker
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _surfaceBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('LIVE COURIER TRACKING', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: _gold.withAlpha(25), borderRadius: BorderRadius.circular(8)),
-                                child: Text('5 Steps', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _goldDark)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          if (isCancelled) ...[
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: _errorRed.withAlpha(25),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: _errorRed.withAlpha(80)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.cancel_outlined, color: _errorRed, size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Order Cancelled: ${order.cancelReason ?? "Cancelled by user"}',
-                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _errorRed),
-                                    ),
-                                  ),
-                                ],
+                    // Cancellation Banner (If Cancelled)
+                    if (isCancelled) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _errorRed.withAlpha(25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _errorRed.withAlpha(80)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.cancel_outlined, color: _errorRed, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Order Cancelled: ${order.cancelReason ?? "Cancelled by user"}',
+                                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _errorRed),
                               ),
                             ),
-                          ] else ...[
-                            _buildStepRow(Icons.shopping_bag_outlined, '1', 'Order Placed & Confirmed', order.formattedDate, true, false, false),
-                            _buildStepRow(Icons.verified_outlined, '2', 'Payment Verified', 'Payment via ${order.paymentMethod}', true, false, false),
-                            _buildStepRow(Icons.inventory_2_outlined, '3', 'Garment QC & Customized Packaging', isShipped || isDelivered ? 'Inspection Passed' : 'In Progress at Warehouse', true, !isShipped && !isDelivered, false),
-                            _buildStepRow(Icons.local_shipping_outlined, '4', 'Out for Delivery / Courier In Transit', isDelivered ? 'Handed to Express Courier' : (isShipped ? 'In Transit — Expected Today' : 'Scheduled'), isShipped || isDelivered, isShipped && !isDelivered, false),
-                            _buildStepRow(Icons.home_outlined, '5', 'Delivered to Customer', isDelivered ? 'Successfully Delivered' : 'Pending', isDelivered, false, true),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
+                    ],
 
                     // 2. Shipping Address & Contact info
                     Text('SHIPPING DESTINATION', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1)),
@@ -2463,6 +2443,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+
 
   Future<String?> _saveInvoiceFileToDisk(String invoiceNo, OrderModel order) async {
     try {
@@ -3114,6 +3096,34 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                     ),
                   );
                 },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _goldDark,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CartScreen(
+                        cartItems: const [],
+                        onCartUpdated: () => setState(() {}),
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.shopping_bag_outlined, color: Color(0xFFFFD700), size: 20),
+                label: Text('View Cart', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ),
           ],

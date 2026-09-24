@@ -8,7 +8,9 @@ import '../models/item_model.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../services/order_service.dart';
+import '../services/websocket_service.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 import 'all_products_screen.dart';
@@ -16,6 +18,7 @@ import 'products_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
+import 'order_tracking_screen.dart';
 
 // ── Gold & White theme tokens ─────────────────────────────────────────────
 const Color _gold = Color(0xFFB8860B);
@@ -99,41 +102,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentTabIndex = 2; // Home tab active by default
   final List<CartItemData> _cartItems = [];
 
-  // Notifications state
-  int _unreadNotificationCount = 3;
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'id': '1',
-      'title': 'Limited Edition Drop Live! 🚀',
-      'body': 'Urban Silhouette 240 GSM Collection is now live. Claim yours before stocks run out.',
-      'time': '10m ago',
-      'isRead': false,
-      'icon': Icons.bolt_rounded,
-      'color': _gold,
-    },
-    {
-      'id': '2',
-      'title': 'Order Dispatched 📦',
-      'body': 'Your order #VX-8834 is out for delivery. Track package in your profile.',
-      'time': '2h ago',
-      'isRead': false,
-      'icon': Icons.local_shipping_outlined,
-      'color': Color(0xFF2563EB),
-    },
-    {
-      'id': '3',
-      'title': 'VIP Loyalty Access Unlocked 👑',
-      'body': 'You earned 150 VEXA Points! Enjoy early preview for next week\'s dropped styles.',
-      'time': '1d ago',
-      'isRead': false,
-      'icon': Icons.workspace_premium_outlined,
-      'color': Color(0xFFD97706),
-    },
-  ];
+  // Notifications state linked to NotificationService
+  int get _unreadNotificationCount => NotificationService.unreadCount;
+  List<Map<String, dynamic>> get _notifications => NotificationService.notifications;
 
   // Auto-cycle promo banner
   int _bannerIndex = 0;
   Timer? _bannerTimer;
+  StreamSubscription? _wsSub;
 
   // Cached orders future to prevent auto-refresh when promo banner timer ticks
   Future<List<OrderModel>>? _ordersFuture;
@@ -160,9 +136,79 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     _mainScrollController = ScrollController();
     ApiConfig.baseUrlNotifier.addListener(_onServerUrlChanged);
+    NotificationService.notificationNotifier.addListener(_onNotificationsChanged);
     OrderService.ordersChangeNotifier.addListener(_refreshOrders);
+    OrderService.startAutoPoll();
     _loadUserAndItems();
     _refreshOrders();
+
+    // Listen to real-time WebSocket live data events
+    _wsSub = VexaWebSocketService().stream.listen((event) {
+      if (mounted) {
+        final type = event['type'];
+        final data = event['data'];
+        debugPrint('⚡ Live WebSocket event received in Mobile App: $type');
+
+        if (type == 'ADMIN_MESSAGE' || type == 'ANNOUNCEMENT' || type == 'NOTIFICATION') {
+          if (data != null && data is Map) {
+            final title = (data['title'] ?? 'Message from VEXA Admin 📢').toString();
+            final body = (data['body'] ?? data['message'] ?? 'Notification from Admin').toString();
+            NotificationService.addNotification(
+              title: title,
+              body: body,
+              icon: Icons.campaign_rounded,
+              color: const Color(0xFFB8860B),
+              type: 'ADMIN_MESSAGE',
+              data: Map<String, dynamic>.from(data),
+              context: context,
+            );
+          }
+        } else if (type == 'ORDER_CREATED' || type == 'ORDER_PLACED') {
+          if (data != null && data is Map) {
+            final orderId = (data['_id'] ?? data['id'] ?? '#VX-ORDER').toString();
+            NotificationService.addNotification(
+              title: 'Order Confirmed! 📦',
+              body: 'Order $orderId placed successfully.',
+              icon: Icons.check_circle_rounded,
+              color: const Color(0xFF10B981),
+              type: 'ORDER_PLACED',
+              data: Map<String, dynamic>.from(data),
+              context: context,
+            );
+          }
+          _refreshOrders();
+        } else if (type == 'ORDER_CANCELLED') {
+          if (data != null && data is Map) {
+            final orderId = (data['_id'] ?? data['id'] ?? '').toString();
+            final cancelReason = data['cancelReason']?.toString();
+            if (orderId.isNotEmpty) {
+              OrderService.updateOrderStatusLocally(
+                orderId,
+                'Cancelled',
+                cancelReason: cancelReason,
+                context: context,
+              );
+            }
+          }
+          _refreshOrders();
+        } else if (type == 'ORDER_STATUS_UPDATED' || type == 'ORDERS_UPDATED') {
+          if (data != null && data is Map) {
+            final orderId = (data['_id'] ?? data['id'] ?? '').toString();
+            final status = (data['status'] ?? '').toString();
+            final cancelReason = data['cancelReason']?.toString();
+            if (orderId.isNotEmpty && status.isNotEmpty) {
+              OrderService.updateOrderStatusLocally(
+                orderId,
+                status,
+                cancelReason: cancelReason,
+                context: context,
+              );
+            }
+          }
+          _refreshOrders();
+        }
+      }
+    });
 
     _tabAnimController = AnimationController(
       vsync: this,
@@ -179,7 +225,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     ApiConfig.baseUrlNotifier.removeListener(_onServerUrlChanged);
+    NotificationService.notificationNotifier.removeListener(_onNotificationsChanged);
     OrderService.ordersChangeNotifier.removeListener(_refreshOrders);
+    _wsSub?.cancel();
     _bannerTimer?.cancel();
     _mainScrollController.dispose();
     _tabAnimController.dispose();
@@ -195,6 +243,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isRealUser = false;
   UserModel? _currentUser;
 
+  void _onNotificationsChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _onServerUrlChanged() {
     if (mounted) _loadUserAndItems();
   }
@@ -206,17 +258,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!_notifications.any((n) => n['id'] == welcomeId)) {
       final name = user.name.isNotEmpty ? user.name : 'VEXA Collector';
       final emailDisplay = user.email.isNotEmpty ? ' (${user.email})' : '';
-      _notifications.insert(0, {
-        'id': welcomeId,
-        'title': 'Welcome Back, $name! 👋',
-        'body': 'You have successfully signed in to your VEXA account$emailDisplay. Enjoy member privileges & exclusive 240 GSM drops.',
-        'time': 'Just now',
-        'isRead': false,
-        'icon': Icons.lock_open_rounded,
-        'color': _gold,
-      });
-
-      _unreadNotificationCount = _notifications.where((n) => n['isRead'] == false).length;
+      NotificationService.addNotification(
+        title: 'Welcome Back, $name! 👋',
+        body: 'You have successfully signed in to your VEXA account$emailDisplay. Enjoy member privileges & exclusive 240 GSM drops.',
+        icon: Icons.lock_open_rounded,
+        color: _gold,
+        type: 'WELCOME',
+      );
     }
   }
 
@@ -319,6 +367,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
           favoriteIds: _favoriteIds,
           onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
+          cartItems: _cartItems,
+          onOpenCart: _openCartScreen,
         ),
       );
     }
@@ -1116,13 +1166,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       borderRadius: BorderRadius.circular(8),
                                       onTap: () {
                                         setSheetState(() {
-                                          for (var n in _notifications) {
-                                            n['isRead'] = true;
-                                          }
-                                          _unreadNotificationCount = 0;
-                                        });
-                                        setState(() {
-                                          _unreadNotificationCount = 0;
+                                          NotificationService.markAllAsRead();
                                         });
                                       },
                                       child: Padding(
@@ -1149,10 +1193,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     onTap: () {
                                       setSheetState(() {
                                         _notifications.clear();
-                                        _unreadNotificationCount = 0;
+                                        // Handled by NotificationService
                                       });
                                       setState(() {
-                                        _unreadNotificationCount = 0;
+                                        // Handled by NotificationService
                                       });
                                     },
                                     child: Padding(
@@ -1249,10 +1293,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       final removedTitle = n['title'] as String;
                                       setSheetState(() {
                                         _notifications.removeAt(index);
-                                        _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                        // Handled by NotificationService
                                       });
                                       setState(() {
-                                        _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                        // Handled by NotificationService
                                       });
 
                                       ScaffoldMessenger.of(context).clearSnackBars();
@@ -1271,10 +1315,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         if (isUnread) {
                                           setSheetState(() {
                                             n['isRead'] = true;
-                                            _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                            // Handled by NotificationService
                                           });
                                           setState(() {
-                                            _unreadNotificationCount = _notifications.where((item) => item['isRead'] == false).length;
+                                            // Handled by NotificationService
                                           });
                                         }
                                       },
@@ -1464,6 +1508,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
                             favoriteIds: _favoriteIds,
                             onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
+                            cartItems: _cartItems,
+                            onOpenCart: _openCartScreen,
                           ),
                         );
                       },
@@ -2428,149 +2474,165 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // Main Product Overview Row
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+          // Main Product Overview Row & Step Indicator (Clickable to open Order Details)
+          InkWell(
+            onTap: () => _openHomeOrderDetailSheet(context, order),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: _border),
-                      ),
-                      clipBehavior: Clip.hardEdge,
-                      child: firstItem != null
-                          ? (firstItem.image.startsWith('assets/')
-                              ? Image.asset(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)))
-                              : Image.network(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext))))
-                          : Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)),
-                    ),
-                    if (itemsCount > 1)
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF0F172A),
-                            borderRadius: BorderRadius.only(topLeft: Radius.circular(8), bottomRight: Radius.circular(14)),
-                          ),
-                          child: Text(
-                            '+${itemsCount - 1} more',
-                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        titleText,
-                        style: GoogleFonts.outfit(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.bold,
-                          color: _textDark,
-                          height: 1.25,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
+                      Stack(
                         children: [
-                          if (firstItem != null && firstItem.size.isNotEmpty) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: _gold.withAlpha(20),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Size ${firstItem.size}',
-                                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _goldDark),
+                          Container(
+                            width: 70,
+                            height: 70,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: _border),
+                            ),
+                            clipBehavior: Clip.hardEdge,
+                            child: firstItem != null
+                                ? (firstItem.image.startsWith('assets/')
+                                    ? Image.asset(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)))
+                                    : Image.network(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext))))
+                                : Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)),
+                          ),
+                          if (itemsCount > 1)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(8), bottomRight: Radius.circular(14)),
+                                ),
+                                child: Text(
+                                  '+${itemsCount - 1} more',
+                                  style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 6),
-                          ],
-                          Text(
-                            '$itemsCount ${itemsCount == 1 ? "item" : "items"}',
-                            style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Row(
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Icon(Icons.calendar_today_rounded, size: 12, color: _subtext),
-                                const SizedBox(width: 4),
-                                Flexible(
+                                Expanded(
                                   child: Text(
-                                    order.formattedDate,
+                                    titleText,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: _textDark,
+                                      height: 1.25,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right_rounded, color: _goldDark, size: 20),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                if (firstItem != null && firstItem.size.isNotEmpty) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _gold.withAlpha(20),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Size ${firstItem.size}',
+                                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _goldDark),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(
+                                  '$itemsCount ${itemsCount == 1 ? "item" : "items"}',
+                                  style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Flexible(
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today_rounded, size: 12, color: _subtext),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          order.formattedDate,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '₹${order.totalAmount.toStringAsFixed(0)}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: _goldDark,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '₹${order.totalAmount.toStringAsFixed(0)}',
-                            style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: _goldDark,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
+
+                // Horizontal Progress Step Indicator
+                if (!isCancelled) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Divider(height: 1, color: _border),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildMiniStepDot('Placed', true, true),
+                            _buildMiniStepConnector(true),
+                            _buildMiniStepDot('QC / Prep', true, true),
+                            _buildMiniStepConnector(isShipped || isDelivered),
+                            _buildMiniStepDot('In Transit', isShipped || isDelivered, isShipped && !isDelivered),
+                            _buildMiniStepConnector(isDelivered),
+                            _buildMiniStepDot('Delivered', isDelivered, isDelivered),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-
-          // Horizontal Progress Step Indicator
-          if (!isCancelled) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Divider(height: 1, color: _border),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildMiniStepDot('Placed', true, true),
-                      _buildMiniStepConnector(true),
-                      _buildMiniStepDot('QC / Prep', true, true),
-                      _buildMiniStepConnector(isShipped || isDelivered),
-                      _buildMiniStepDot('In Transit', isShipped || isDelivered, isShipped && !isDelivered),
-                      _buildMiniStepConnector(isDelivered),
-                      _buildMiniStepDot('Delivered', isDelivered, isDelivered),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                ],
-              ),
-            ),
-          ],
 
           // Footer Actions Row
           Container(
@@ -2608,7 +2670,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       elevation: 2,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: () => _openHomeOrderDetailSheet(context, order),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: order)),
+                      );
+                    },
                     icon: const Icon(Icons.alt_route_rounded, size: 15, color: Colors.white),
                     label: Text(
                       'Track Order',
@@ -2808,6 +2875,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 );
               },
             ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'floating_cart_wishlist_tab',
+        backgroundColor: _goldDark,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+          side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
+        ),
+        onPressed: _openCartScreen,
+        icon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
+            if (_totalCartCount > 0)
+              Positioned(
+                top: -6,
+                right: -8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF0C2340),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    '$_totalCartCount',
+                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        label: Text(
+          'View Cart',
+          style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+      ),
     );
   }
 
@@ -2818,8 +2923,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         fullscreenDialog: true,
         builder: (ctx) {
           final isCancelled = order.status.toLowerCase() == 'cancelled';
-          final isDelivered = order.status.toLowerCase() == 'delivered';
-          final isShipped = order.status.toLowerCase() == 'shipped' || order.status.toLowerCase() == 'out for delivery';
 
           return Scaffold(
             backgroundColor: _bgColor,
@@ -2892,89 +2995,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Container(
-                    decoration: const BoxDecoration(color: _surfaceBg, shape: BoxShape.circle),
-                    child: IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18, color: _textDark),
-                      onPressed: () => Navigator.pop(ctx),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                    ),
-                  ),
-                ),
-              ],
             ),
             body: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                // 1. LIVE SHIPMENT TRACKING CARD
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _gold.withAlpha(40)),
-                    boxShadow: [
-                      BoxShadow(color: _gold.withAlpha(12), blurRadius: 16, offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
+                // 1. CANCELLATION BANNER (If Cancelled)
+                if (isCancelled) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withAlpha(20),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFEF4444).withAlpha(80)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
-                                child: const Icon(Icons.alt_route_rounded, color: _goldDark, size: 18),
+                              Text(
+                                'Order Cancelled',
+                                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
                               ),
-                              const SizedBox(width: 10),
-                              Text('LIVE SHIPMENT STATUS', style: GoogleFonts.cinzel(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1)),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(8)),
-                            child: Text('5 Steps', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext)),
-                          ),
-                        ],
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Divider(height: 1, color: _border),
-                      ),
-                      if (isCancelled) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withAlpha(25),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFEF4444).withAlpha(80)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 20),
-                              const SizedBox(width: 8),
-                              Text('Order Cancelled. Refund initiated.', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444))),
+                              const SizedBox(height: 2),
+                              Text(
+                                order.cancelReason ?? 'Cancelled by user request. Refund initiated.',
+                                style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                              ),
                             ],
                           ),
                         ),
-                      ] else ...[
-                        _buildHomeTrackingStepRow(Icons.shopping_bag_outlined, '1', 'Order Placed & Confirmed', order.formattedDate, true, false, false),
-                        _buildHomeTrackingStepRow(Icons.verified_outlined, '2', 'Payment Verified', 'Payment via ${order.paymentMethod}', true, false, false),
-                        _buildHomeTrackingStepRow(Icons.inventory_2_outlined, '3', 'Garment QC & Customized Packaging', isShipped || isDelivered ? 'Inspection Passed' : 'In Progress at Warehouse', true, !isShipped && !isDelivered, false),
-                        _buildHomeTrackingStepRow(Icons.local_shipping_outlined, '4', 'Out for Delivery / Courier In Transit', isDelivered ? 'Handed to Express Courier' : (isShipped ? 'In Transit — Expected Today' : 'Scheduled'), isShipped || isDelivered, isShipped && !isDelivered, false),
-                        _buildHomeTrackingStepRow(Icons.home_outlined, '5', 'Delivered to Customer', isDelivered ? 'Successfully Delivered' : 'Pending', isDelivered, false, true),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 20),
 
                 // 2. SHIPPING ADDRESS BLOCK
@@ -3199,6 +3257,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           );
         },
       ),
+    );
+  }
+
+
+
+  Widget _buildOrderItemDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+        Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark)),
+      ],
     );
   }
 
@@ -3618,93 +3688,7 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
     );
   }
 
-  Widget _buildHomeTrackingStepRow(IconData icon, String stepNum, String title, String subtitle, bool isCompleted, bool isCurrent, bool isLast) {
-    final activeColor = isCurrent ? const Color(0xFF2563EB) : _goldDark;
-    final stepBg = isCompleted
-        ? _goldDark
-        : isCurrent
-            ? activeColor
-            : _surfaceBg;
-    final stepIconColor = isCompleted || isCurrent ? Colors.white : _subtext;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: stepBg,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCompleted ? _goldDark : isCurrent ? activeColor : _border,
-                  width: isCurrent ? 3 : 1.5,
-                ),
-                boxShadow: isCurrent
-                    ? [BoxShadow(color: activeColor.withAlpha(80), blurRadius: 8, spreadRadius: 1)]
-                    : null,
-              ),
-              child: Center(
-                child: isCompleted
-                    ? const Icon(Icons.check_rounded, color: Colors.white, size: 15)
-                    : Icon(icon, color: stepIconColor, size: 13),
-              ),
-            ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: isCompleted ? _goldDark : _border,
-                  borderRadius: BorderRadius.circular(1),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: GoogleFonts.outfit(
-                          fontSize: 13,
-                          fontWeight: isCompleted || isCurrent ? FontWeight.bold : FontWeight.w500,
-                          color: isCompleted || isCurrent ? _textDark : _subtext,
-                        ),
-                      ),
-                    ),
-                    if (isCurrent)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: activeColor.withAlpha(20),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'IN PROGRESS',
-                          style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w800, color: activeColor),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(subtitle, style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ROOT BUILD (5 BOTTOM BAR TABS: Products, My Orders, Home, Wishlist, Profile)
@@ -3738,6 +3722,8 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                 onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
                 showBackButton: true,
                 onBackTap: () => setState(() => _currentTabIndex = 2),
+                cartItems: _cartItems,
+                onOpenCart: _openCartScreen,
               ),
               // 1: My Orders
               _buildOrdersTab(),
@@ -3759,61 +3745,50 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
             ],
           ),
 
-          // Floating Cart Button at Bottom-Right (in place of mic symbol)
+          // Floating Cart Extended Button on Home tab (_currentTabIndex == 2)
           if (_currentTabIndex == 2)
             Positioned(
-              right: 18,
-              bottom: 18,
-            child: GestureDetector(
-              onTap: _openCartScreen,
-              child: Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [_goldDark, _gold],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _gold.withAlpha(140),
-                      blurRadius: 14,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+              right: 16,
+              bottom: 20,
+              child: FloatingActionButton.extended(
+                heroTag: 'floating_cart_home_tab',
+                backgroundColor: _goldDark,
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
+                onPressed: _openCartScreen,
+                icon: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 26),
+                    const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
                     if (_totalCartCount > 0)
                       Positioned(
-                        top: 4,
-                        right: 4,
+                        top: -6,
+                        right: -8,
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF4757),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0C2340),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
                           ),
-                          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-                          child: Center(
-                            child: Text(
-                              '$_totalCartCount',
-                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, height: 1),
-                            ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            '$_totalCartCount',
+                            style: GoogleFonts.outfit(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
                   ],
                 ),
+                label: Text(
+                  'View Cart',
+                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
               ),
             ),
-          ),
         ],
       ),
       bottomNavigationBar: _currentTabIndex != 2

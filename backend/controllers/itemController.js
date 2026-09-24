@@ -1,4 +1,5 @@
 const Item = require('../models/Item');
+const { broadcast } = require('../config/websocket');
 
 const defaultItems = [
   {
@@ -154,6 +155,8 @@ exports.getItems = async (req, res, next) => {
 exports.createItem = async (req, res, next) => {
   try {
     const item = await Item.create(req.body);
+    broadcast('ITEM_CREATED', item);
+    broadcast('ITEMS_UPDATED', item);
     res.status(201).json({
       success: true,
       data: item
@@ -161,6 +164,8 @@ exports.createItem = async (req, res, next) => {
   } catch (error) {
     const newItem = { _id: Date.now().toString(), ...req.body };
     defaultItems.unshift(newItem);
+    broadcast('ITEM_CREATED', newItem);
+    broadcast('ITEMS_UPDATED', newItem);
     res.status(201).json({
       success: true,
       data: newItem
@@ -204,6 +209,8 @@ exports.updateItem = async (req, res, next) => {
     if (!item) {
       return res.status(404).json({ success: false, message: 'Item not found' });
     }
+    broadcast('ITEM_UPDATED', item);
+    broadcast('ITEMS_UPDATED', item);
     res.status(200).json({
       success: true,
       data: item
@@ -219,9 +226,8 @@ exports.updateItem = async (req, res, next) => {
 exports.deleteItem = async (req, res, next) => {
   try {
     const item = await Item.findByIdAndDelete(req.params.id);
-    if (!item) {
-      return res.status(404).json({ success: false, message: 'Item not found' });
-    }
+    broadcast('ITEM_DELETED', { id: req.params.id });
+    broadcast('ITEMS_UPDATED', { id: req.params.id });
     res.status(200).json({
       success: true,
       data: {}

@@ -45,7 +45,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { products, useProducts, SIZES, type Product } from "@/lib/products";
+import { products, useProducts, SIZES, type Product, getProductImage } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL, setLoggedIn } from "@/lib/auth";
 import { useCart, addToCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
@@ -973,6 +973,7 @@ export function UserDashboard() {
             localStorage.setItem("vexa_inventory_stocks", JSON.stringify(inventory));
             window.dispatchEvent(new Event("vexa_inventory_updated"));
             window.dispatchEvent(new Event("vexa_items_updated"));
+            window.dispatchEvent(new CustomEvent("vexa_orders_updated", { detail: demoOrderObj }));
           } catch (e) {
             console.warn("Failed to cache order:", e);
           }
@@ -1610,7 +1611,7 @@ export function UserDashboard() {
                           {(ord.items || []).map((item, idx) => (
                             <div key={idx} className="flex items-center gap-3 sm:gap-4 min-w-0">
                               <img
-                                src={item.image}
+                                src={getProductImage(item)}
                                 alt={item.name}
                                 className="size-12 sm:size-14 rounded-lg object-cover border border-border shrink-0"
                               />

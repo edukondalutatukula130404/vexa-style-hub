@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/item_model.dart';
+import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 
 const Color _gold = Color(0xFFB8860B);
@@ -42,6 +43,8 @@ class ProductsScreen extends StatefulWidget {
   final Function(String id)? onToggleFavorite;
   final bool showBackButton;
   final VoidCallback? onBackTap;
+  final List<CartItemData>? cartItems;
+  final VoidCallback? onOpenCart;
 
   const ProductsScreen({
     super.key,
@@ -51,6 +54,8 @@ class ProductsScreen extends StatefulWidget {
     this.onToggleFavorite,
     this.showBackButton = true,
     this.onBackTap,
+    this.cartItems,
+    this.onOpenCart,
   });
 
   @override
@@ -693,6 +698,57 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'floating_cart_products',
+        backgroundColor: _goldDark,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+          side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
+        ),
+        onPressed: () {
+          if (widget.onOpenCart != null) {
+            widget.onOpenCart!();
+          } else {
+            Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute(
+                builder: (_) => CartScreen(
+                  cartItems: widget.cartItems ?? [],
+                  onCartUpdated: () => setState(() {}),
+                ),
+              ),
+            );
+          }
+        },
+        icon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
+            if ((widget.cartItems?.length ?? 0) > 0)
+              Positioned(
+                top: -6,
+                right: -8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF0C2340),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    '${widget.cartItems!.fold<int>(0, (sum, i) => sum + i.quantity)}',
+                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        label: Text(
+          'View Cart',
+          style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

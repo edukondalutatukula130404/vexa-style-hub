@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/item_model.dart';
+import '../services/order_service.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 
@@ -149,6 +150,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         builder: (_) => ProductDetailScreen(
           item: item,
           onAddToCart: widget.onAddToCart,
+          onOpenCart: widget.onOpenCart,
         ),
       ),
     );
@@ -455,22 +457,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 },
               )
             : null,
-        titleSpacing: widget.showBackButton ? 0 : 16,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: _goldDark.withAlpha(50),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _gold.withAlpha(120)),
-              ),
-              child: const Icon(Icons.grid_view_rounded, color: _gold, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Text('All Products (${filtered.length})', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
-          ],
-        ),
+        centerTitle: false,
+        titleSpacing: 0,
+        title: Text('All Products (${filtered.length})', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
       ),
       body: Column(
         children: [
@@ -716,6 +705,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 builder: (_) => CartScreen(
                   cartItems: widget.cartItems ?? [],
                   onCartUpdated: () => setState(() {}),
+                  onNavigateToProducts: () => Navigator.pop(context),
+                  onNavigateToOrders: () {
+                    Navigator.pop(context);
+                    OrderService.notifyOrdersChanged();
+                  },
                 ),
               ),
             );

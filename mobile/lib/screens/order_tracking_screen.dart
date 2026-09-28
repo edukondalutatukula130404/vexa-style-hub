@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/order_service.dart';
 import '../services/websocket_service.dart';
@@ -149,24 +148,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.copy_rounded, color: _goldDark, size: 18),
-            tooltip: 'Copy Tracking ID',
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: _currentOrder.id));
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Copied Order ID "${_currentOrder.id}" to clipboard!'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: _goldDark,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -206,189 +187,154 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
 
   Widget _buildRealtimeMapCard(bool isCancelled, int stepIdx) {
     return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _gold.withAlpha(120), width: 1.2),
+        border: Border.all(color: _border, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(40),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: Colors.black.withAlpha(6),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row inside Dark Card
+          // Header Row inside Card
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ESTIMATED DELIVERY',
+                      style: GoogleFonts.outfit(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: _goldDark,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _expectedDeliveryText,
+                      style: GoogleFonts.cinzel(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _textDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _currentOrder.statusColor.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _currentOrder.statusColor.withAlpha(100)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: _currentOrder.statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _currentOrder.status.toUpperCase(),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: _currentOrder.statusColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // Route Nodes & Progress Line (clean layout without background block grid)
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ESTIMATED DELIVERY',
-                        style: GoogleFonts.outfit(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.bold,
-                          color: _gold,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _expectedDeliveryText,
-                        style: GoogleFonts.cinzel(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _currentOrder.statusColor.withAlpha(40),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _currentOrder.statusColor.withAlpha(120)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: _currentOrder.statusColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _currentOrder.status.toUpperCase(),
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: _currentOrder.statusColor,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Simulated Animated Map Graphic Canvas
-          Container(
-            height: 150,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withAlpha(15)),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Stack(
+              alignment: Alignment.centerLeft,
               children: [
-                // Grid line background decoration
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _GridPatternPainter(),
+                // Base Track Line
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _border,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-
-                // Animated GPS Route Path Line
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        // Track Line
-                        Container(
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(30),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        // Progress Line
-                        FractionallySizedBox(
-                          widthFactor: isCancelled ? 0.0 : ((stepIdx + 1) / 5).clamp(0.2, 1.0),
-                          child: Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [_goldDark, _gold, Color(0xFF10B981)],
-                              ),
-                              borderRadius: BorderRadius.circular(2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _gold.withAlpha(160),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Route Nodes: Warehouse -> Hub -> Courier Van -> Destination
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0),
-                            _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1),
-                            _buildMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2, isActiveNode: stepIdx == 2 || stepIdx == 3),
-                            _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Live Live GPS Badge
-                Positioned(
-                  bottom: 10,
-                  left: 14,
+                // Solid Single Color Progress Line (Warehouse to QC Hub to Destination)
+                FractionallySizedBox(
+                  widthFactor: isCancelled ? 0.0 : ((stepIdx + 1) / 5).clamp(0.2, 1.0),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(160),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withAlpha(30)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 12),
-                        const SizedBox(width: 4),
-                        Text(
-                          isCancelled
-                              ? 'Shipment Cancelled'
-                              : (stepIdx == 4 ? 'Package Delivered' : 'Live GPS Sync Active • Waybill #BD-98402'),
-                          style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.white),
-                        ),
-                      ],
+                      color: _goldDark,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
+                ),
+
+                // Route Nodes: Warehouse -> Hub -> Courier Van -> Destination
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0),
+                    _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1),
+                    _buildMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2, isActiveNode: stepIdx == 2 || stepIdx == 3),
+                    _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4),
+                  ],
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+
+          // Live GPS Sync Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withAlpha(15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF10B981).withAlpha(50)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 12),
+                const SizedBox(width: 6),
+                Text(
+                  isCancelled
+                      ? 'Shipment Cancelled'
+                      : (stepIdx == 4 ? 'Package Delivered' : 'Live GPS Sync Active • Waybill #BD-98402'),
+                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -403,20 +349,20 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
           width: isActiveNode ? 36 : 28,
           height: isActiveNode ? 36 : 28,
           decoration: BoxDecoration(
-            color: isReached ? (isActiveNode ? _gold : const Color(0xFF10B981)) : const Color(0xFF334155),
+            color: isReached ? _goldDark : const Color(0xFFF1F5F9),
             shape: BoxShape.circle,
             border: Border.all(
-              color: isActiveNode ? Colors.white : Colors.white.withAlpha(40),
-              width: isActiveNode ? 2.0 : 1.0,
+              color: isReached ? _goldDark : _border,
+              width: isActiveNode ? 2.5 : 1.0,
             ),
             boxShadow: isActiveNode
-                ? [BoxShadow(color: _gold.withAlpha(180), blurRadius: 10)]
+                ? [BoxShadow(color: _goldDark.withAlpha(100), blurRadius: 8)]
                 : null,
           ),
           child: Icon(
             icon,
             size: isActiveNode ? 18 : 14,
-            color: isReached ? Colors.white : Colors.white54,
+            color: isReached ? Colors.white : _subtext,
           ),
         ),
         const SizedBox(height: 4),
@@ -424,8 +370,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
           label,
           style: GoogleFonts.outfit(
             fontSize: 8.5,
-            fontWeight: isReached ? FontWeight.bold : FontWeight.normal,
-            color: isReached ? Colors.white : Colors.white38,
+            fontWeight: isReached ? FontWeight.bold : FontWeight.w500,
+            color: isReached ? _textDark : _subtext,
           ),
         ),
       ],
@@ -888,23 +834,4 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
       ),
     );
   }
-}
-
-class _GridPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withAlpha(8)
-      ..strokeWidth = 1;
-
-    for (double i = 0; i < size.width; i += 20) {
-      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
-    }
-    for (double i = 0; i < size.height; i += 20) {
-      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

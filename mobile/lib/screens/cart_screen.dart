@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/order_service.dart';
+import '../services/wallet_service.dart';
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
 const Color _gold = Color(0xFFB8860B);
@@ -140,8 +142,9 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  void _showCheckoutDialog() {
-    final nameController = TextEditingController(text: 'John Doe');
+  Future<void> _showCheckoutDialog() async {
+    final loggedInUser = await AuthService.getUser();
+    final nameController = TextEditingController(text: (loggedInUser != null && loggedInUser.name.isNotEmpty) ? loggedInUser.name : 'John Doe');
     final addressController = TextEditingController(text: '123 Luxury Avenue, Fashion District');
     final phoneController = TextEditingController(text: '+91 98765 43210');
     final pincodeController = TextEditingController(text: '400001');
@@ -152,6 +155,7 @@ class _CartScreenState extends State<CartScreen> {
     String selectedBank = 'HDFC Bank';
     String selectedWallet = 'Mobikwik Wallet';
 
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -430,9 +434,26 @@ class _CartScreenState extends State<CartScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('VEXA Pay Wallet', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                                    Row(
+                                      children: [
+                                        Text('VEXA Pay Wallet', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF10B981).withAlpha(25),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
+                                          ),
+                                          child: Text(
+                                            '₹${WalletService.balance.toStringAsFixed(0)}',
+                                            style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                     const SizedBox(height: 2),
-                                    Text('Instant 1-Click Balance Checkout', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                    Text('Available Balance: ₹${WalletService.balance.toStringAsFixed(0)} • Instant 1-Click Checkout', style: GoogleFonts.outfit(fontSize: 11, color: _subtext, fontWeight: FontWeight.w500)),
                                   ],
                                 ),
                               ),
@@ -748,15 +769,19 @@ class _CartScreenState extends State<CartScreen> {
                                       image: c.item.image,
                                     )).toList();
 
-                                    final placedOrder = await OrderService.createOrder(
-                                      customerName: nameController.text,
-                                      shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
-                                      phone: phoneController.text,
-                                      paymentMethod: methodLabel,
-                                      totalAmount: _finalTotal,
-                                      couponApplied: _appliedCoupon,
-                                      items: orderItems,
-                                    );
+
+                                   final currentUser = await AuthService.getUser();
+                                   final placedOrder = await OrderService.createOrder(
+                                     customerName: nameController.text.isNotEmpty ? nameController.text : (currentUser?.name ?? 'Valued Customer'),
+                                     shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
+                                     phone: phoneController.text,
+                                     paymentMethod: methodLabel,
+                                     totalAmount: _finalTotal,
+                                     couponApplied: _appliedCoupon,
+                                     items: orderItems,
+                                     email: currentUser?.email,
+                                     context: mounted ? context : null,
+                                   );
 
                                     if (!context.mounted) return;
                                     setState(() {
@@ -1884,6 +1909,11 @@ class _CartScreenState extends State<CartScreen> {
                     Navigator.pop(context);
                     if (widget.onNavigateToOrders != null) {
                       widget.onNavigateToOrders!();
+                    } else {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                      OrderService.notifyOrdersChanged();
                     }
                   },
                   icon: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 18),
@@ -1941,20 +1971,9 @@ class _CartScreenState extends State<CartScreen> {
         ),
         centerTitle: false,
         titleSpacing: 0,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _gold.withAlpha(25),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _gold.withAlpha(80)),
-              ),
-              child: const Icon(Icons.shopping_bag_outlined, color: _goldDark, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'SHOPPING CART',
@@ -1973,45 +1992,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ],
             ),
-          ],
-        ),
-        actions: [
-          if (widget.cartItems.isNotEmpty)
-            TextButton.icon(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    title: Text('Clear Cart?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-                    content: Text('Are you sure you want to remove all items from your cart?', style: GoogleFonts.outfit(color: _subtext)),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text('Cancel', style: GoogleFonts.outfit(color: _subtext)),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: _errorRed),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          setState(() {
-                            widget.cartItems.clear();
-                            _appliedCoupon = '';
-                            _discountPercent = 0.0;
-                          });
-                          if (widget.onCartUpdated != null) widget.onCartUpdated!();
-                        },
-                        child: Text('Clear All', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              icon: const Icon(Icons.delete_sweep_outlined, size: 18, color: _errorRed),
-              label: Text('Clear', style: GoogleFonts.outfit(fontSize: 12, color: _errorRed, fontWeight: FontWeight.bold)),
-            ),
-          const SizedBox(width: 8),
-        ],
+        actions: const [],
       ),
       body: widget.cartItems.isEmpty
           ? _buildEmptyStateView()
@@ -2480,12 +2461,14 @@ class _CartScreenState extends State<CartScreen> {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        if (cartItem.quantity > 1) {
-                          setState(() {
+                        setState(() {
+                          if (cartItem.quantity > 1) {
                             cartItem.quantity--;
-                          });
-                          if (widget.onCartUpdated != null) widget.onCartUpdated!();
-                        }
+                          } else {
+                            widget.cartItems.remove(cartItem);
+                          }
+                        });
+                        if (widget.onCartUpdated != null) widget.onCartUpdated!();
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

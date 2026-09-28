@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/item_model.dart';
+import '../services/order_service.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 
@@ -80,6 +81,9 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         builder: (_) => ProductDetailScreen(
           item: item,
           onAddToCart: widget.onAddToCart,
+          onOpenCart: widget.onOpenCart,
+          favoriteIds: widget.favoriteIds,
+          onToggleFavorite: widget.onToggleFavorite,
         ),
       ),
     );
@@ -98,6 +102,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
+        centerTitle: false,
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -283,6 +289,11 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                 builder: (_) => CartScreen(
                   cartItems: widget.cartItems ?? [],
                   onCartUpdated: () => setState(() {}),
+                  onNavigateToProducts: () => Navigator.pop(context),
+                  onNavigateToOrders: () {
+                    Navigator.pop(context);
+                    OrderService.notifyOrdersChanged();
+                  },
                 ),
               ),
             );

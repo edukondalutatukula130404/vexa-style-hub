@@ -6,6 +6,7 @@ import '../config/api_config.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
 import 'websocket_service.dart';
+import 'wallet_service.dart';
 
 class OrderItem {
   final String itemId;
@@ -149,6 +150,9 @@ class OrderService {
   static final ValueNotifier<int> ordersChangeNotifier = ValueNotifier<int>(0);
   static Timer? _pollingTimer;
 
+  /// Track locally cancelled order IDs and reasons to prevent server syncs from overwriting cancelled status
+  static final Map<String, String> _cancelledOrderReasons = {};
+
   static void notifyOrdersChanged() {
     ordersChangeNotifier.value++;
   }
@@ -164,6 +168,12 @@ class OrderService {
     _pollingTimer = null;
   }
 
+  /// Check if an order ID has been cancelled locally
+  static bool isOrderCancelledLocally(String orderId) {
+    final clean = orderId.replaceAll('#', '').toLowerCase().trim();
+    return _cancelledOrderReasons.containsKey(clean) || _cancelledOrderReasons.containsKey(orderId);
+  }
+
   /// Update order status locally in memory and notify listeners
   static void updateOrderStatusLocally(
     String orderId,
@@ -172,6 +182,14 @@ class OrderService {
     BuildContext? context,
   }) {
     final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+
+    if (newStatus.toLowerCase() == 'cancelled') {
+      final reasonStr = (cancelReason != null && cancelReason.isNotEmpty)
+          ? cancelReason
+          : 'Cancelled by customer';
+      _cancelledOrderReasons[cleanTarget] = reasonStr;
+      _cancelledOrderReasons[orderId] = reasonStr;
+    }
 
     for (var order in _inMemoryOrders) {
       final cleanOrd = order.id.replaceAll('#', '').toLowerCase().trim();
@@ -268,27 +286,46 @@ class OrderService {
           final List serverData = body['data'];
           final serverOrders = serverData.map((j) => OrderModel.fromJson(j)).toList();
 
-          // Merge server orders with local in-memory orders, matching by ID or details
+          // Merge server orders with local in-memory orders, matching strictly by ID
           final Map<String, OrderModel> merged = {};
           for (var o in _inMemoryOrders) {
+            final oClean = o.id.replaceAll('#', '').toLowerCase().trim();
+            if (_cancelledOrderReasons.containsKey(oClean) || _cancelledOrderReasons.containsKey(o.id)) {
+              o.status = 'Cancelled';
+              o.cancelReason = _cancelledOrderReasons[oClean] ?? _cancelledOrderReasons[o.id];
+            }
             merged[o.id] = o;
           }
+
           for (var s in serverOrders) {
             final sClean = s.id.replaceAll('#', '').toLowerCase().trim();
-            bool matchedInMemory = false;
+            final isLocallyCancelled = _cancelledOrderReasons.containsKey(sClean) ||
+                _cancelledOrderReasons.containsKey(s.id);
+            if (isLocallyCancelled) {
+              s.status = 'Cancelled';
+              s.cancelReason = _cancelledOrderReasons[sClean] ?? _cancelledOrderReasons[s.id] ?? 'Cancelled by customer';
+            }
 
+            bool matchedInMemory = false;
             for (var mem in _inMemoryOrders) {
               final memClean = mem.id.replaceAll('#', '').toLowerCase().trim();
               if (mem.id == s.id ||
                   memClean == sClean ||
-                  (sClean.length >= 4 && memClean.contains(sClean)) ||
-                  (memClean.length >= 4 && sClean.contains(memClean)) ||
-                  (mem.customerName.toLowerCase() == s.customerName.toLowerCase() && (mem.totalAmount - s.totalAmount).abs() < 1.0)) {
-                mem.status = s.status;
-                if (s.cancelReason != null && s.cancelReason!.isNotEmpty) {
-                  mem.cancelReason = s.cancelReason;
+                  (sClean.length >= 4 && sClean == memClean)) {
+                if (mem.status.toLowerCase() == 'cancelled' || isLocallyCancelled) {
+                  s.status = 'Cancelled';
+                  mem.status = 'Cancelled';
+                  if (mem.cancelReason != null && mem.cancelReason!.isNotEmpty) {
+                    s.cancelReason = mem.cancelReason;
+                  }
+                  merged[mem.id] = mem;
+                } else {
+                  mem.status = s.status;
+                  if (s.cancelReason != null && s.cancelReason!.isNotEmpty) {
+                    mem.cancelReason = s.cancelReason;
+                  }
+                  merged[mem.id] = s;
                 }
-                merged[mem.id] = s;
                 matchedInMemory = true;
               }
             }
@@ -304,6 +341,14 @@ class OrderService {
       }
     } catch (_) {
       // Backend unreachable or offline, fallback to in-memory list
+    }
+
+    for (var o in _inMemoryOrders) {
+      final oClean = o.id.replaceAll('#', '').toLowerCase().trim();
+      if (_cancelledOrderReasons.containsKey(oClean) || _cancelledOrderReasons.containsKey(o.id)) {
+        o.status = 'Cancelled';
+        o.cancelReason = _cancelledOrderReasons[oClean] ?? _cancelledOrderReasons[o.id];
+      }
     }
 
     _inMemoryOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -393,32 +438,82 @@ class OrderService {
 
     if (!backendSuccess) {
       debugPrint('⚡ [OrderService] Backend unreachable — sending ORDER_CREATED directly via WebSocket.');
+      VexaWebSocketService().send('ORDER_CREATED', orderPayload);
+      VexaWebSocketService().send('ORDERS_UPDATED', orderPayload);
     }
-    
-    // Always send via WebSocket as extra guarantee
-    VexaWebSocketService().send('ORDER_CREATED', orderPayload);
-    VexaWebSocketService().send('ORDERS_UPDATED', orderPayload);
 
     return newOrder;
   }
 
-  /// Cancel an order
-  static Future<bool> cancelOrder(String orderId, String reason, {BuildContext? context}) async {
+  /// Cancel an order and issue instant refund to VEXA Pay Wallet
+  static Future<bool> cancelOrder(
+    String orderId,
+    String reason, {
+    BuildContext? context,
+    OrderModel? targetOrder,
+  }) async {
+    final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+    _cancelledOrderReasons[cleanTarget] = reason;
+    _cancelledOrderReasons[orderId] = reason;
+
+    double refundAmount = 0.0;
+    bool foundInMem = false;
+
     for (var order in _inMemoryOrders) {
-      if (order.id == orderId) {
+      final cleanOrd = order.id.replaceAll('#', '').toLowerCase().trim();
+      if (order.id == orderId ||
+          cleanOrd == cleanTarget ||
+          (cleanTarget.length >= 4 && cleanOrd.contains(cleanTarget)) ||
+          (cleanOrd.length >= 4 && cleanTarget.contains(cleanOrd)) ||
+          cleanOrd.endsWith(cleanTarget) ||
+          cleanTarget.endsWith(cleanOrd)) {
         order.status = 'Cancelled';
         order.cancelReason = reason;
+        refundAmount = order.totalAmount;
+        foundInMem = true;
         break;
       }
     }
 
+    if (!foundInMem && targetOrder != null) {
+      targetOrder.status = 'Cancelled';
+      targetOrder.cancelReason = reason;
+      refundAmount = targetOrder.totalAmount;
+      _inMemoryOrders.insert(0, targetOrder);
+      foundInMem = true;
+    } else if (!foundInMem) {
+      final cancelledPlaceholder = OrderModel(
+        id: orderId,
+        customerName: 'Valued Customer',
+        shippingAddress: 'Indiranagar 100ft Road, Bengaluru',
+        phone: '+91 98765 43210',
+        paymentMethod: 'Razorpay UPI',
+        totalAmount: 1899.0,
+        status: 'Cancelled',
+        createdAt: DateTime.now(),
+        items: [],
+        cancelReason: reason,
+      );
+      _inMemoryOrders.insert(0, cancelledPlaceholder);
+      refundAmount = cancelledPlaceholder.totalAmount;
+    }
+
+    if (refundAmount > 0) {
+      WalletService.processOrderCancelRefund(
+        orderId: orderId,
+        amount: refundAmount,
+        reason: reason,
+        context: context,
+      );
+    }
+
     NotificationService.addNotification(
       title: 'Order Cancelled ❌',
-      body: 'Order $orderId has been cancelled. Reason: $reason',
+      body: 'Order $orderId cancelled. ₹${refundAmount.toStringAsFixed(0)} refunded to VEXA Wallet.',
       icon: Icons.cancel_rounded,
       color: const Color(0xFFEF4444),
       type: 'ORDER_CANCELLED',
-      data: {'orderId': orderId, 'cancelReason': reason},
+      data: {'orderId': orderId, 'cancelReason': reason, 'refundAmount': refundAmount},
       context: context,
     );
 
@@ -429,6 +524,7 @@ class OrderService {
       'id': orderId,
       'status': 'Cancelled',
       'cancelReason': reason,
+      'refundAmount': refundAmount,
     };
 
     VexaWebSocketService().send('ORDER_CANCELLED', cancelPayload);
@@ -439,7 +535,7 @@ class OrderService {
       await http.put(
         Uri.parse('${ApiConfig.baseUrl}/orders/$orderId/status'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'status': 'Cancelled', 'cancelReason': reason}),
+        body: jsonEncode({'status': 'Cancelled', 'cancelReason': reason, 'refundAmount': refundAmount}),
       ).timeout(const Duration(seconds: 3));
     } catch (_) {}
 

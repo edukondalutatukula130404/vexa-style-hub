@@ -353,6 +353,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ProductDetailScreen(
         item: item,
         onAddToCart: (it, color, size, qty) => _addToCart(it, color, size, qty),
+        onOpenCart: _openCartScreen,
+        favoriteIds: _favoriteIds,
+        onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
       ),
     );
   }
@@ -382,93 +385,169 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.zero,
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            top: 24,
-            left: 20,
-            right: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 45,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: _subtext.withAlpha(80),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text('BESPOKE CUSTOMISATION', style: GoogleFonts.outfit(fontSize: 10, color: _gold, fontWeight: FontWeight.w700, letterSpacing: 2.5)),
-              const SizedBox(height: 4),
-              Text('Book Your Custom Tee', style: GoogleFonts.cinzel(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
-              const SizedBox(height: 4),
-              Text('Personalized embroidery, custom colorways & bulk orders.', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
-              const SizedBox(height: 20),
-              TextField(
-                controller: nameController,
-                style: GoogleFonts.outfit(color: _textDark),
-                decoration: InputDecoration(
-                  labelText: 'Your Name',
-                  labelStyle: GoogleFonts.outfit(color: _subtext),
-                  prefixIcon: const Icon(Icons.person_outline_rounded, color: _gold),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                style: GoogleFonts.outfit(color: _textDark),
-                decoration: InputDecoration(
-                  labelText: 'Phone / WhatsApp Number',
-                  labelStyle: GoogleFonts.outfit(color: _subtext),
-                  prefixIcon: const Icon(Icons.phone_outlined, color: _gold),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: detailsController,
-                maxLines: 2,
-                style: GoogleFonts.outfit(color: _textDark),
-                decoration: InputDecoration(
-                  labelText: 'Customization Details (e.g. Embroidery, color, size)',
-                  labelStyle: GoogleFonts.outfit(color: _subtext),
-                  prefixIcon: const Icon(Icons.edit_note_rounded, color: _gold),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _goldDark,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Custom Tee request submitted! We will reach out on WhatsApp shortly.'),
-                        backgroundColor: _goldDark,
-                        duration: Duration(seconds: 3),
+        return SizedBox(
+          width: double.infinity,
+          height: MediaQuery.of(ctx).size.height,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              top: 16,
+              left: 24,
+              right: 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top close bar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'VEXA BESPOKE',
+                      style: GoogleFonts.cinzel(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: _goldDark,
+                        letterSpacing: 1.5,
                       ),
-                    );
-                  },
-                  child: Text('Submit Custom Order Request', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded, color: _textDark, size: 26),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Divider(height: 1, color: _border),
+                const SizedBox(height: 20),
+
+                // Scrollable content area taking 100% height
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'BESPOKE CUSTOMISATION',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            color: _gold,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Book Your Custom Tee',
+                          style: GoogleFonts.cinzel(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: _textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Personalized embroidery, custom colorways & bulk corporate/personal orders. Made to measure by VEXA master tailors.',
+                          style: GoogleFonts.outfit(fontSize: 13, color: _subtext, height: 1.4),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Input Fields
+                        TextField(
+                          controller: nameController,
+                          style: GoogleFonts.outfit(color: _textDark),
+                          decoration: InputDecoration(
+                            labelText: 'Your Full Name',
+                            labelStyle: GoogleFonts.outfit(color: _subtext),
+                            prefixIcon: const Icon(Icons.person_outline_rounded, color: _gold),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _gold, width: 2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: phoneController,
+                          keyboardType: TextInputType.phone,
+                          style: GoogleFonts.outfit(color: _textDark),
+                          decoration: InputDecoration(
+                            labelText: 'Phone / WhatsApp Number',
+                            labelStyle: GoogleFonts.outfit(color: _subtext),
+                            prefixIcon: const Icon(Icons.phone_outlined, color: _gold),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _gold, width: 2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: detailsController,
+                          maxLines: 4,
+                          style: GoogleFonts.outfit(color: _textDark),
+                          decoration: InputDecoration(
+                            labelText: 'Customization Details (e.g. Custom embroidery text, fit type, color preference, quantity)',
+                            labelStyle: GoogleFonts.outfit(color: _subtext),
+                            alignLabelWithHint: true,
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.only(bottom: 50),
+                              child: Icon(Icons.edit_note_rounded, color: _gold),
+                            ),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _gold, width: 2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+
+                        // Submit button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _goldDark,
+                              elevation: 4,
+                              shadowColor: _goldDark.withAlpha(100),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Custom Tee request submitted! We will reach out on WhatsApp shortly.'),
+                                  backgroundColor: _goldDark,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              'Submit Custom Order Request',
+                              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -693,121 +772,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildGreetingHeader() {
     final wish = _timeBasedWish;
-    final userName = (_currentUser != null && _currentUser!.name.trim().isNotEmpty)
-        ? _currentUser!.name.trim()
+    String cleanText(String s) {
+      String str = s.replaceAll(RegExp(r'vexa', caseSensitive: false), '')
+                    .replaceAll(RegExp(r'\s+'), ' ')
+                    .trim();
+      final lower = str.toLowerCase();
+      if (lower.contains('tatukulaedukondalu')) {
+        str = str.replaceAll(RegExp(r'tatukulaedukondalu', caseSensitive: false), 'TATUKULA EDUKONDALU');
+      } else if (lower.contains('tatukula') && lower.contains('edukondalu') && !lower.contains('tatukula edukondalu')) {
+        str = str.replaceAll(RegExp(r'tatukula\s*edukondalu', caseSensitive: false), 'TATUKULA EDUKONDALU');
+      } else {
+        str = str.replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}');
+      }
+      return str.trim();
+    }
+
+    final rawUser = (_currentUser != null && _currentUser!.name.trim().isNotEmpty)
+        ? cleanText(_currentUser!.name)
         : 'Collector';
-    final companyName = (_currentUser != null && _currentUser!.companyName.trim().isNotEmpty)
-        ? _currentUser!.companyName.trim()
-        : 'VEXA Style Hub';
 
-    final displayName = _isRealUser ? '$userName • $companyName' : 'VEXA Collector • VEXA Style Hub';
+    final displayName = rawUser.isNotEmpty ? rawUser : 'Collector';
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _gold.withAlpha(140), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: _gold.withAlpha(40),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: Colors.black.withAlpha(10),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Stack(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            right: -25,
-            top: -25,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _gold.withAlpha(35),
-              ),
+          Text(
+            'WELCOME,',
+            style: GoogleFonts.cinzel(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: _goldDark,
+              letterSpacing: 2,
             ),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      wish.wish,
-                      style: GoogleFonts.cinzel(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: _goldDark,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.cinzel(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: _goldDark,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      wish.subtitle,
-                      style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        color: const Color(0xFF475569),
-                        letterSpacing: 0.2,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_goldDark, _gold],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _goldDark.withAlpha(90),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.workspace_premium_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(height: 2),
+          Text(
+            displayName.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.cinzel(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: _textDark,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            wish.subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.outfit(
+              fontSize: 12.5,
+              color: _subtext,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -860,576 +881,575 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _showGuestNotificationPrompt() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Notifications',
-      barrierColor: Colors.black.withAlpha(140),
-      transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
-      transitionBuilder: (context, anim1, anim2, child) {
-        final slideTween = Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeOutCubic));
-
-        return SlideTransition(
-          position: anim1.drive(slideTween),
-          child: Scaffold(
-            backgroundColor: _bgColor,
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 1,
-              shadowColor: Colors.black.withAlpha(15),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: _gold.withAlpha(25),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.notifications_outlined, color: _gold, size: 20),
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 180),
+        reverseTransitionDuration: const Duration(milliseconds: 150),
+        pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
+          backgroundColor: _bgColor,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 1,
+            shadowColor: Colors.black.withAlpha(15),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _gold.withAlpha(25),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 10),
+                  child: const Icon(Icons.notifications_outlined, color: _gold, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'NOTIFICATIONS',
+                  style: GoogleFonts.cinzel(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    color: _textDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 12),
+                  // Centered Gold Lock Emblem with Glow Ring
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: _gold.withAlpha(20),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _gold.withAlpha(80), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _gold.withAlpha(30),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.lock_outline_rounded,
+                      color: _goldDark,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   Text(
-                    'NOTIFICATIONS',
+                    'SIGN IN TO VIEW NOTIFICATIONS',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.cinzel(
-                      fontSize: 16,
+                      fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
+                      letterSpacing: 1.4,
                       color: _textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'Please sign in to your VEXA account to view your personalized notifications, drop alerts, and order updates.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        color: _subtext,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Luxury Notification Perks preview card
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(8),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildNotificationFeatureRow(
+                          icon: Icons.local_shipping_outlined,
+                          title: 'Order Status & Live Tracking',
+                          subtitle: 'Get real-time updates on dispatch and delivery.',
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Divider(height: 1, color: _border),
+                        ),
+                        _buildNotificationFeatureRow(
+                          icon: Icons.bolt_rounded,
+                          title: 'Exclusive 240 GSM Drops',
+                          subtitle: 'First access to limited edition drop collections.',
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Divider(height: 1, color: _border),
+                        ),
+                        _buildNotificationFeatureRow(
+                          icon: Icons.workspace_premium_outlined,
+                          title: 'VIP Loyalty Rewards',
+                          subtitle: 'Earn points and receive exclusive member coupons.',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Action buttons
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _goldDark,
+                        elevation: 2,
+                        shadowColor: _goldDark.withAlpha(80),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/login');
+                      },
+                      child: Text(
+                        'SIGN IN NOW',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: _gold, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/register');
+                      },
+                      child: Text(
+                        'CREATE AN ACCOUNT',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                          color: _goldDark,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.outfit(
+                        color: _subtext,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            body: SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 12),
-                    // Centered Gold Lock Emblem with Glow Ring
-                    Container(
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        color: _gold.withAlpha(20),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _gold.withAlpha(80), width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _gold.withAlpha(30),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.lock_outline_rounded,
-                        color: _goldDark,
-                        size: 48,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'SIGN IN TO VIEW NOTIFICATIONS',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.cinzel(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.4,
-                        color: _textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'Please sign in to your VEXA account to view your personalized notifications, drop alerts, and order updates.',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 13.5,
-                          color: _subtext,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Luxury Notification Perks preview card
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(8),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          _buildNotificationFeatureRow(
-                            icon: Icons.local_shipping_outlined,
-                            title: 'Order Status & Live Tracking',
-                            subtitle: 'Get real-time updates on dispatch and delivery.',
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Divider(height: 1, color: _border),
-                          ),
-                          _buildNotificationFeatureRow(
-                            icon: Icons.bolt_rounded,
-                            title: 'Exclusive 240 GSM Drops',
-                            subtitle: 'First access to limited edition drop collections.',
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Divider(height: 1, color: _border),
-                          ),
-                          _buildNotificationFeatureRow(
-                            icon: Icons.workspace_premium_outlined,
-                            title: 'VIP Loyalty Rewards',
-                            subtitle: 'Earn points and receive exclusive member coupons.',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Action buttons
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _goldDark,
-                          elevation: 2,
-                          shadowColor: _goldDark.withAlpha(80),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, '/login');
-                        },
-                        child: Text(
-                          'SIGN IN NOW',
-                          style: GoogleFonts.outfit(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: _gold, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, '/register');
-                        },
-                        child: Text(
-                          'CREATE AN ACCOUNT',
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                            color: _goldDark,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'Cancel',
-                        style: GoogleFonts.outfit(
-                          color: _subtext,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ),
-        );
-      },
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.fastOutSlowIn,
+            )),
+            child: child,
+          );
+        },
+      ),
     );
   }
 
   void _showNotificationsSheet() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Notifications',
-      barrierColor: Colors.black.withAlpha(140),
-      transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
-      transitionBuilder: (context, anim1, anim2, child) {
-        final slideTween = Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeOutCubic));
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 180),
+        reverseTransitionDuration: const Duration(milliseconds: 150),
+        pageBuilder: (context, animation, secondaryAnimation) => StatefulBuilder(
+          builder: (context, setSheetState) {
+            final hasUnread = _notifications.any((n) => n['isRead'] == false);
+            final hasNotifications = _notifications.isNotEmpty;
 
-        return SlideTransition(
-          position: anim1.drive(slideTween),
-          child: StatefulBuilder(
-            builder: (context, setSheetState) {
-              final hasUnread = _notifications.any((n) => n['isRead'] == false);
-              final hasNotifications = _notifications.isNotEmpty;
-
-              return Scaffold(
-                backgroundColor: _bgColor,
-                appBar: AppBar(
-                  backgroundColor: Colors.white,
-                  elevation: 1,
-                  shadowColor: Colors.black.withAlpha(15),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  title: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _gold.withAlpha(25),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.notifications_outlined, color: _gold, size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'NOTIFICATIONS',
-                        style: GoogleFonts.cinzel(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                          color: _textDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: const [],
+            return Scaffold(
+              backgroundColor: _bgColor,
+              appBar: AppBar(
+                backgroundColor: Colors.white,
+                elevation: 1,
+                shadowColor: Colors.black.withAlpha(15),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+                  onPressed: () => Navigator.pop(context),
                 ),
-                body: SafeArea(
-                  child: Column(
-                    children: [
-                      // Sub-header Action Bar: Read All (if unread) & Delete All
-                      if (hasNotifications)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          color: Colors.white,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '${_notifications.length} ${_notifications.length == 1 ? 'Notification' : 'Notifications'}',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: _subtext,
-                                ),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: _gold.withAlpha(25),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.notifications_outlined, color: _gold, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'NOTIFICATIONS',
+                      style: GoogleFonts.cinzel(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                        color: _textDark,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: const [],
+              ),
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    // Sub-header Action Bar: Read All (if unread) & Delete All
+                    if (hasNotifications)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        color: Colors.white,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${_notifications.length} ${_notifications.length == 1 ? 'Notification' : 'Notifications'}',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _subtext,
                               ),
-                              Row(
-                                children: [
-                                  // ONLY SHOW READ ALL OPTION IF THERE ARE UNREAD NOTIFICATIONS
-                                  if (hasUnread)
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(8),
-                                      onTap: () {
-                                        setSheetState(() {
-                                          NotificationService.markAllAsRead();
-                                        });
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.done_all_rounded, color: _goldDark, size: 18),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'Read All',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: _goldDark,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  if (hasUnread) const SizedBox(width: 12),
+                            ),
+                            Row(
+                              children: [
+                                // ONLY SHOW READ ALL OPTION IF THERE ARE UNREAD NOTIFICATIONS
+                                if (hasUnread)
                                   InkWell(
                                     borderRadius: BorderRadius.circular(8),
                                     onTap: () {
                                       setSheetState(() {
-                                        _notifications.clear();
-                                        // Handled by NotificationService
-                                      });
-                                      setState(() {
-                                        // Handled by NotificationService
+                                        NotificationService.markAllAsRead();
                                       });
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.delete_outline_rounded, color: Color(0xFFE53935), size: 18),
+                                          const Icon(Icons.done_all_rounded, color: _goldDark, size: 18),
                                           const SizedBox(width: 4),
                                           Text(
-                                            'Delete All',
+                                            'Read All',
                                             style: GoogleFonts.outfit(
                                               fontSize: 13,
                                               fontWeight: FontWeight.bold,
-                                              color: const Color(0xFFE53935),
+                                              color: _goldDark,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
                                   ),
+                                if (hasUnread) const SizedBox(width: 12),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () {
+                                    setSheetState(() {
+                                      _notifications.clear();
+                                      // Handled by NotificationService
+                                    });
+                                    setState(() {
+                                      // Handled by NotificationService
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.delete_outline_rounded, color: Color(0xFFE53935), size: 18),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Delete All',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFFE53935),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const Divider(height: 1),
+
+                    // Notification Items List
+                    Expanded(
+                      child: _notifications.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: const BoxDecoration(
+                                      color: _surfaceBg,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.notifications_off_outlined, size: 54, color: Colors.grey.shade400),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No Notifications Yet',
+                                    style: GoogleFonts.cinzel(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'You\'re all caught up! Check back for drop alerts & order updates.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                  ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _notifications.length,
+                              separatorBuilder: (context, index) => const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                final n = _notifications[index];
+                                final isUnread = n['isRead'] == false;
 
-                      const Divider(height: 1),
+                                return Dismissible(
+                                  key: Key(n['id'] as String),
+                                  direction: DismissDirection.endToStart, // Left swipe
+                                  background: Container(
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: 20),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFEBEB),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFFFCA5A5).withAlpha(120)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        const Icon(Icons.delete_outline_rounded, color: Color(0xFFE53935), size: 22),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Remove',
+                                          style: GoogleFonts.outfit(
+                                            color: const Color(0xFFE53935),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  onDismissed: (direction) {
+                                    final removedTitle = n['title'] as String;
+                                    setSheetState(() {
+                                      _notifications.removeAt(index);
+                                      // Handled by NotificationService
+                                    });
+                                    setState(() {
+                                      // Handled by NotificationService
+                                    });
 
-                      // Notification Items List
-                      Expanded(
-                        child: _notifications.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(20),
-                                      decoration: const BoxDecoration(
-                                        color: _surfaceBg,
-                                        shape: BoxShape.circle,
+                                    ScaffoldMessenger.of(context).clearSnackBars();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Removed "$removedTitle"'),
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 2),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      child: Icon(Icons.notifications_off_outlined, size: 54, color: Colors.grey.shade400),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No Notifications Yet',
-                                      style: GoogleFonts.cinzel(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'You\'re all caught up! Check back for drop alerts & order updates.',
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.outfit(fontSize: 13, color: _subtext),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.separated(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _notifications.length,
-                                separatorBuilder: (context, index) => const SizedBox(height: 12),
-                                itemBuilder: (context, index) {
-                                  final n = _notifications[index];
-                                  final isUnread = n['isRead'] == false;
-
-                                  return Dismissible(
-                                    key: Key(n['id'] as String),
-                                    direction: DismissDirection.endToStart, // Left swipe
-                                    background: Container(
-                                      alignment: Alignment.centerRight,
-                                      padding: const EdgeInsets.only(right: 20),
+                                    );
+                                  },
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () {
+                                      if (isUnread) {
+                                        setSheetState(() {
+                                          n['isRead'] = true;
+                                          // Handled by NotificationService
+                                        });
+                                        setState(() {
+                                          // Handled by NotificationService
+                                        });
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFFFEBEB),
+                                        color: isUnread ? Colors.white : _bgColor,
                                         borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: const Color(0xFFFCA5A5).withAlpha(120)),
+                                        border: Border.all(
+                                          color: isUnread ? _gold.withAlpha(100) : _border,
+                                          width: isUnread ? 1.2 : 1,
+                                        ),
+                                        boxShadow: isUnread
+                                            ? [
+                                                BoxShadow(
+                                                  color: _gold.withAlpha(20),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                              ]
+                                            : [],
                                       ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.delete_outline_rounded, color: Color(0xFFE53935), size: 22),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Remove',
-                                            style: GoogleFonts.outfit(
-                                              color: const Color(0xFFE53935),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
+                                          Stack(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(12),
+                                                decoration: BoxDecoration(
+                                                  color: (n['color'] as Color).withAlpha(25),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(n['icon'] as IconData, color: n['color'] as Color, size: 22),
+                                              ),
+                                              if (isUnread)
+                                                Positioned(
+                                                  top: 0,
+                                                  right: 0,
+                                                  child: Container(
+                                                    width: 10,
+                                                    height: 10,
+                                                    decoration: const BoxDecoration(
+                                                      color: _gold,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        n['title'] as String,
+                                                        style: GoogleFonts.outfit(
+                                                          fontWeight: isUnread ? FontWeight.w800 : FontWeight.bold,
+                                                          fontSize: 14.5,
+                                                          color: _textDark,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      n['time'] as String,
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 11.5,
+                                                        color: isUnread ? _goldDark : _subtext,
+                                                        fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  n['body'] as String,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 12.5,
+                                                    color: _subtext,
+                                                    height: 1.4,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    onDismissed: (direction) {
-                                      final removedTitle = n['title'] as String;
-                                      setSheetState(() {
-                                        _notifications.removeAt(index);
-                                        // Handled by NotificationService
-                                      });
-                                      setState(() {
-                                        // Handled by NotificationService
-                                      });
-
-                                      ScaffoldMessenger.of(context).clearSnackBars();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Removed "$removedTitle"'),
-                                          behavior: SnackBarBehavior.floating,
-                                          duration: const Duration(seconds: 2),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        ),
-                                      );
-                                    },
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(16),
-                                      onTap: () {
-                                        if (isUnread) {
-                                          setSheetState(() {
-                                            n['isRead'] = true;
-                                            // Handled by NotificationService
-                                          });
-                                          setState(() {
-                                            // Handled by NotificationService
-                                          });
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: isUnread ? Colors.white : _bgColor,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(
-                                            color: isUnread ? _gold.withAlpha(120) : _border,
-                                            width: isUnread ? 1.5 : 1.0,
-                                          ),
-                                          boxShadow: isUnread
-                                              ? [
-                                                  BoxShadow(
-                                                    color: _gold.withAlpha(20),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 3),
-                                                  ),
-                                                ]
-                                              : [],
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Stack(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.all(12),
-                                                  decoration: BoxDecoration(
-                                                    color: (n['color'] as Color).withAlpha(25),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: Icon(n['icon'] as IconData, color: n['color'] as Color, size: 22),
-                                                ),
-                                                if (isUnread)
-                                                  Positioned(
-                                                    top: 0,
-                                                    right: 0,
-                                                    child: Container(
-                                                      width: 10,
-                                                      height: 10,
-                                                      decoration: const BoxDecoration(
-                                                        color: _gold,
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                            const SizedBox(width: 14),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Expanded(
-                                                        child: Text(
-                                                          n['title'] as String,
-                                                          style: GoogleFonts.outfit(
-                                                            fontWeight: isUnread ? FontWeight.w800 : FontWeight.bold,
-                                                            fontSize: 14.5,
-                                                            color: _textDark,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      Text(
-                                                        n['time'] as String,
-                                                        style: GoogleFonts.outfit(
-                                                          fontSize: 11.5,
-                                                          color: isUnread ? _goldDark : _subtext,
-                                                          fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  Text(
-                                                    n['body'] as String,
-                                                    style: GoogleFonts.outfit(
-                                                      fontSize: 12.5,
-                                                      color: _subtext,
-                                                      height: 1.4,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
-              );
-            },
-          ),
-        );
-      },
+              ),
+            );
+          },
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.fastOutSlowIn,
+            )),
+            child: child,
+          );
+        },
+      ),
     );
   }
-
-
-
 
   // ── 4. PROMO BANNER CAROUSEL ──────────────────────────────────────────
   Widget _buildPromoBannerCarousel() {
@@ -1841,6 +1861,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: _bgColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        centerTitle: false,
         elevation: 0.8,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
@@ -1853,49 +1874,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           },
         ),
         titleSpacing: 0,
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_goldDark, _gold],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _gold.withAlpha(80),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            Text(
+              'MY ORDERS',
+              style: GoogleFonts.cinzel(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: _textDark,
+                letterSpacing: 1.8,
               ),
-              child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 18),
             ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'MY ORDERS',
-                  style: GoogleFonts.cinzel(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: _textDark,
-                    letterSpacing: 1.8,
-                  ),
-                ),
-                Text(
-                  'Live Courier Tracking & Order History',
-                  style: GoogleFonts.outfit(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: _subtext,
-                  ),
-                ),
-              ],
+            Text(
+              'Live Courier Tracking & Order History',
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: _subtext,
+              ),
             ),
           ],
         ),
@@ -1927,8 +1925,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             // Compute status counts for filter chips
             final totalCount = rawOrders.length;
             final processingCount = rawOrders.where((o) => o.status.toLowerCase().contains('process') || o.status.toLowerCase().contains('confirm')).length;
-            final shippedCount = rawOrders.where((o) => o.status.toLowerCase().contains('ship') || o.status.toLowerCase().contains('transit') || o.status.toLowerCase().contains('delivery')).length;
-            final deliveredCount = rawOrders.where((o) => o.status.toLowerCase().contains('deliver')).length;
+            final shippedCount = rawOrders.where((o) => o.status.toLowerCase().contains('ship') || o.status.toLowerCase().contains('transit') || o.status.toLowerCase().contains('out for delivery')).length;
+            final deliveredCount = rawOrders.where((o) => o.status.toLowerCase() == 'delivered' || (o.status.toLowerCase().contains('deliver') && !o.status.toLowerCase().contains('out for delivery'))).length;
             final cancelledCount = rawOrders.where((o) => o.status.toLowerCase().contains('cancel')).length;
 
             // Apply filters
@@ -1936,8 +1934,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               final s = order.status.toLowerCase();
               final matchesFilter = _selectedOrderStatusFilter == 'All' ||
                   (_selectedOrderStatusFilter == 'Processing' && (s.contains('process') || s.contains('confirm'))) ||
-                  (_selectedOrderStatusFilter == 'Shipped' && (s.contains('ship') || s.contains('transit') || s.contains('delivery'))) ||
-                  (_selectedOrderStatusFilter == 'Delivered' && s.contains('deliver')) ||
+                  (_selectedOrderStatusFilter == 'Shipped' && (s.contains('ship') || s.contains('transit') || s.contains('out for delivery'))) ||
+                  (_selectedOrderStatusFilter == 'Delivered' && (s == 'delivered' || (s.contains('deliver') && !s.contains('out for delivery')))) ||
                   (_selectedOrderStatusFilter == 'Cancelled' && s.contains('cancel'));
 
               final q = _orderSearchQuery.trim().toLowerCase();
@@ -2339,6 +2337,273 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _showCancelOrderDialog(OrderModel order) {
+    String selectedReason = 'Changed my mind / Placed by mistake';
+    final customReasonController = TextEditingController();
+
+    final cancelReasons = [
+      'Changed my mind / Placed by mistake',
+      'Ordered wrong size or color variant',
+      'Found better deal / price elsewhere',
+      'Delivery time is too long',
+      'Need to change shipping address',
+      'Other reason',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SizedBox(
+              width: double.infinity,
+              height: MediaQuery.of(sheetCtx).size.height,
+              child: Scaffold(
+                backgroundColor: Colors.white,
+                appBar: AppBar(
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  automaticallyImplyLeading: false,
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withAlpha(20),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'CANCEL ORDER ${order.id}',
+                              style: GoogleFonts.cinzel(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: _textDark,
+                              ),
+                            ),
+                            Text(
+                              'Please select a reason for cancellation',
+                              style: GoogleFonts.outfit(fontSize: 12, color: _subtext),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: _textDark, size: 26),
+                      onPressed: () => Navigator.pop(sheetCtx),
+                    ),
+                  ],
+                  bottom: const PreferredSize(
+                    preferredSize: Size.fromHeight(1),
+                    child: Divider(height: 1, color: _border),
+                  ),
+                ),
+                body: SafeArea(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.only(
+                            left: 20,
+                            right: 20,
+                            top: 20,
+                            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'WHY DO YOU WANT TO CANCEL?',
+                                style: GoogleFonts.cinzel(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _textDark,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              ...cancelReasons.map((reason) {
+                                final isSelected = selectedReason == reason;
+                                return InkWell(
+                                  onTap: () {
+                                    setSheetState(() {
+                                      selectedReason = reason;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFFEF4444).withAlpha(12) : const Color(0xFFFAFAFC),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected ? const Color(0xFFEF4444) : _border,
+                                        width: isSelected ? 1.5 : 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                                          color: isSelected ? const Color(0xFFEF4444) : _subtext,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            reason,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13.5,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                              color: isSelected ? const Color(0xFF991B1B) : _textDark,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                              if (selectedReason == 'Other reason') ...[
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: customReasonController,
+                                  maxLines: 3,
+                                  style: GoogleFonts.outfit(fontSize: 13, color: _textDark),
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter specific cancellation reason...',
+                                    hintStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: _border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                                    ),
+                                    contentPadding: const EdgeInsets.all(14),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Bottom action buttons
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          border: Border(top: BorderSide(color: _border)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  side: const BorderSide(color: _border),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () => Navigator.pop(sheetCtx),
+                                child: Text(
+                                  'Keep Order',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: _subtext,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFEF4444),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () async {
+                                  final finalReason = selectedReason == 'Other reason' && customReasonController.text.trim().isNotEmpty
+                                      ? customReasonController.text.trim()
+                                      : selectedReason;
+
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  Navigator.pop(sheetCtx);
+
+                                  await OrderService.cancelOrder(order.id, finalReason, context: context, targetOrder: order);
+
+                                  if (mounted) {
+                                    setState(() {
+                                      order.status = 'Cancelled';
+                                      order.cancelReason = finalReason;
+                                      _selectedOrderStatusFilter = 'Cancelled';
+                                    });
+                                    _refreshOrders();
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        backgroundColor: const Color(0xFF10B981),
+                                        behavior: SnackBarBehavior.floating,
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                'Order ${order.id} cancelled. ₹${order.totalAmount.toStringAsFixed(0)} credited to VEXA Wallet!',
+                                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: Text(
+                                  'Confirm Cancel',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildRedesignedOrderCard(BuildContext context, OrderModel order) {
     final firstItem = order.items.isNotEmpty ? order.items.first : null;
     final titleText = firstItem != null ? firstItem.name : 'VEXA Couture Order';
@@ -2636,7 +2901,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
           // Footer Actions Row
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
             decoration: const BoxDecoration(
               color: Color(0xFFFAFAFC),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
@@ -2644,29 +2909,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             child: Row(
               children: [
+                // 1. Need Support (Left)
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: _border),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () {
                       _showCustomTeeBottomSheet();
                     },
-                    icon: const Icon(Icons.help_outline_rounded, size: 15, color: _subtext),
-                    label: Text(
+                    child: Text(
                       'Need Support',
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _subtext),
+                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: _subtext),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 6),
+
+                // 2. Cancel Order (Middle - shown if active & not delivered)
+                if (!isCancelled && !isDelivered) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: const Color(0xFFEF4444).withAlpha(120)),
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => _showCancelOrderDialog(order),
+                      child: Text(
+                        'Cancel Order',
+                        style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+
+                // 3. Track Order (Right)
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _goldDark,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                       elevation: 2,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -2676,10 +2967,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: order)),
                       );
                     },
-                    icon: const Icon(Icons.alt_route_rounded, size: 15, color: Colors.white),
-                    label: Text(
+                    child: Text(
                       'Track Order',
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
@@ -2757,12 +3049,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         titleSpacing: 0,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: const Color(0xFFFF4757).withAlpha(25), shape: BoxShape.circle),
-              child: const Icon(Icons.favorite_rounded, color: Color(0xFFFF4757), size: 20),
-            ),
-            const SizedBox(width: 10),
             Text('MY WISHLIST', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5)),
             const SizedBox(width: 6),
             Text('(${wishItems.length})', style: GoogleFonts.outfit(fontSize: 13, color: _subtext, fontWeight: FontWeight.bold)),
@@ -3259,19 +3545,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
-
-
-
-  Widget _buildOrderItemDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
-        Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark)),
-      ],
-    );
-  }
-
   Future<String?> _saveInvoiceFileToDisk(String invoiceNo, OrderModel order) async {
     try {
       String? downloadsPath;

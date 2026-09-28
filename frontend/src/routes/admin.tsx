@@ -259,15 +259,30 @@ export function Admin() {
         }
 
         if (orderData && (orderData._id || orderData.id)) {
-          const rawId = orderData._id || orderData.id || Date.now().toString();
-          const notifId = `notif-order-${rawId}`;
-          const shortCode = String(rawId).slice(-8).toUpperCase();
+          const mongoId = orderData._id ? String(orderData._id).trim() : "";
+          const customId = orderData.id ? String(orderData.id).trim() : "";
+          const rawId = customId || mongoId || Date.now().toString();
+
+          // Strip leading '#' characters to prevent double hash "##VX-1502"
+          const cleanCode = rawId.replace(/^#+/, "").trim();
+          const shortCode = cleanCode.length > 8 ? cleanCode.slice(-8).toUpperCase() : cleanCode.toUpperCase();
+          const notifId = `notif-order-${cleanCode}`;
+
           const customerName = orderData.userName || orderData.userEmail || "Customer";
           const amount = Number(orderData.totalAmount) || 0;
           const itemsCount = Array.isArray(orderData.items) ? orderData.items.length : 1;
 
           setNotifications((prev) => {
-            if (prev.some((n) => n.id === notifId)) return prev;
+            const isDuplicate = prev.some((n) => {
+              if (n.id === notifId) return true;
+              if (mongoId && n.id.includes(mongoId)) return true;
+              if (customId && n.id.includes(customId.replace(/^#+/, ""))) return true;
+              if (shortCode && n.message.includes(shortCode)) return true;
+              return false;
+            });
+
+            if (isDuplicate) return prev;
+
             const newNotif: NotificationItem = {
               id: notifId,
               title: "⚡ Realtime Booking Received",
@@ -281,6 +296,11 @@ export function Admin() {
             return [newNotif, ...prev];
           });
 
+          // Track all ID variations in known IDs set so polling will not trigger a second notification
+          if (mongoId) knownOrderIdsRef.current.add(mongoId);
+          if (customId) knownOrderIdsRef.current.add(customId);
+          knownOrderIdsRef.current.add(cleanCode);
+
           // Play Audio Chime
           playNotifChime();
 
@@ -292,20 +312,24 @@ export function Admin() {
       }
     };
 
+    const handleOrdersUpdatedEvent = () => {
+      fetchOrders();
+    };
+
     const handleWsMessage = (e: any) => {
       const payload = e?.detail;
-      if (payload && (payload.type === "ORDER_CREATED" || payload.type === "ORDERS_UPDATED")) {
+      if (payload && payload.type === "ORDER_CREATED") {
         if (payload.data) {
           handleNewOrderNotif({ detail: payload.data });
         }
       }
     };
 
-    window.addEventListener("vexa_orders_updated", handleNewOrderNotif);
+    window.addEventListener("vexa_orders_updated", handleOrdersUpdatedEvent);
     window.addEventListener("vexa_ws_message", handleWsMessage);
 
     return () => {
-      window.removeEventListener("vexa_orders_updated", handleNewOrderNotif);
+      window.removeEventListener("vexa_orders_updated", handleOrdersUpdatedEvent);
       window.removeEventListener("vexa_ws_message", handleWsMessage);
     };
   }, []);
@@ -1121,23 +1145,44 @@ export function Admin() {
       // Skip first fetch (page load) to avoid notifying for pre-existing orders.
       if (!isFirstFetchRef.current) {
         allOrders.forEach((ord) => {
-          const rawId = ord._id || (ord as any).id || "";
+          const mongoId = ord._id ? String(ord._id).trim() : "";
+          const customId = (ord as any).id ? String((ord as any).id).trim() : "";
+          const rawId = customId || mongoId || "";
           if (!rawId) return;
-          if (!knownOrderIdsRef.current.has(rawId)) {
-            // This is a NEW order detected by polling!
-            knownOrderIdsRef.current.add(rawId);
-            const notifId = `notif-order-${rawId}`;
-            const shortCode = String(rawId).slice(-8).toUpperCase();
+
+          const cleanCode = rawId.replace(/^#+/, "").trim();
+          const shortCode = cleanCode.length > 8 ? cleanCode.slice(-8).toUpperCase() : cleanCode.toUpperCase();
+
+          const isAlreadyKnown =
+            (mongoId && knownOrderIdsRef.current.has(mongoId)) ||
+            (customId && knownOrderIdsRef.current.has(customId)) ||
+            knownOrderIdsRef.current.has(cleanCode);
+
+          if (!isAlreadyKnown) {
+            // Mark all ID formats as known
+            if (mongoId) knownOrderIdsRef.current.add(mongoId);
+            if (customId) knownOrderIdsRef.current.add(customId);
+            knownOrderIdsRef.current.add(cleanCode);
+
+            const notifId = `notif-order-${cleanCode}`;
             const customerName = ord.userName || ord.userEmail || "Customer";
             const amount = Number(ord.totalAmount) || 0;
             const itemsCount = Array.isArray(ord.items) ? ord.items.length : 1;
 
             setNotifications((prev) => {
-              if (prev.some((n) => n.id === notifId)) return prev;
+              const isDup = prev.some((n) => {
+                if (n.id === notifId) return true;
+                if (mongoId && n.id.includes(mongoId)) return true;
+                if (customId && n.id.includes(customId.replace(/^#+/, ""))) return true;
+                if (shortCode && n.message.includes(shortCode)) return true;
+                return false;
+              });
+              if (isDup) return prev;
+
               const newNotif: NotificationItem = {
                 id: notifId,
-                title: "⚡ New Order Received!",
-                message: `Order #${shortCode} by ${customerName} — ₹${amount.toLocaleString("en-IN")} (${itemsCount} item${itemsCount > 1 ? "s" : ""})`,
+                title: "⚡ Realtime Booking Received",
+                message: `New Order #${shortCode} placed by ${customerName} for ₹${amount.toLocaleString("en-IN")} (${itemsCount} item${itemsCount > 1 ? "s" : ""})`,
                 time: "Just now",
                 timestamp: Date.now(),
                 read: false,
@@ -1148,33 +1193,19 @@ export function Admin() {
             });
 
             // Fire audio chime
-            try {
-              const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-              if (AudioCtx) {
-                const ctx = new AudioCtx();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = "sine";
-                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.15, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.45);
-              }
-            } catch (_) {}
-
-
+            playNotifChime();
           }
         });
       } else {
         // First fetch: just populate known IDs silently, don't notify
         isFirstFetchRef.current = false;
         allOrders.forEach((ord) => {
-          const rawId = ord._id || (ord as any).id || "";
-          if (rawId) knownOrderIdsRef.current.add(rawId);
+          const mongoId = ord._id ? String(ord._id).trim() : "";
+          const customId = (ord as any).id ? String((ord as any).id).trim() : "";
+          if (mongoId) knownOrderIdsRef.current.add(mongoId);
+          if (customId) knownOrderIdsRef.current.add(customId);
+          const cleanCode = (customId || mongoId).replace(/^#+/, "").trim();
+          if (cleanCode) knownOrderIdsRef.current.add(cleanCode);
         });
       }
       // ─────────────────────────────────────────────────────────────────────────
@@ -1546,16 +1577,6 @@ export function Admin() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {/* REALTIME BROADCAST MESSAGE BUTTON */}
-                <button
-                  type="button"
-                  onClick={() => setBroadcastModalOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gold/50 bg-gold/15 text-gold hover:bg-gold hover:text-primary-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
-                  title="Send Live Realtime Broadcast Message to Mobile App"
-                >
-                  <Megaphone className="size-4 animate-bounce text-gold hover:text-primary-foreground" />
-                  <span className="hidden sm:inline">Broadcast Message</span>
-                </button>
 
                 {/* REALTIME ADMIN NOTIFICATION BELL */}
               <div ref={notifRef} className="relative shrink-0">
@@ -1701,6 +1722,7 @@ export function Admin() {
                   </div>
                 )}
               </div>
+            </div>
             </div>
 
             {/* MAIN CONTENT AREA */}

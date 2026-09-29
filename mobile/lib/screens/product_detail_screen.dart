@@ -4,6 +4,7 @@ import '../models/item_model.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/share_product_modal.dart';
+import '../widgets/vexa_feedback_snackbar.dart';
 
 class _ReviewItem {
   final String id;
@@ -218,6 +219,180 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final total = _reviews.fold<double>(0, (sum, item) => sum + item.rating);
     return total / _reviews.length;
   }
+
+  void _openImageZoomModal(int initialIndex) {
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (ctx) {
+        int zoomPageIndex = initialIndex;
+        final PageController zoomPageController = PageController(initialPage: initialIndex);
+
+        return StatefulBuilder(
+          builder: (context, setZoomState) {
+            final slides = _gallerySlides;
+
+            return Scaffold(
+              backgroundColor: Colors.black,
+              body: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Fullscreen Interactive Zoom View
+                  PageView.builder(
+                    controller: zoomPageController,
+                    onPageChanged: (idx) {
+                      setZoomState(() {
+                        zoomPageIndex = idx;
+                      });
+                    },
+                    itemCount: slides.length,
+                    itemBuilder: (context, idx) {
+                      final slide = slides[idx];
+                      final imgPath = slide['image'] as String;
+
+                      return InteractiveViewer(
+                        minScale: 0.8,
+                        maxScale: 5.0,
+                        clipBehavior: Clip.none,
+                        child: Center(
+                          child: _buildProductImage(
+                            imgPath,
+                            width: double.infinity,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // Top Header Controls
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 10,
+                    left: 16,
+                    right: 16,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Close button
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(40),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                          ),
+                        ),
+
+                        // Index Pill Counter
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withAlpha(180),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Text(
+                            '${zoomPageIndex + 1} / ${slides.length}',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+
+                        // Pinch to Zoom Hint Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.pinch_outlined, color: Colors.white, size: 15),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Pinch to Zoom',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bottom Thumbnail Gallery Row
+                  Positioned(
+                    bottom: MediaQuery.of(context).padding.bottom + 20,
+                    left: 0,
+                    right: 0,
+                    child: SizedBox(
+                      height: 56,
+                      child: Center(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: slides.length,
+                          separatorBuilder: (c, i) => const SizedBox(width: 10),
+                          itemBuilder: (context, idx) {
+                            final isSel = idx == zoomPageIndex;
+                            final slide = slides[idx];
+                            final imgPath = slide['image'] as String;
+
+                            return GestureDetector(
+                              onTap: () {
+                                zoomPageController.animateToPage(
+                                  idx,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                );
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isSel ? AppTheme.primaryColor : Colors.white24,
+                                    width: isSel ? 2.5 : 1.0,
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: _buildProductImage(
+                                    imgPath,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
 
   Map<int, int> get _ratingDistribution {
     final dist = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
@@ -466,11 +641,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     // 1. FULL HERO IMAGE DISPLAY WITH SIDE SCROLLING (MULTI-ANGLE)
                     // ════════════════════════════════════════════════════════
                     SizedBox(
-                      height: 420,
+                      height: 460,
                       width: double.infinity,
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
+                          // Studio neutral background container so full uncropped image displays cleanly
+                          Container(color: const Color(0xFF1C1C1E)),
+
                           // Side-scrollable PageView of exact product image angles (Front Side, Back Side, Side Angle, Key Highlights)
                           PageView.builder(
                             controller: _pageController,
@@ -489,7 +667,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 imgPath,
                                 width: double.infinity,
                                 height: double.infinity,
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
                               );
 
                               if (type == 'side') {
@@ -503,40 +681,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 );
                               }
 
-                              return Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  imageWidget,
-                                  if (type == 'highlights') ...[
-                                    // Key Highlights Overlay (Matching user's reference)
-                                    Container(
-                                      color: Colors.black.withAlpha(165),
-                                      padding: const EdgeInsets.only(top: 60, left: 24, right: 24, bottom: 40),
-                                      child: SingleChildScrollView(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'Key Highlights',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.w900,
-                                                color: Colors.white,
-                                                letterSpacing: 0.5,
+                              return GestureDetector(
+                                onTap: () => _openImageZoomModal(index),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    imageWidget,
+                                    if (type == 'highlights') ...[
+                                      // Key Highlights Overlay (Matching user's reference)
+                                      Container(
+                                        color: Colors.black.withAlpha(165),
+                                        padding: const EdgeInsets.only(top: 60, left: 24, right: 24, bottom: 40),
+                                        child: SingleChildScrollView(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Key Highlights',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white,
+                                                  letterSpacing: 0.5,
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 16),
-                                            _buildHighlightItem('Pattern', 'Self Design / Heavy Ribbed Seams'),
-                                            _buildHighlightItem('Type', 'Daily | Luxury Streetwear'),
-                                            _buildHighlightItem('Occasion', 'Party | Festive | Casual'),
-                                            _buildHighlightItem('Fabric', '240 GSM Combed Cotton'),
-                                            _buildHighlightItem('Fit', 'Relaxed Boxy Drop-Shoulder'),
-                                          ],
+                                              const SizedBox(height: 16),
+                                              _buildHighlightItem('Pattern', 'Self Design / Heavy Ribbed Seams'),
+                                              _buildHighlightItem('Type', 'Daily | Luxury Streetwear'),
+                                              _buildHighlightItem('Occasion', 'Party | Festive | Casual'),
+                                              _buildHighlightItem('Fabric', '240 GSM Combed Cotton'),
+                                              _buildHighlightItem('Fit', 'Relaxed Boxy Drop-Shoulder'),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               );
                             },
                           ),
@@ -720,7 +901,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
 
-                          // Bottom-Right Slide View Tag Pill hidden per user preference
+                          // Bottom-Right Floating Zoom Hint Button
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: GestureDetector(
+                              onTap: () => _openImageZoomModal(_activePageIndex),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(190),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withAlpha(50),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Tap to Zoom',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1606,11 +1824,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 if (widget.onAddToCart != null) {
                                   widget.onAddToCart!(widget.item, _selectedColor, _selectedSize, _quantity);
                                 }
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Added $_quantity x ${widget.item.name} ($_selectedSize, $_selectedColor) to cart'),
-                                    backgroundColor: AppTheme.primaryColor,
-                                  ),
+                                VexaFeedback.showAddToCartSuccess(
+                                  context,
+                                  productName: widget.item.name,
+                                  onViewCart: widget.onOpenCart,
                                 );
                               },
                               child: Text(

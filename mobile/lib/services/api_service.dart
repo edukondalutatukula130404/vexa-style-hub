@@ -233,6 +233,15 @@ class ApiService {
 
   // 5. Fetch Catalog Items
   static Future<List<ItemModel>> getItems() async {
+    // Handle API Simulation states
+    if (ApiConfig.simulatedState == 'slow') {
+      await Future.delayed(const Duration(seconds: 2));
+    } else if (ApiConfig.simulatedState == 'empty') {
+      return [];
+    } else if (ApiConfig.simulatedState == 'error' || ApiConfig.simulatedState == 'offline') {
+      throw Exception('Failed to load products. Network connection error.');
+    }
+
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.itemsUrl),
@@ -245,7 +254,10 @@ class ApiService {
         final items = itemsJson.map((json) => ItemModel.fromJson(json)).toList();
         if (items.length >= getFallbackItems().length) return items;
       }
-    } catch (_) {
+    } catch (e) {
+      if (ApiConfig.simulatedState == 'error' || ApiConfig.simulatedState == 'offline') {
+        rethrow;
+      }
       // Try auto discover active server
       final autoFound = await ApiConfig.autoDiscoverBackend();
       if (autoFound != null) {
@@ -266,6 +278,7 @@ class ApiService {
     }
     return getFallbackItems();
   }
+
 
   static List<ItemModel> getFallbackItems() {
     return [

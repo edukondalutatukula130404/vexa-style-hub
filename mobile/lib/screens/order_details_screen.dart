@@ -675,6 +675,11 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
               ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.download_rounded, color: _goldDark, size: 22),
+            tooltip: 'Download Invoice',
+            onPressed: () => _showInvoiceModal(context, _currentOrder, autoStartDownload: true),
+          ),
+          IconButton(
             icon: const Icon(Icons.alt_route_rounded, color: _goldDark, size: 20),
             tooltip: 'Track Package',
             onPressed: () {
@@ -929,43 +934,22 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                 ),
                 const SizedBox(height: 10),
               ],
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: _goldDark, width: 1.2),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () {
-                        _showInvoiceModal(context, _currentOrder, autoStartDownload: true);
-                      },
-                      icon: const Icon(Icons.download_rounded, color: _goldDark, size: 18),
-                      label: Text(
-                        'Download Invoice',
-                        style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: _goldDark),
-                      ),
-                    ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: _showCourierSupportBottomSheet,
-                      icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
-                      label: Text(
-                        'Courier Support',
-                        style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                    ),
+                  onPressed: _showCourierSupportBottomSheet,
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+                  label: Text(
+                    'Courier Support',
+                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                ],
+                ),
               ),
             ],
           ),

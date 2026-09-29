@@ -269,8 +269,17 @@ class OrderService {
 
   /// Retrieve all user orders (combining in-memory + backend API if accessible)
   static Future<List<OrderModel>> getOrders({String? email}) async {
+    if (ApiConfig.simulatedState == 'slow') {
+      await Future.delayed(const Duration(seconds: 2));
+    } else if (ApiConfig.simulatedState == 'empty') {
+      return [];
+    } else if (ApiConfig.simulatedState == 'error' || ApiConfig.simulatedState == 'offline') {
+      throw Exception('Failed to load orders. Connection error.');
+    }
+
     try {
       String userEmail = (email != null && email.isNotEmpty) ? email : '';
+
       if (userEmail.isEmpty) {
         final user = await AuthService.getUser();
         userEmail = user?.email ?? 'admin@vexa.com';
@@ -397,7 +406,7 @@ class OrderService {
       icon: Icons.check_circle_rounded,
       color: const Color(0xFF10B981),
       type: 'ORDER_PLACED',
-      data: {'orderId': orderId},
+      data: {'orderId': orderId, '_id': orderId, 'id': orderId},
       context: (context != null && context.mounted) ? context : null,
     );
 

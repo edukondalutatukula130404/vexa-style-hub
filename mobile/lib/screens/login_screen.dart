@@ -4,6 +4,7 @@ import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/vexa_button.dart';
 
 const Color _goldDark = Color(0xFF8B6508);
 
@@ -450,29 +451,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       // Primary Continue Button
                       SizedBox(
                         width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _goldDark,
-                            elevation: 3,
-                            shadowColor: _goldDark.withAlpha(60),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                          onPressed: _isLoading ? null : _handleLogin,
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
-                              : Text(
-                                  'Continue',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                        child: VexaButton(
+                          text: 'Continue',
+                          isLoading: _isLoading,
+                          isDisabled: _isLoading,
+                          onPressed: _handleLogin,
+                          backgroundColor: _goldDark,
+                          borderRadius: 14,
+                          height: 52,
                         ),
                       ),
                       const SizedBox(height: 20),

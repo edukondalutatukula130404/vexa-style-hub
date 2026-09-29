@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/item_model.dart';
 import '../services/order_service.dart';
+import '../widgets/vexa_empty_state.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 
@@ -550,26 +551,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
           // 4. Products Grid (ALL PRODUCTS)
           Expanded(
             child: filtered.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.checkroom_outlined, size: 60, color: _subtext),
-                        const SizedBox(height: 16),
-                        Text('No items found', style: GoogleFonts.outfit(fontSize: 18, color: _textDark, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 6),
-                        Text('Try adjusting your search or filter options.', style: GoogleFonts.outfit(color: _subtext)),
-                        const SizedBox(height: 14),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: _goldDark),
-                          onPressed: _resetFilters,
-                          child: Text('Reset Filters', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
+                ? VexaEmptyState.searchResults(
+                    onClearSearch: _resetFilters,
                   )
                 : GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       childAspectRatio: 0.58,
@@ -688,13 +674,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         heroTag: 'floating_cart_products',
-        backgroundColor: _goldDark,
+        backgroundColor: const Color(0xFFF2D370),
         elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-          side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
+        shape: const CircleBorder(
+          side: BorderSide(color: Colors.white, width: 1.5),
         ),
         onPressed: () {
           if (widget.onOpenCart != null) {
@@ -715,10 +700,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
             );
           }
         },
-        icon: Stack(
+        child: Stack(
           clipBehavior: Clip.none,
           children: [
-            const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
+            const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0F172A), size: 22),
             if ((widget.cartItems?.length ?? 0) > 0)
               Positioned(
                 top: -6,
@@ -738,10 +723,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 ),
               ),
           ],
-        ),
-        label: Text(
-          'View Cart',
-          style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
         ),
       ),
     );

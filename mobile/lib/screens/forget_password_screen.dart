@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/vexa_button.dart';
 
 class ForgetPasswordScreen extends StatefulWidget {
   const ForgetPasswordScreen({super.key});
@@ -365,23 +366,13 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                 // Action Button
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : (_currentStep == 1 ? _handleRequestReset : _handleResetPassword),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : Text(
-                            _currentStep == 1 ? 'Send OTP' : 'Verify OTP & Reset Password',
-                            style: GoogleFonts.outfit(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                  child: VexaButton(
+                    text: _currentStep == 1 ? 'Send OTP' : 'Verify OTP & Reset Password',
+                    isLoading: _isLoading,
+                    isDisabled: _isLoading,
+                    onPressed: _currentStep == 1 ? _handleRequestReset : _handleResetPassword,
+                    borderRadius: 14,
+                    height: 52,
                   ),
                 ),
                 const SizedBox(height: 28),

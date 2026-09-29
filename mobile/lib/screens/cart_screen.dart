@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import '../services/wallet_service.dart';
+import '../widgets/vexa_empty_state.dart';
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
 const Color _gold = Color(0xFFB8860B);
@@ -2002,109 +2003,14 @@ class _CartScreenState extends State<CartScreen> {
 
   // ── 1. EMPTY CART VIEW ───────────────────────────────────────────────────
   Widget _buildEmptyStateView() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Glowing Luxury Bag Badge
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 130,
-                  height: 130,
-                  decoration: BoxDecoration(
-                    color: _gold.withAlpha(15),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: _cardBg,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _gold.withAlpha(120), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _goldDark.withAlpha(25),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.shopping_bag_outlined,
-                    size: 48,
-                    color: _goldDark,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-
-            Text(
-              'YOUR CART IS EMPTY',
-              style: GoogleFonts.cinzel(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 3,
-                color: _textDark,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Discover our 240 GSM heavyweight cotton drop and elevate your wardrobe with effortless style.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(
-                fontSize: 13.5,
-                color: _subtext,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 28),
-
-            // Start Shopping CTA
-            SizedBox(
-              width: 220,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _goldDark,
-                  elevation: 4,
-                  shadowColor: _goldDark.withAlpha(80),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () {
-                  if (widget.onNavigateToProducts != null) {
-                    widget.onNavigateToProducts!();
-                  } else {
-                    Navigator.pushNamed(context, '/home');
-                  }
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'EXPLORE CATALOG',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return VexaEmptyState.cart(
+      onStartShopping: () {
+        if (widget.onNavigateToProducts != null) {
+          widget.onNavigateToProducts!();
+        } else {
+          Navigator.pushNamed(context, '/home');
+        }
+      },
     );
   }
 

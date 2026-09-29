@@ -55,9 +55,25 @@ class NotificationService {
     Map<String, dynamic>? data,
     BuildContext? context,
   }) {
-    // Avoid duplicate notifications with the exact same title & body created within 2 seconds
+    // 1. Deduplicate by orderId if present
+    final orderId = data?['orderId'] ?? data?['_id'] ?? data?['id'];
+    if (orderId != null && orderId.toString().isNotEmpty) {
+      final isDuplicate = notifications.any((n) {
+        final nOrderId = n['data']?['orderId'] ?? n['data']?['_id'] ?? n['data']?['id'];
+        if (nOrderId != null && nOrderId.toString() == orderId.toString() && (n['type'] == 'ORDER_PLACED' || n['type'] == type)) {
+          return true;
+        }
+        if (n['type'] == 'ORDER_PLACED' && (n['body'].toString().contains(orderId.toString()) || n['title'] == title)) {
+          return true;
+        }
+        return false;
+      });
+      if (isDuplicate) return;
+    }
+
+    // 2. Avoid duplicate notifications with the exact same title & body created recently
     final existingIndex = notifications.indexWhere(
-      (n) => n['title'] == title && n['body'] == body,
+      (n) => n['title'] == title && (n['body'] == body || n['type'] == type),
     );
     if (existingIndex != -1 && existingIndex < 2) {
       return;

@@ -254,6 +254,8 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
             ),
             const SizedBox(height: 14),
 
+            const SizedBox(height: 14),
+
             // Helper Action Buttons (Auto-Detect / Reset)
             Row(
               children: [
@@ -282,6 +284,89 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 18),
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 10),
+
+            // UI State & API Simulator Section
+            Row(
+              children: [
+                const Icon(Icons.science_rounded, size: 16, color: AppTheme.primaryColor),
+                const SizedBox(width: 8),
+                Text(
+                  'API & UI State Testing Simulator:',
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ValueListenableBuilder<String>(
+              valueListenable: ApiConfig.simulationNotifier,
+              builder: (context, currentSimState, _) {
+                return Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Normal'),
+                      selected: currentSimState == 'normal',
+                      selectedColor: AppTheme.primaryColor,
+                      labelStyle: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: currentSimState == 'normal' ? Colors.black : Colors.white,
+                        fontWeight: currentSimState == 'normal' ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (_) => ApiConfig.setSimulatedState('normal'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Slow Loading'),
+                      selected: currentSimState == 'slow',
+                      selectedColor: const Color(0xFF3B82F6),
+                      labelStyle: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: currentSimState == 'slow' ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (_) => ApiConfig.setSimulatedState('slow'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Empty Data'),
+                      selected: currentSimState == 'empty',
+                      selectedColor: const Color(0xFF8B5CF6),
+                      labelStyle: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: currentSimState == 'empty' ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (_) => ApiConfig.setSimulatedState('empty'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('API Error'),
+                      selected: currentSimState == 'error',
+                      selectedColor: const Color(0xFFEF4444),
+                      labelStyle: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: currentSimState == 'error' ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (_) => ApiConfig.setSimulatedState('error'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Offline Mode'),
+                      selected: currentSimState == 'offline',
+                      selectedColor: const Color(0xFFF59E0B),
+                      labelStyle: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: Colors.black,
+                        fontWeight: currentSimState == 'offline' ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (_) => ApiConfig.setSimulatedState('offline'),
+                    ),
+                  ],
+                );
+              },
+            ),
+
           ],
         ),
       ),

@@ -23,6 +23,16 @@ class ApiConfig {
     isProduction ? productionUrl : localWifiUrl,
   );
 
+  /// API State Simulator for testing UI states (normal, slow, empty, error, offline)
+  static String simulatedState = 'normal';
+  static final ValueNotifier<String> simulationNotifier = ValueNotifier<String>('normal');
+
+  static void setSimulatedState(String state) {
+    simulatedState = state;
+    simulationNotifier.value = state;
+  }
+
+
   static const List<String> defaultCandidates = [
     localWifiUrl,
     'http://localhost:5000/api',

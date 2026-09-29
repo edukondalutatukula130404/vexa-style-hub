@@ -5,6 +5,7 @@ import 'screens/cart_screen.dart';
 import 'screens/forget_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/no_internet_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
@@ -32,6 +33,11 @@ class VexaMobileApp extends StatelessWidget {
       darkTheme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,
       initialRoute: '/splash',
+      builder: (context, child) {
+        return ConnectivityWrapper(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/onboarding': (context) => const OnboardingScreen(),
@@ -41,6 +47,7 @@ class VexaMobileApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/cart': (context) => const CartScreen(cartItems: []),
         '/profile': (context) => const ProfileScreen(),
+        '/no-internet': (context) => const NoInternetScreen(),
       },
     );
   }

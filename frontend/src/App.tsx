@@ -4,6 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { MobileFrameWrapper } from "@/components/MobileFrameWrapper";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { NoInternetOverlay } from "@/components/NoInternetOverlay";
 import { vexaSocket } from "@/lib/socket";
 
 // Route Pages
@@ -82,6 +83,7 @@ function NotFound() {
 export default function App() {
   return (
     <BrowserRouter>
+      <NoInternetOverlay />
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />

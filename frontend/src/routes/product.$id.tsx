@@ -27,6 +27,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { addToCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
+import { ShareProductModal } from "@/components/ShareProductModal";
 
 import black from "@/assets/tee-black.jpg";
 import white from "@/assets/tee-white.jpg";
@@ -144,6 +145,7 @@ export function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState<"specs" | "care" | "shipping">("specs");
   const [addedToast, setAddedToast] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Review state
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -509,7 +511,7 @@ export function ProductDetailPage() {
       )}
 
 
-      {/* Back to Products Navigation Button (Mobile & Desktop) */}
+      {/* Back to Products & Share Navigation Bar */}
       <div className="mb-6 flex items-center justify-between">
         <Link
           to="/products"
@@ -518,6 +520,15 @@ export function ProductDetailPage() {
           <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
           <span>Back</span>
         </Link>
+
+        <button
+          type="button"
+          onClick={() => setShowShareModal(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold backdrop-blur transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm cursor-pointer"
+        >
+          <Share2 className="size-4" />
+          <span>Share</span>
+        </button>
       </div>
 
       {/* Main Product Grid */}
@@ -1242,6 +1253,13 @@ export function ProductDetailPage() {
           </div>
         </div>
       )}
+
+      {/* SHARE PRODUCT MODAL */}
+      <ShareProductModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        product={product}
+      />
     </section>
   );
 }

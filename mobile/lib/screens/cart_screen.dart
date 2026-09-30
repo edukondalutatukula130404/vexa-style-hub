@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import '../services/wallet_service.dart';
 import '../widgets/vexa_empty_state.dart';
+import 'product_detail_screen.dart';
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
 const Color _gold = Color(0xFFB8860B);
@@ -2236,6 +2237,37 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  void _navigateToProductDetail(ItemModel item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetailScreen(
+          item: item,
+          onAddToCart: (pItem, color, size, qty) {
+            final existingIndex = widget.cartItems.indexWhere(
+              (c) => c.item.id == pItem.id && c.selectedColor == color && c.selectedSize == size,
+            );
+            if (existingIndex >= 0) {
+              setState(() {
+                widget.cartItems[existingIndex].quantity += qty;
+              });
+            } else {
+              setState(() {
+                widget.cartItems.add(CartItemData(
+                  item: pItem,
+                  selectedColor: color,
+                  selectedSize: size,
+                  quantity: qty,
+                ));
+              });
+            }
+            if (widget.onCartUpdated != null) widget.onCartUpdated!();
+          },
+        ),
+      ),
+    );
+  }
+
   // ── CART ITEM CARD ───────────────────────────────────────────────────────
   Widget _buildCartItemCard(CartItemData cartItem, int index) {
     return Container(
@@ -2256,83 +2288,90 @@ class _CartScreenState extends State<CartScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Image Thumbnail
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: _cartProductImage(
-              cartItem.item.image,
-              width: 80,
-              height: 80,
-              fit: BoxFit.cover,
+          // Image Thumbnail (Tapping opens Product Detail)
+          GestureDetector(
+            onTap: () => _navigateToProductDetail(cartItem.item),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: _cartProductImage(
+                cartItem.item.image,
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: 14),
 
-          // Title, Variant Chips & Unit Price
+          // Title, Variant Chips & Unit Price (Tapping opens Product Detail)
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  cartItem.item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: _textDark,
-                  ),
-                ),
-                const SizedBox(height: 6),
-
-                // Color & Size Chips
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      constraints: const BoxConstraints(maxWidth: 150),
-                      decoration: BoxDecoration(
-                        color: _surfaceBg,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: _border),
-                      ),
-                      child: Text(
-                        'Color: ${cartItem.selectedColor}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(fontSize: 10, color: _subtext, fontWeight: FontWeight.w600),
-                      ),
+            child: GestureDetector(
+              onTap: () => _navigateToProductDetail(cartItem.item),
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cartItem.item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _textDark,
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: _surfaceBg,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: _border),
-                      ),
-                      child: Text(
-                        'Size: ${cartItem.selectedSize}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(fontSize: 10, color: _subtext, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Price display
-                Text(
-                  '₹${cartItem.totalPrice.toStringAsFixed(0)}',
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: _goldDark,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 6),
+
+                  // Color & Size Chips
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        constraints: const BoxConstraints(maxWidth: 150),
+                        decoration: BoxDecoration(
+                          color: _surfaceBg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: _border),
+                        ),
+                        child: Text(
+                          'Color: ${cartItem.selectedColor}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(fontSize: 10, color: _subtext, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _surfaceBg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: _border),
+                        ),
+                        child: Text(
+                          'Size: ${cartItem.selectedSize}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(fontSize: 10, color: _subtext, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Price display
+                  Text(
+                    '₹${cartItem.totalPrice.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: _goldDark,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

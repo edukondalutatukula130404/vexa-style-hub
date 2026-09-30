@@ -58,6 +58,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   bool _isFavorite = false;
   int _filterStar = 0; // 0 = All
+  bool _showAllReviews = false;
 
   late PageController _pageController;
   int _activePageIndex = 0;
@@ -220,178 +221,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return total / _reviews.length;
   }
 
-  void _openImageZoomModal(int initialIndex) {
-    showDialog(
-      context: context,
-      useSafeArea: false,
-      builder: (ctx) {
-        int zoomPageIndex = initialIndex;
-        final PageController zoomPageController = PageController(initialPage: initialIndex);
-
-        return StatefulBuilder(
-          builder: (context, setZoomState) {
-            final slides = _gallerySlides;
-
-            return Scaffold(
-              backgroundColor: Colors.black,
-              body: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Fullscreen Interactive Zoom View
-                  PageView.builder(
-                    controller: zoomPageController,
-                    onPageChanged: (idx) {
-                      setZoomState(() {
-                        zoomPageIndex = idx;
-                      });
-                    },
-                    itemCount: slides.length,
-                    itemBuilder: (context, idx) {
-                      final slide = slides[idx];
-                      final imgPath = slide['image'] as String;
-
-                      return InteractiveViewer(
-                        minScale: 0.8,
-                        maxScale: 5.0,
-                        clipBehavior: Clip.none,
-                        child: Center(
-                          child: _buildProductImage(
-                            imgPath,
-                            width: double.infinity,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // Top Header Controls
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 10,
-                    left: 16,
-                    right: 16,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Close button
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(40),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
-                          ),
-                        ),
-
-                        // Index Pill Counter
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withAlpha(180),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: Text(
-                            '${zoomPageIndex + 1} / ${slides.length}',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-
-                        // Pinch to Zoom Hint Pill
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.pinch_outlined, color: Colors.white, size: 15),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Pinch to Zoom',
-                                style: GoogleFonts.outfit(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Bottom Thumbnail Gallery Row
-                  Positioned(
-                    bottom: MediaQuery.of(context).padding.bottom + 20,
-                    left: 0,
-                    right: 0,
-                    child: SizedBox(
-                      height: 56,
-                      child: Center(
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: slides.length,
-                          separatorBuilder: (c, i) => const SizedBox(width: 10),
-                          itemBuilder: (context, idx) {
-                            final isSel = idx == zoomPageIndex;
-                            final slide = slides[idx];
-                            final imgPath = slide['image'] as String;
-
-                            return GestureDetector(
-                              onTap: () {
-                                zoomPageController.animateToPage(
-                                  idx,
-                                  duration: const Duration(milliseconds: 250),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: isSel ? AppTheme.primaryColor : Colors.white24,
-                                    width: isSel ? 2.5 : 1.0,
-                                  ),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: _buildProductImage(
-                                    imgPath,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
 
   Map<int, int> get _ratingDistribution {
@@ -436,17 +265,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  void _toggleHelpful(_ReviewItem review) {
-    setState(() {
-      if (review.isHelpful) {
-        review.helpfulCount--;
-        review.isHelpful = false;
-      } else {
-        review.helpfulCount++;
-        review.isHelpful = true;
-      }
-    });
-  }
+
 
   void _openWriteReviewSheet() {
     int selectedRating = 5;
@@ -627,10 +446,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Main Scrollable Content
+      body: Column(
+        children: [
+          // Main Scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 controller: _scrollController,
@@ -641,7 +459,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     // 1. FULL HERO IMAGE DISPLAY WITH SIDE SCROLLING (MULTI-ANGLE)
                     // ════════════════════════════════════════════════════════
                     SizedBox(
-                      height: 460,
+                      height: 520,
                       width: double.infinity,
                       child: Stack(
                         fit: StackFit.expand,
@@ -663,11 +481,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               final type = slide['type'] as String;
                               final imgPath = slide['image'] as String;
 
-                              Widget imageWidget = _buildProductImage(
-                                imgPath,
-                                width: double.infinity,
-                                height: double.infinity,
-                                fit: BoxFit.contain,
+                              Widget imageWidget = InteractiveViewer(
+                                minScale: 1.0,
+                                maxScale: 4.5,
+                                clipBehavior: Clip.none,
+                                child: _buildProductImage(
+                                  imgPath,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
                               );
 
                               if (type == 'side') {
@@ -681,13 +504,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 );
                               }
 
-                              return GestureDetector(
-                                onTap: () => _openImageZoomModal(index),
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    imageWidget,
-                                    if (type == 'highlights') ...[
+                              return Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  imageWidget,
+                                  if (type == 'highlights') ...[
                                       // Key Highlights Overlay (Matching user's reference)
                                       Container(
                                         color: Colors.black.withAlpha(165),
@@ -717,9 +538,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       ),
                                     ],
                                   ],
-                                ),
-                              );
-                            },
+                                );
+                              },
                           ),
 
                           // Top Gradient Overlay for back & action buttons contrast
@@ -727,14 +547,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             top: 0,
                             left: 0,
                             right: 0,
-                            height: 90,
+                            height: MediaQuery.of(context).padding.top + 90,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
                                   colors: [
-                                    Colors.black.withAlpha(110),
+                                    Colors.black.withAlpha(140),
                                     Colors.transparent,
                                   ],
                                 ),
@@ -744,7 +564,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                           // Top-Left Floating Back Button
                           Positioned(
-                            top: 16,
+                            top: MediaQuery.of(context).padding.top + 10,
                             left: 16,
                             child: GestureDetector(
                               onTap: () => Navigator.pop(context),
@@ -771,7 +591,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                           // Top-Right Floating Controls (Wishlist & Share)
                           Positioned(
-                            top: 16,
+                            top: MediaQuery.of(context).padding.top + 10,
                             right: 16,
                             child: Column(
                               children: [
@@ -901,44 +721,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
 
-                          // Bottom-Right Floating Zoom Hint Button
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: GestureDetector(
-                              onTap: () => _openImageZoomModal(_activePageIndex),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withAlpha(190),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.white24),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(50),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Tap to Zoom',
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -996,23 +778,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           const SizedBox(height: 10),
 
-                          // Special Discount Offer Pill Tag
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF8A2BE2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Big Billion Days Price',
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
 
                           // Price Row
                           Row(
@@ -1541,42 +1306,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                                 const SizedBox(height: 16),
 
-                                // Filter chips
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: [0, 5, 4, 3, 2, 1].map((star) {
-                                      final isSelected = _filterStar == star;
-                                      final label = star == 0 ? 'All (${_reviews.length})' : '$star ★';
-                                      return Padding(
-                                        padding: const EdgeInsets.only(right: 8),
-                                        child: ChoiceChip(
-                                          label: Text(label),
-                                          selected: isSelected,
-                                          onSelected: (_) {
-                                            setState(() {
-                                              _filterStar = star;
-                                            });
-                                          },
-                                          selectedColor: AppTheme.primaryColor,
-                                          backgroundColor: AppTheme.cardColor,
-                                          labelStyle: GoogleFonts.outfit(
-                                            color: isSelected ? Colors.white : AppTheme.subtextColor,
-                                            fontSize: 12,
-                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                            side: BorderSide(
-                                              color: isSelected ? AppTheme.primaryColor : const Color(0xFF2D2D3A),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
 
                                 // Reviews List
                                 if (_filteredReviews.isEmpty)
@@ -1602,150 +1331,171 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       ],
                                     ),
                                   )
-                                else
-                                  ListView.separated(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _filteredReviews.length,
-                                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                                    itemBuilder: (context, index) {
-                                      final rev = _filteredReviews[index];
-                                      return Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.cardColor,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: const Color(0xFF2D2D3A)),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Row(
+                                else ...[
+                                  Builder(
+                                    builder: (context) {
+                                      final displayed = _showAllReviews
+                                          ? _filteredReviews
+                                          : _filteredReviews.take(2).toList();
+                                      return Column(
+                                        children: [
+                                          ListView.separated(
+                                            shrinkWrap: true,
+                                            physics: const NeverScrollableScrollPhysics(),
+                                            itemCount: displayed.length,
+                                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                            itemBuilder: (context, index) {
+                                              final rev = displayed[index];
+                                              return Container(
+                                                padding: const EdgeInsets.all(16),
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.cardColor,
+                                                  borderRadius: BorderRadius.circular(16),
+                                                  border: Border.all(color: const Color(0xFF2D2D3A)),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    CircleAvatar(
-                                                      radius: 16,
-                                                      backgroundColor: AppTheme.primaryColor.withAlpha(50),
-                                                      child: Text(
-                                                        rev.author.isNotEmpty ? rev.author[0].toUpperCase() : 'U',
-                                                        style: GoogleFonts.outfit(
-                                                          color: AppTheme.primaryColor,
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 13,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 10),
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                       children: [
                                                         Row(
                                                           children: [
-                                                            Text(
-                                                              rev.author,
-                                                              style: GoogleFonts.outfit(
-                                                                color: AppTheme.textColor,
-                                                                fontWeight: FontWeight.bold,
-                                                                fontSize: 14,
+                                                            CircleAvatar(
+                                                              radius: 16,
+                                                              backgroundColor: AppTheme.primaryColor.withAlpha(50),
+                                                              child: Text(
+                                                                rev.author.isNotEmpty ? rev.author[0].toUpperCase() : 'U',
+                                                                style: GoogleFonts.outfit(
+                                                                  color: AppTheme.primaryColor,
+                                                                  fontWeight: FontWeight.bold,
+                                                                  fontSize: 13,
+                                                                ),
                                                               ),
                                                             ),
-                                                            if (rev.verified) ...[
-                                                              const SizedBox(width: 6),
-                                                              Container(
-                                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                                decoration: BoxDecoration(
-                                                                  color: Colors.green.withAlpha(40),
-                                                                  borderRadius: BorderRadius.circular(6),
-                                                                ),
-                                                                child: Row(
+                                                            const SizedBox(width: 10),
+                                                            Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Row(
                                                                   children: [
-                                                                    const Icon(Icons.verified_rounded, size: 11, color: Colors.greenAccent),
-                                                                    const SizedBox(width: 3),
                                                                     Text(
-                                                                      'Verified Buyer',
+                                                                      rev.author,
                                                                       style: GoogleFonts.outfit(
-                                                                        color: Colors.greenAccent,
-                                                                        fontSize: 10,
-                                                                        fontWeight: FontWeight.w600,
+                                                                        color: AppTheme.textColor,
+                                                                        fontWeight: FontWeight.bold,
+                                                                        fontSize: 14,
                                                                       ),
                                                                     ),
+                                                                    if (rev.verified) ...[
+                                                                      const SizedBox(width: 6),
+                                                                      Container(
+                                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                        decoration: BoxDecoration(
+                                                                          color: Colors.green.withAlpha(40),
+                                                                          borderRadius: BorderRadius.circular(6),
+                                                                        ),
+                                                                        child: Row(
+                                                                          children: [
+                                                                            const Icon(Icons.verified_rounded, size: 11, color: Colors.greenAccent),
+                                                                            const SizedBox(width: 3),
+                                                                            Text(
+                                                                              'Verified Buyer',
+                                                                              style: GoogleFonts.outfit(
+                                                                                color: Colors.greenAccent,
+                                                                                fontSize: 10,
+                                                                                fontWeight: FontWeight.w600,
+                                                                              ),
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                    ],
                                                                   ],
                                                                 ),
-                                                              ),
-                                                            ],
+                                                                const SizedBox(height: 2),
+                                                                Text(
+                                                                  rev.date,
+                                                                  style: GoogleFonts.outfit(
+                                                                    color: AppTheme.subtextColor,
+                                                                    fontSize: 11,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
                                                           ],
                                                         ),
-                                                        const SizedBox(height: 2),
-                                                        Text(
-                                                          rev.date,
-                                                          style: GoogleFonts.outfit(
-                                                            color: AppTheme.subtextColor,
-                                                            fontSize: 11,
-                                                          ),
+                                                        Row(
+                                                          children: List.generate(5, (starIdx) {
+                                                            final starVal = starIdx + 1;
+                                                            return Icon(
+                                                              starVal <= rev.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                                                              color: const Color(0xFFFFC107),
+                                                              size: 14,
+                                                            );
+                                                          }),
                                                         ),
                                                       ],
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    Text(
+                                                      rev.comment,
+                                                      style: GoogleFonts.outfit(
+                                                        color: AppTheme.textColor,
+                                                        fontSize: 13,
+                                                        height: 1.4,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
-                                                Row(
-                                                  children: List.generate(5, (starIdx) {
-                                                    final starVal = starIdx + 1;
-                                                    return Icon(
-                                                      starVal <= rev.rating ? Icons.star_rounded : Icons.star_border_rounded,
-                                                      color: const Color(0xFFFFC107),
-                                                      size: 14,
-                                                    );
-                                                  }),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Text(
-                                              rev.comment,
-                                              style: GoogleFonts.outfit(
-                                                color: AppTheme.textColor,
-                                                fontSize: 13,
-                                                height: 1.4,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.end,
-                                              children: [
-                                                InkWell(
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  onTap: () => _toggleHelpful(rev),
-                                                  child: Padding(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(
-                                                          rev.isHelpful ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-                                                          size: 13,
-                                                          color: rev.isHelpful ? AppTheme.primaryColor : AppTheme.subtextColor,
-                                                        ),
-                                                        const SizedBox(width: 4),
-                                                        Text(
-                                                          'Helpful (${rev.helpfulCount})',
-                                                          style: GoogleFonts.outfit(
-                                                            fontSize: 11,
-                                                            color: rev.isHelpful ? AppTheme.primaryColor : AppTheme.subtextColor,
-                                                            fontWeight: rev.isHelpful ? FontWeight.bold : FontWeight.normal,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
+                                              );
+                                            },
+                                          ),
+                                          if (_filteredReviews.length > 2) ...[
+                                            const SizedBox(height: 14),
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: OutlinedButton.icon(
+                                                style: OutlinedButton.styleFrom(
+                                                  side: BorderSide(
+                                                    color: AppTheme.primaryColor.withAlpha(200),
+                                                    width: 1.5,
+                                                  ),
+                                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(12),
                                                   ),
                                                 ),
-                                              ],
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _showAllReviews = !_showAllReviews;
+                                                  });
+                                                },
+                                                icon: Icon(
+                                                  _showAllReviews
+                                                      ? Icons.keyboard_arrow_up_rounded
+                                                      : Icons.keyboard_arrow_down_rounded,
+                                                  color: AppTheme.primaryColor,
+                                                  size: 20,
+                                                ),
+                                                label: Text(
+                                                  _showAllReviews
+                                                      ? 'Show Less Reviews'
+                                                      : 'View All Reviews (${_filteredReviews.length})',
+                                                  style: GoogleFonts.outfit(
+                                                    color: AppTheme.primaryColor,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13.5,
+                                                  ),
+                                                ),
+                                              ),
                                             ),
                                           ],
-                                        ),
+                                        ],
                                       );
                                     },
                                   ),
+                                ],
                                const SizedBox(height: 24),
                               ],
                             ),
@@ -1761,18 +1511,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // ════════════════════════════════════════════════════════
             // 7. STICKY BOTTOM ACTION BAR (ADD TO CART & BUY NOW)
             // ════════════════════════════════════════════════════════
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(20),
-                    blurRadius: 10,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(20),
+                      blurRadius: 10,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
               child: _outOfStockSizes.contains(_selectedSize)
                   ? SizedBox(
                       width: double.infinity,
@@ -1879,8 +1631,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ],
                     ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

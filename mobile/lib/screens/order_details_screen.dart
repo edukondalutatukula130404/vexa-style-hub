@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/order_service.dart';
 import '../services/websocket_service.dart';
 import 'order_tracking_screen.dart';
+import 'customer_support_screen.dart';
 
 const Color _gold = Color(0xFFB8860B);
 const Color _goldDark = Color(0xFF8B6508);
@@ -474,97 +475,6 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
     );
   }
 
-  void _showCourierSupportBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            top: 24,
-            left: 20,
-            right: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: const Color(0xFF10B981).withAlpha(20), shape: BoxShape.circle),
-                        child: const Icon(Icons.headset_mic_rounded, color: Color(0xFF10B981), size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      Text('COURIER CONCIERGE', style: GoogleFonts.cinzel(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1)),
-                    ],
-                  ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Need priority assistance regarding your order #${_currentOrder.id}? Our logistics desk is available 24/7.',
-                style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.4),
-              ),
-              const SizedBox(height: 18),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: _gold.withAlpha(20), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.phone_in_talk_rounded, color: _goldDark),
-                ),
-                title: Text('Call VIP Support Desk', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                subtitle: Text('+91 98765 43210 (Toll-Free Helpline)', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Connecting to VEXA VIP Concierge Hotline...'),
-                      backgroundColor: _goldDark,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-              ),
-              const Divider(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: const Color(0xFF10B981).withAlpha(20), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF10B981)),
-                ),
-                title: Text('WhatsApp Logistics Assistant', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                subtitle: Text('Instant tracking updates & delivery re-scheduling', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Opening WhatsApp Concierge Channel...'),
-                      backgroundColor: Color(0xFF10B981),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _confirmCancelOrder() {
     showDialog(
       context: context,
@@ -918,36 +828,69 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isCancelled && !isDelivered) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _errorRed),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              Row(
+                children: [
+                  if (!isCancelled && !isDelivered) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: _errorRed),
+                          backgroundColor: const Color(0xFFFEF2F2),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _confirmCancelOrder,
+                        icon: const Icon(Icons.cancel_outlined, color: _errorRed, size: 18),
+                        label: Text(
+                          'Cancel Order',
+                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _errorRed),
+                        ),
+                      ),
                     ),
-                    onPressed: _confirmCancelOrder,
-                    icon: const Icon(Icons.cancel_outlined, color: _errorRed, size: 18),
-                    label: Text('CANCEL THIS ORDER', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _errorRed)),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _goldDark,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: widget.order)),
+                        );
+                      },
+                      icon: const Icon(Icons.location_on_outlined, color: Colors.white, size: 18),
+                      label: Text(
+                        'Track Order',
+                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-              ],
+                ],
+              ),
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 2,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF10B981)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: _showCourierSupportBottomSheet,
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => CustomerSupportScreen(order: widget.order)),
+                    );
+                  },
+                  icon: const Icon(Icons.headset_mic_outlined, color: Color(0xFF10B981), size: 18),
                   label: Text(
-                    'Courier Support',
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                    'Customer Support',
+                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
                   ),
                 ),
               ),

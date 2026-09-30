@@ -19,6 +19,7 @@ import 'profile_screen.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'order_tracking_screen.dart';
+import 'customer_support_screen.dart';
 
 // ── Gold & White theme tokens ─────────────────────────────────────────────
 const Color _gold = Color(0xFFB8860B);
@@ -1905,13 +1906,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildOrdersTab() {
     return Scaffold(
-      backgroundColor: _bgColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         centerTitle: false,
-        elevation: 0.8,
+        elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A), size: 22),
           onPressed: () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
@@ -1920,33 +1921,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             }
           },
         ),
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'MY ORDERS',
-              style: GoogleFonts.cinzel(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: _textDark,
-                letterSpacing: 1.8,
-              ),
-            ),
-            Text(
-              'Live Courier Tracking & Order History',
-              style: GoogleFonts.outfit(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: _subtext,
-              ),
-            ),
-          ],
+        title: Text(
+          'My Orders',
+          style: GoogleFonts.outfit(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF0F172A),
+          ),
         ),
       ),
       body: RefreshIndicator(
-        color: _goldDark,
+        color: const Color(0xFFD4AF37),
         onRefresh: _refreshOrders,
         child: FutureBuilder<List<OrderModel>>(
           future: _ordersFuture,
@@ -1956,7 +1941,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(color: _goldDark, strokeWidth: 2.5),
+                    CircularProgressIndicator(color: Color(0xFFD4AF37), strokeWidth: 2.5),
                     SizedBox(height: 16),
                     Text(
                       'Fetching order history...',
@@ -1968,13 +1953,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             }
 
             final rawOrders = snapshot.data ?? [];
-
-            // Compute status counts for filter chips
-            final totalCount = rawOrders.length;
-            final processingCount = rawOrders.where((o) => o.status.toLowerCase().contains('process') || o.status.toLowerCase().contains('confirm')).length;
-            final shippedCount = rawOrders.where((o) => o.status.toLowerCase().contains('ship') || o.status.toLowerCase().contains('transit') || o.status.toLowerCase().contains('out for delivery')).length;
-            final deliveredCount = rawOrders.where((o) => o.status.toLowerCase() == 'delivered' || (o.status.toLowerCase().contains('deliver') && !o.status.toLowerCase().contains('out for delivery'))).length;
-            final cancelledCount = rawOrders.where((o) => o.status.toLowerCase().contains('cancel')).length;
 
             // Apply filters
             final filteredOrders = rawOrders.where((order) {
@@ -1997,120 +1975,80 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             return CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // 1. SEARCH & FILTER TOOLBAR (SEARCH BAR + FILTER BUTTON SIDE-BY-SIDE)
+                // 1. SEARCH BAR & SIDE-BY-SIDE FILTERS BUTTON
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                    child: Column(
+                    child: Row(
                       children: [
-                        // Search bar & Side-by-side Filter Option Row
-                        Row(
-                          children: [
-                            // Search input (Expanded)
-                            Expanded(
-                              child: Container(
-                                height: 46,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: _border),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(5),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: TextField(
-                                  onChanged: (val) => setState(() => _orderSearchQuery = val),
-                                  style: GoogleFonts.outfit(fontSize: 13, color: _textDark),
-                                  decoration: InputDecoration(
-                                    hintText: 'Search by Order ID or item...',
-                                    hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: _subtext),
-                                    prefixIcon: const Icon(Icons.search_rounded, color: _goldDark, size: 20),
-                                    suffixIcon: _orderSearchQuery.isNotEmpty
-                                        ? IconButton(
-                                            icon: const Icon(Icons.close_rounded, size: 18, color: _subtext),
-                                            onPressed: () => setState(() => _orderSearchQuery = ''),
-                                          )
-                                        : null,
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                                  ),
-                                ),
+                        Expanded(
+                          child: Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: TextField(
+                              onChanged: (val) => setState(() => _orderSearchQuery = val),
+                              style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF0F172A)),
+                              decoration: InputDecoration(
+                                hintText: 'Search your order here',
+                                hintStyle: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF94A3B8)),
+                                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                                suffixIcon: _orderSearchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF64748B)),
+                                        onPressed: () => setState(() => _orderSearchQuery = ''),
+                                      )
+                                    : null,
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 11),
                               ),
                             ),
-
-                            const SizedBox(width: 10),
-
-                            // Side-by-side Icon-Only Filter Option Button
-                            Container(
-                              height: 46,
-                              width: 46,
-                              decoration: BoxDecoration(
-                                color: _selectedOrderStatusFilter == 'All' ? Colors.white : _goldDark,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: _selectedOrderStatusFilter == 'All' ? _border : _goldDark),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(5),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: PopupMenuButton<String>(
-                                initialValue: _selectedOrderStatusFilter,
-                                onSelected: (String status) {
-                                  setState(() {
-                                    _selectedOrderStatusFilter = status;
-                                  });
-                                },
-                                tooltip: 'Filter Orders by Status',
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                offset: const Offset(0, 50),
-                                child: Center(
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      Icon(
-                                        Icons.tune_rounded,
-                                        color: _selectedOrderStatusFilter == 'All' ? _goldDark : Colors.white,
-                                        size: 20,
-                                      ),
-                                      if (_selectedOrderStatusFilter != 'All')
-                                        Positioned(
-                                          top: -2,
-                                          right: -2,
-                                          child: Container(
-                                            width: 7,
-                                            height: 7,
-                                            decoration: const BoxDecoration(
-                                              color: Colors.amberAccent,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                itemBuilder: (BuildContext context) => [
-                                  _buildOrdersMenuItem('All', totalCount),
-                                  _buildOrdersMenuItem('Processing', processingCount),
-                                  _buildOrdersMenuItem('Shipped', shippedCount),
-                                  _buildOrdersMenuItem('Delivered', deliveredCount),
-                                  _buildOrdersMenuItem('Cancelled', cancelledCount),
-                                ],
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(width: 10),
+                        PopupMenuButton<String>(
+                          initialValue: _selectedOrderStatusFilter,
+                          onSelected: (val) => setState(() => _selectedOrderStatusFilter = val),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(value: 'All', child: Text('All Orders')),
+                            const PopupMenuItem(value: 'Shipped', child: Text('Expected / Shipped')),
+                            const PopupMenuItem(value: 'Delivered', child: Text('Delivered')),
+                            const PopupMenuItem(value: 'Cancelled', child: Text('Cancelled')),
+                          ],
+                          child: Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.tune_rounded, color: Color(0xFF334155), size: 18),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Filters',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
+
 
                 // 3. ORDERS LIST / EMPTY STATE
                 filteredOrders.isEmpty
@@ -2122,13 +2060,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(color: _border),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(6),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -2136,18 +2067,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Container(
                                 padding: const EdgeInsets.all(22),
                                 decoration: BoxDecoration(
-                                  color: _gold.withAlpha(20),
+                                  color: const Color(0xFFD4AF37).withAlpha(30),
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: _gold.withAlpha(60)),
                                 ),
-                                child: const Icon(Icons.local_shipping_outlined, color: _goldDark, size: 48),
+                                child: const Icon(Icons.local_shipping_outlined, color: Color(0xFFD4AF37), size: 48),
                               ),
                               const SizedBox(height: 20),
                               Text(
                                 _orderSearchQuery.isNotEmpty || _selectedOrderStatusFilter != 'All'
                                     ? 'No Matching Orders'
                                     : 'No Orders Placed Yet',
-                                style: GoogleFonts.cinzel(
+                                style: GoogleFonts.outfit(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: _textDark,
@@ -2157,7 +2087,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Text(
                                 _orderSearchQuery.isNotEmpty || _selectedOrderStatusFilter != 'All'
                                     ? 'Try changing your filter settings or search query to view other purchases.'
-                                    : 'Order luxury 240 GSM garments to track live shipment status here.',
+                                    : 'Order luxury garments to track live shipment status here.',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.outfit(
                                   fontSize: 13,
@@ -2165,64 +2095,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   height: 1.4,
                                 ),
                               ),
-                              const SizedBox(height: 24),
-                              if (_orderSearchQuery.isNotEmpty || _selectedOrderStatusFilter != 'All')
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: _goldDark, width: 1.5),
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _selectedOrderStatusFilter = 'All';
-                                      _orderSearchQuery = '';
-                                    });
-                                  },
-                                  icon: const Icon(Icons.filter_alt_off_rounded, color: _goldDark, size: 18),
-                                  label: Text(
-                                    'Reset Filters',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: _goldDark,
-                                    ),
-                                  ),
-                                )
-                              else
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _goldDark,
-                                    padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                    elevation: 3,
-                                  ),
-                                  onPressed: () => setState(() => _currentTabIndex = 0),
-                                  icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 18),
-                                  label: Text(
-                                    'BROWSE LUXURY CATALOG',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
                             ],
                           ),
                         ),
                       )
                     : SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                        padding: const EdgeInsets.only(bottom: 100),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
                               final order = filteredOrders[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: _buildRedesignedOrderCard(context, order),
-                              );
+                              return _buildRedesignedOrderCard(context, order);
                             },
                             childCount: filteredOrders.length,
                           ),
@@ -2236,736 +2119,168 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  PopupMenuItem<String> _buildOrdersMenuItem(String label, int count) {
-    final isSelected = _selectedOrderStatusFilter == label;
-    return PopupMenuItem<String>(
-      value: label,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                size: 16,
-                color: isSelected ? _goldDark : _subtext,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? _goldDark : _textDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: isSelected ? _goldDark.withAlpha(20) : _surfaceBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$count',
-              style: GoogleFonts.outfit(
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? _goldDark : _subtext,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _showCancelOrderDialog(OrderModel order) {
-    String selectedReason = 'Changed my mind / Placed by mistake';
-    final customReasonController = TextEditingController();
-
-    final cancelReasons = [
-      'Changed my mind / Placed by mistake',
-      'Ordered wrong size or color variant',
-      'Found better deal / price elsewhere',
-      'Delivery time is too long',
-      'Need to change shipping address',
-      'Other reason',
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-      builder: (sheetCtx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SizedBox(
-              width: double.infinity,
-              height: MediaQuery.of(sheetCtx).size.height,
-              child: Scaffold(
-                backgroundColor: Colors.white,
-                appBar: AppBar(
-                  backgroundColor: Colors.white,
-                  elevation: 0,
-                  automaticallyImplyLeading: false,
-                  title: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withAlpha(20),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'CANCEL ORDER ${order.id}',
-                              style: GoogleFonts.cinzel(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: _textDark,
-                              ),
-                            ),
-                            Text(
-                              'Please select a reason for cancellation',
-                              style: GoogleFonts.outfit(fontSize: 12, color: _subtext),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, color: _textDark, size: 26),
-                      onPressed: () => Navigator.pop(sheetCtx),
-                    ),
-                  ],
-                  bottom: const PreferredSize(
-                    preferredSize: Size.fromHeight(1),
-                    child: Divider(height: 1, color: _border),
-                  ),
-                ),
-                body: SafeArea(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.only(
-                            left: 20,
-                            right: 20,
-                            top: 20,
-                            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'WHY DO YOU WANT TO CANCEL?',
-                                style: GoogleFonts.cinzel(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: _textDark,
-                                  letterSpacing: 1.1,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              ...cancelReasons.map((reason) {
-                                final isSelected = selectedReason == reason;
-                                return InkWell(
-                                  onTap: () {
-                                    setSheetState(() {
-                                      selectedReason = reason;
-                                    });
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 10),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? const Color(0xFFEF4444).withAlpha(12) : const Color(0xFFFAFAFC),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: isSelected ? const Color(0xFFEF4444) : _border,
-                                        width: isSelected ? 1.5 : 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                                          color: isSelected ? const Color(0xFFEF4444) : _subtext,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            reason,
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 13.5,
-                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                              color: isSelected ? const Color(0xFF991B1B) : _textDark,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                              if (selectedReason == 'Other reason') ...[
-                                const SizedBox(height: 10),
-                                TextField(
-                                  controller: customReasonController,
-                                  maxLines: 3,
-                                  style: GoogleFonts.outfit(fontSize: 13, color: _textDark),
-                                  decoration: InputDecoration(
-                                    hintText: 'Enter specific cancellation reason...',
-                                    hintStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: const BorderSide(color: _border),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
-                                    ),
-                                    contentPadding: const EdgeInsets.all(14),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Bottom action buttons
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          border: Border(top: BorderSide(color: _border)),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  side: const BorderSide(color: _border),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: () => Navigator.pop(sheetCtx),
-                                child: Text(
-                                  'Keep Order',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: _subtext,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFEF4444),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  elevation: 2,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: () async {
-                                  final finalReason = selectedReason == 'Other reason' && customReasonController.text.trim().isNotEmpty
-                                      ? customReasonController.text.trim()
-                                      : selectedReason;
-
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  Navigator.pop(sheetCtx);
-
-                                  await OrderService.cancelOrder(order.id, finalReason, context: context, targetOrder: order);
-
-                                  if (mounted) {
-                                    setState(() {
-                                      order.status = 'Cancelled';
-                                      order.cancelReason = finalReason;
-                                      _selectedOrderStatusFilter = 'Cancelled';
-                                    });
-                                    _refreshOrders();
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        backgroundColor: const Color(0xFF10B981),
-                                        behavior: SnackBarBehavior.floating,
-                                        content: Row(
-                                          children: [
-                                            const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Text(
-                                                'Order ${order.id} cancelled. ₹${order.totalAmount.toStringAsFixed(0)} credited to VEXA Wallet!',
-                                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                child: Text(
-                                  'Confirm Cancel',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
   Widget _buildRedesignedOrderCard(BuildContext context, OrderModel order) {
     final firstItem = order.items.isNotEmpty ? order.items.first : null;
-    final titleText = firstItem != null ? firstItem.name : 'VEXA Couture Order';
-    final itemsCount = order.items.fold(0, (sum, item) => sum + item.quantity);
-    final isCancelled = order.status.toLowerCase().contains('cancel');
-    final isDelivered = order.status.toLowerCase().contains('deliver');
-    final isShipped = order.status.toLowerCase().contains('ship') || order.status.toLowerCase().contains('transit') || order.status.toLowerCase().contains('out for delivery');
+    final status = order.status.toLowerCase();
+
+    // Format status header string (e.g., Delivery expected by Oct 04 / Delivered on Jan 06 / Cancelled on Dec 30, 2025)
+    String headerText;
+    if (status.contains('cancel')) {
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final m = months[order.createdAt.month - 1];
+      final d = order.createdAt.day.toString().padLeft(2, '0');
+      headerText = 'Cancelled on $m $d, ${order.createdAt.year}';
+    } else if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final exp = order.createdAt.add(const Duration(days: 3));
+      final m = months[exp.month - 1];
+      final d = exp.day.toString().padLeft(2, '0');
+      headerText = 'Delivered on $m $d';
+    } else {
+      final exp = order.createdAt.add(const Duration(days: 4));
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final m = months[exp.month - 1];
+      final d = exp.day.toString().padLeft(2, '0');
+      headerText = 'Delivery expected by $m $d';
+    }
+
+    // Format status subtitle string
+    String subtitleText;
+    if (status.contains('cancel')) {
+      if (order.cancelReason != null && order.cancelReason!.isNotEmpty) {
+        subtitleText = order.cancelReason!;
+      } else {
+        subtitleText = 'Your order was cancelled as per your request...';
+      }
+    } else if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
+      subtitleText = firstItem != null ? firstItem.name : 'MOTREX Full Sleeve Colorblock Men Jacket';
+    } else {
+      subtitleText = 'Today, Sep 30: Product has left the facility...';
+    }
+
+    final isUnpaidOrActive = status.contains('ship') || status.contains('transit') || status.contains('process');
 
     return Container(
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isShipped ? _gold.withAlpha(100) : _border,
-          width: isShipped ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(12),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      color: Colors.white,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Header Row (Order ID, Payment Method & Status Tag)
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFAFAFC),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border(bottom: BorderSide(color: _border, width: 0.8)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Clipboard.setData(ClipboardData(text: order.id));
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Copied Order ID "${order.id}" to clipboard!'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: _goldDark,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _gold.withAlpha(20),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: _gold.withAlpha(80)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                order.id,
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13,
-                                  color: _goldDark,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.copy_rounded, size: 12, color: _goldDark),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: _surfaceBg,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            order.paymentMethod,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: _subtext,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: order.statusColor.withAlpha(25),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: order.statusColor.withAlpha(90)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(color: order.statusColor, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        order.status.toUpperCase(),
-                        style: GoogleFonts.outfit(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: order.statusColor,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Main Product Overview Row & Step Indicator (Clickable to open Order Details)
           InkWell(
             onTap: () => _openHomeOrderDetailSheet(context, order),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Stack(
-                        children: [
-                          Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: _border),
-                            ),
-                            clipBehavior: Clip.hardEdge,
-                            child: firstItem != null
-                                ? (firstItem.image.startsWith('assets/')
-                                    ? Image.asset(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)))
-                                    : Image.network(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext))))
-                                : Container(color: _surfaceBg, child: const Icon(Icons.checkroom, color: _subtext)),
-                          ),
-                          if (itemsCount > 1)
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF0F172A),
-                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(8), bottomRight: Radius.circular(14)),
-                                ),
-                                child: Text(
-                                  '+${itemsCount - 1} more',
-                                  style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    titleText,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: _textDark,
-                                      height: 1.25,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right_rounded, color: _goldDark, size: 20),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                if (firstItem != null && firstItem.size.isNotEmpty) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: _gold.withAlpha(20),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'Size ${firstItem.size}',
-                                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _goldDark),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                Text(
-                                  '$itemsCount ${itemsCount == 1 ? "item" : "items"}',
-                                  style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Flexible(
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.calendar_today_rounded, size: 12, color: _subtext),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          order.formattedDate,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '₹${order.totalAmount.toStringAsFixed(0)}',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: _goldDark,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product Thumbnail Box
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: firstItem != null
+                        ? (firstItem.image.startsWith('assets/')
+                            ? Image.asset(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.checkroom, color: Color(0xFF94A3B8)))
+                            : Image.network(firstItem.image, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.checkroom, color: Color(0xFF94A3B8))))
+                        : const Icon(Icons.checkroom, color: Color(0xFF94A3B8)),
                   ),
-                ),
-
-                // Horizontal Progress Step Indicator
-                if (!isCancelled) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  const SizedBox(width: 14),
+                  // Middle Details Column
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Divider(height: 1, color: _border),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildMiniStepDot('Placed', true, true),
-                            _buildMiniStepConnector(true),
-                            _buildMiniStepDot('QC / Prep', true, true),
-                            _buildMiniStepConnector(isShipped || isDelivered),
-                            _buildMiniStepDot('In Transit', isShipped || isDelivered, isShipped && !isDelivered),
-                            _buildMiniStepConnector(isDelivered),
-                            _buildMiniStepDot('Delivered', isDelivered, isDelivered),
-                          ],
+                        Text(
+                          headerText,
+                          style: GoogleFonts.outfit(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F172A),
+                          ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitleText,
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            color: const Color(0xFF64748B),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  // Chevron Right
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFF0F172A),
+                    size: 20,
+                  ),
                 ],
-              ],
+              ),
             ),
           ),
-
-          // Footer Actions Row
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFAFAFC),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-              border: Border(top: BorderSide(color: _border, width: 0.8)),
-            ),
-            child: Row(
-              children: [
-                // 1. Need Support (Left)
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _border),
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      _showCustomTeeBottomSheet();
-                    },
-                    child: Text(
-                      'Need Support',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: _subtext),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-
-                // 2. Cancel Order (Middle - shown if active & not delivered)
-                if (!isCancelled && !isDelivered) ...[
+          // Pay right now banner if active COD order
+          if (isUnpaidOrActive) ...[
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: const Color(0xFFEF4444).withAlpha(120)),
-                        backgroundColor: const Color(0xFFFEF2F2),
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => _showCancelOrderDialog(order),
-                      child: Text(
-                        'Cancel Order',
-                        style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    child: Text(
+                      'Pay right now and save the COD fee',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: const Color(0xFF92400E),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                ],
-
-                // 3. Track Order (Right)
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _goldDark,
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFD4AF37),
+                      side: const BorderSide(color: Color(0xFFD4AF37), width: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: order)),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Processing payment for ₹${order.totalAmount.toStringAsFixed(0)}...'),
+                          backgroundColor: const Color(0xFFD4AF37),
+                        ),
                       );
                     },
                     child: Text(
-                      'Track Order',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      'Pay ₹${order.totalAmount.toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
+          const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMiniStepDot(String label, bool isDone, bool isActive) {
-    final dotColor = isDone ? (isActive ? const Color(0xFF3B82F6) : _goldDark) : _border;
-    return Column(
-      children: [
-        Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            color: isDone ? dotColor : Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: dotColor, width: 2),
-            boxShadow: isActive
-                ? [BoxShadow(color: dotColor.withAlpha(80), blurRadius: 6)]
-                : null,
-          ),
-          child: isDone
-              ? const Center(child: Icon(Icons.check, size: 9, color: Colors.white))
-              : null,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 9,
-            fontWeight: isDone ? FontWeight.bold : FontWeight.normal,
-            color: isDone ? _textDark : _subtext,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiniStepConnector(bool isDone) {
-    return Expanded(
-      child: Container(
-        height: 2,
-        margin: const EdgeInsets.only(bottom: 14),
-        color: isDone ? _goldDark : _border,
       ),
     );
   }
@@ -3116,6 +2431,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         fullscreenDialog: true,
         builder: (ctx) {
           final isCancelled = order.status.toLowerCase() == 'cancelled';
+          final isDelivered = order.status.toLowerCase().contains('deliver');
 
           return Scaffold(
             backgroundColor: _bgColor,
@@ -3410,23 +2726,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 20),
 
-                // 5. ACTION BUTTON (COURIER ASSIST)
+                // 5. ACTION BUTTONS (CANCEL ORDER LEFT, TRACK ORDER RIGHT & CUSTOMER SUPPORT)
+                Row(
+                  children: [
+                    if (!isCancelled && !isDelivered) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: const Color(0xFFEF4444).withAlpha(150)),
+                            backgroundColor: const Color(0xFFFEF2F2),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showCancelOrderDialog(order);
+                          },
+                          icon: const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 18),
+                          label: Text(
+                            'Cancel Order',
+                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _goldDark,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: order)),
+                          );
+                        },
+                        icon: const Icon(Icons.location_on_outlined, color: Colors.white, size: 18),
+                        label: Text(
+                          'Track Order',
+                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      elevation: 2,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF10B981)),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
-                      _showCustomTeeBottomSheet();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => CustomerSupportScreen(order: order)),
+                      );
                     },
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+                    icon: const Icon(Icons.headset_mic_outlined, color: Color(0xFF10B981), size: 18),
                     label: Text(
-                      'Courier Support',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                      'Customer Support',
+                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
                     ),
                   ),
                 ),
@@ -3436,6 +2802,273 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           );
         },
       ),
+    );
+  }
+
+  void _showCancelOrderDialog(OrderModel order) {
+    String selectedReason = 'Changed my mind / Placed by mistake';
+    final customReasonController = TextEditingController();
+
+    final cancelReasons = [
+      'Changed my mind / Placed by mistake',
+      'Ordered wrong size or color variant',
+      'Found better deal / price elsewhere',
+      'Delivery time is too long',
+      'Need to change shipping address',
+      'Other reason',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SizedBox(
+              width: double.infinity,
+              height: MediaQuery.of(sheetCtx).size.height,
+              child: Scaffold(
+                backgroundColor: Colors.white,
+                appBar: AppBar(
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  automaticallyImplyLeading: false,
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withAlpha(20),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'CANCEL ORDER ${order.id}',
+                              style: GoogleFonts.cinzel(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: _textDark,
+                              ),
+                            ),
+                            Text(
+                              'Please select a reason for cancellation',
+                              style: GoogleFonts.outfit(fontSize: 12, color: _subtext),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: _textDark, size: 26),
+                      onPressed: () => Navigator.pop(sheetCtx),
+                    ),
+                  ],
+                  bottom: const PreferredSize(
+                    preferredSize: Size.fromHeight(1),
+                    child: Divider(height: 1, color: _border),
+                  ),
+                ),
+                body: SafeArea(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.only(
+                            left: 20,
+                            right: 20,
+                            top: 20,
+                            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'WHY DO YOU WANT TO CANCEL?',
+                                style: GoogleFonts.cinzel(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _textDark,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              ...cancelReasons.map((reason) {
+                                final isSelected = selectedReason == reason;
+                                return InkWell(
+                                  onTap: () {
+                                    setSheetState(() {
+                                      selectedReason = reason;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFFEF4444).withAlpha(12) : const Color(0xFFFAFAFC),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected ? const Color(0xFFEF4444) : _border,
+                                        width: isSelected ? 1.5 : 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                                          color: isSelected ? const Color(0xFFEF4444) : _subtext,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            reason,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13.5,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                              color: isSelected ? const Color(0xFF991B1B) : _textDark,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                              if (selectedReason == 'Other reason') ...[
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: customReasonController,
+                                  maxLines: 3,
+                                  style: GoogleFonts.outfit(fontSize: 13, color: _textDark),
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter specific cancellation reason...',
+                                    hintStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: _border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                                    ),
+                                    contentPadding: const EdgeInsets.all(14),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Bottom action buttons
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          border: Border(top: BorderSide(color: _border)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  side: const BorderSide(color: _border),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () => Navigator.pop(sheetCtx),
+                                child: Text(
+                                  'Keep Order',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: _subtext,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFEF4444),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () async {
+                                  final finalReason = selectedReason == 'Other reason' && customReasonController.text.trim().isNotEmpty
+                                      ? customReasonController.text.trim()
+                                      : selectedReason;
+
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  Navigator.pop(sheetCtx);
+
+                                  await OrderService.cancelOrder(order.id, finalReason, context: context, targetOrder: order);
+
+                                  if (mounted) {
+                                    setState(() {
+                                      order.status = 'Cancelled';
+                                      order.cancelReason = finalReason;
+                                      _selectedOrderStatusFilter = 'Cancelled';
+                                    });
+                                    _refreshOrders();
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        backgroundColor: const Color(0xFF10B981),
+                                        behavior: SnackBarBehavior.floating,
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                'Order ${order.id} cancelled. ₹${order.totalAmount.toStringAsFixed(0)} credited to VEXA Wallet!',
+                                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: Text(
+                                  'Confirm Cancel',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
   Future<String?> _saveInvoiceFileToDisk(String invoiceNo, OrderModel order) async {
@@ -4201,50 +3834,6 @@ class _PromoBannerCard extends StatelessWidget {
                 banner.img,
                 fit: BoxFit.cover,
                 alignment: banner.imgAlignment,
-              ),
-            ),
-
-            // Right-Aligned Compact Gold Action Button (No Black Background)
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_goldDark, _gold],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(60),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      banner.cta,
-                      style: GoogleFonts.outfit(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 11,
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
               ),
             ),
           ],

@@ -168,44 +168,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handleLogout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      useSafeArea: false,
+      builder: (context) => Scaffold(
         backgroundColor: _cardBg,
-        title: Row(
-          children: [
-            const Icon(Icons.logout_rounded, color: _errorRed, size: 22),
-            const SizedBox(width: 10),
-            Text(
-              'Log Out',
-              style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to log out of your VEXA Style Hub account?',
-          style: GoogleFonts.outfit(color: _subtext, fontSize: 13.5, height: 1.4),
-        ),
-        actions: [
-          TextButton(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.black87, size: 24),
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.outfit(color: _subtext, fontWeight: FontWeight.bold)),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _errorRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          title: Text(
+            'LOG OUT',
+            style: GoogleFonts.cinzel(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black87,
+              letterSpacing: 1.0,
             ),
-            onPressed: () async {
-              await AuthService.clearSession();
-              if (!context.mounted) return;
-              Navigator.pop(context);
-              setState(() {
-                _currentUser = null;
-              });
-            },
-            child: Text('Log Out', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-        ],
+          centerTitle: true,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _errorRed.withAlpha(20),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.logout_rounded, color: _errorRed, size: 36),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Log Out of Your Account',
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: _textDark,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Are you sure you want to log out of your VEXA Style Hub account? You will need to sign back in to access your orders, wishlist, and saved addresses.',
+                  style: GoogleFonts.outfit(
+                    color: _subtext,
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 52,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: _border, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.outfit(
+                              color: _textDark,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: SizedBox(
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _errorRed,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            await AuthService.clearSession();
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            setState(() {
+                              _currentUser = null;
+                            });
+                          },
+                          child: Text(
+                            'Log Out',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -213,72 +290,158 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handleDeleteAccount() {
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      useSafeArea: false,
+      builder: (dialogCtx) => Scaffold(
         backgroundColor: _cardBg,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withAlpha(20),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 22),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Delete Account?',
-                style: GoogleFonts.cinzel(color: _textDark, fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to permanently delete your VEXA Style Hub account?',
-              style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.bold, fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'This action is irreversible. All your saved addresses, order history, VIP rewards, and account preferences will be permanently erased.',
-              style: GoogleFonts.outfit(color: _subtext, fontSize: 12, height: 1.4),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.black87, size: 24),
             onPressed: () => Navigator.pop(dialogCtx),
-            child: Text('Keep Account', style: GoogleFonts.outfit(color: _subtext, fontWeight: FontWeight.bold)),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          title: Text(
+            'DELETE ACCOUNT',
+            style: GoogleFonts.cinzel(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black87,
+              letterSpacing: 1.0,
             ),
-            onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              await AuthService.clearSession();
-              if (!dialogCtx.mounted) return;
-              Navigator.pop(dialogCtx);
-              setState(() {
-                _currentUser = null;
-              });
-              messenger.showSnackBar(
-                SnackBar(
-                  backgroundColor: const Color(0xFFEF4444),
-                  content: Text('Your VEXA account has been permanently deleted.', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
-              );
-            },
-            child: Text('DELETE PERMANENTLY', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
-        ],
+          centerTitle: true,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withAlpha(20),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 36),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Delete Account Permanently',
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: _textDark,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Are you sure you want to permanently delete your VEXA Style Hub account?',
+                  style: GoogleFonts.outfit(
+                    color: _textDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'This action is irreversible. All your saved addresses, order history, VIP rewards, and account preferences will be permanently erased.',
+                          style: GoogleFonts.outfit(
+                            color: Colors.red.shade900,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 52,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: _border, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () => Navigator.pop(dialogCtx),
+                          child: Text(
+                            'Keep Account',
+                            style: GoogleFonts.outfit(
+                              color: _textDark,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: SizedBox(
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            await AuthService.clearSession();
+                            if (!dialogCtx.mounted) return;
+                            Navigator.pop(dialogCtx);
+                            setState(() {
+                              _currentUser = null;
+                            });
+                            messenger.showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFFEF4444),
+                                content: Text(
+                                  'Your VEXA account has been permanently deleted.',
+                                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'Delete Permanently',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -4924,36 +5087,122 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
       'United Arab Emirates (AED)',
     ];
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(width: 42, height: 4, decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(2))),
+      useSafeArea: false,
+      builder: (ctx) => Scaffold(
+        backgroundColor: _cardBg,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.black87, size: 24),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          title: Text(
+            'CURRENCY & REGION',
+            style: GoogleFonts.cinzel(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black87,
+              letterSpacing: 1.0,
             ),
-            const SizedBox(height: 16),
-            Text('CURRENCY & REGION', style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5)),
-            const SizedBox(height: 16),
-            ...currencies.map((c) => ListTile(
-              title: Text(c, style: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: _textDark)),
-              trailing: _selectedCurrency == c ? const Icon(Icons.check_circle, color: _goldDark) : null,
-              onTap: () {
-                setState(() {
-                  _selectedCurrency = c;
-                });
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Region set to $c'), backgroundColor: _goldDark),
-                );
-              },
-            )),
-          ],
+          ),
+          centerTitle: true,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select your preferred currency and shopping region.',
+                  style: GoogleFonts.outfit(
+                    color: _subtext,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(8),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: List.generate(currencies.length, (index) {
+                      final c = currencies[index];
+                      final isSelected = _selectedCurrency == c;
+                      return Column(
+                        children: [
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            title: Text(
+                              c,
+                              style: GoogleFonts.outfit(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                fontSize: 16,
+                                color: isSelected ? _goldDark : _textDark,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded, color: _goldDark, size: 22)
+                                : const Icon(Icons.radio_button_unchecked_rounded, color: _subtext, size: 20),
+                            onTap: () {
+                              setState(() {
+                                _selectedCurrency = c;
+                              });
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Region set to $c'),
+                                  backgroundColor: _goldDark,
+                                ),
+                              );
+                            },
+                          ),
+                          if (index < currencies.length - 1)
+                            const Divider(height: 1, indent: 20, endIndent: 20),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _goldDark,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(
+                      'Done',
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -5231,52 +5480,155 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                   onTap: () {
                     showDialog(
                       context: context,
-                      builder: (context) => AlertDialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      useSafeArea: false,
+                      builder: (context) => Scaffold(
                         backgroundColor: _cardBg,
-                        title: Text('Customer Concierge', style: GoogleFonts.cinzel(fontWeight: FontWeight.bold, fontSize: 16)),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Need assistance with custom sizing, orders, or delivery?',
-                              style: GoogleFonts.outfit(color: _subtext, fontSize: 13, height: 1.4),
-                            ),
-                            const SizedBox(height: 16),
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.chat, color: Colors.green),
-                              title: Text('WhatsApp Support', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
-                              subtitle: Text('+91 98765 43210', style: GoogleFonts.outfit(fontSize: 11)),
-                              onTap: () {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Opening WhatsApp Support chat...'), backgroundColor: _goldDark),
-                                );
-                              },
-                            ),
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.email, color: _goldDark),
-                              title: Text('Email Concierge', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
-                              subtitle: Text('support@vexa.app', style: GoogleFonts.outfit(fontSize: 11)),
-                              onTap: () {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Opening Email Concierge...'), backgroundColor: _goldDark),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: _goldDark),
+                        appBar: AppBar(
+                          backgroundColor: Colors.white,
+                          elevation: 0.5,
+                          leading: IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Colors.black87, size: 24),
                             onPressed: () => Navigator.pop(context),
-                            child: Text('Close', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
-                        ],
+                          title: Text(
+                            'CUSTOMER CONCIERGE',
+                            style: GoogleFonts.cinzel(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black87,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          centerTitle: true,
+                        ),
+                        body: SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Need assistance with custom sizing, orders, or delivery?',
+                                  style: GoogleFonts.outfit(
+                                    color: _subtext,
+                                    fontSize: 15,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: _border),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withAlpha(10),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      ListTile(
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                        leading: Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withAlpha(25),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.chat_rounded, color: Colors.green, size: 24),
+                                        ),
+                                        title: Text(
+                                          'WhatsApp Support',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          '+91 98765 43210',
+                                          style: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                        ),
+                                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: _subtext),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Opening WhatsApp Support chat...'),
+                                              backgroundColor: _goldDark,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      const Divider(height: 1, indent: 20, endIndent: 20),
+                                      ListTile(
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                        leading: Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: _goldDark.withAlpha(25),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.email_rounded, color: _goldDark, size: 24),
+                                        ),
+                                        title: Text(
+                                          'Email Concierge',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          'support@vexa.app',
+                                          style: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                        ),
+                                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: _subtext),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Opening Email Concierge...'),
+                                              backgroundColor: _goldDark,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Spacer(),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _goldDark,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 2,
+                                    ),
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text(
+                                      'Close',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     );
                   },

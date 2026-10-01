@@ -25,6 +25,34 @@ class ItemModel {
     required this.inStock,
   }) : image = _resolveImage(image, name, id);
 
+  ItemModel copyWith({
+    String? id,
+    String? name,
+    String? description,
+    double? price,
+    double? oldPrice,
+    String? color,
+    List<String>? colors,
+    String? category,
+    String? collectionType,
+    String? image,
+    bool? inStock,
+  }) {
+    return ItemModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      oldPrice: oldPrice ?? this.oldPrice,
+      color: color ?? this.color,
+      colors: colors ?? this.colors,
+      category: category ?? this.category,
+      collectionType: collectionType ?? this.collectionType,
+      image: image ?? this.image,
+      inStock: inStock ?? this.inStock,
+    );
+  }
+
   factory ItemModel.fromJson(Map<String, dynamic> json) {
     List<String> parsedColors = [];
     if (json['colors'] is List) {
@@ -49,6 +77,20 @@ class ItemModel {
       image: rawImage,
       inStock: json['inStock'] ?? true,
     );
+  }
+
+  /// Dynamic, unique product rating derived from product ID and name
+  double get rating {
+    final hash = (id.hashCode.abs() + name.length * 13) % 1000;
+    final baseRatings = [4.7, 4.8, 4.6, 4.9, 4.5, 4.8, 4.7, 4.9, 4.6, 4.8, 4.7, 4.5, 4.9, 4.8];
+    return baseRatings[hash % baseRatings.length];
+  }
+
+  /// Dynamic, unique total reviews count derived from product ID and name
+  int get reviewsCount {
+    final hash = (id.hashCode.abs() + name.length * 29) % 1000;
+    final baseCounts = [142, 284, 96, 318, 175, 230, 114, 342, 198, 256, 84, 162, 220, 189];
+    return baseCounts[hash % baseCounts.length];
   }
 
   /// Maps each product ID or name to its unique bundled T-shirt asset image.

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/user_model.dart';
@@ -10,6 +9,7 @@ import '../services/order_service.dart';
 import '../services/wallet_service.dart';
 import 'order_tracking_screen.dart';
 import 'order_details_screen.dart';
+import '../widgets/razorpay_gateway_modal.dart';
 
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
@@ -35,8 +35,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   UserModel? _currentUser;
   bool _isLoadingUser = true;
-  bool _dropAlertsEnabled = true;
-  String _selectedCurrency = 'India (INR ₹)';
 
   double get _walletBalance => WalletService.balance;
   List<Map<String, dynamic>> get _walletTransactions => WalletService.transactions;
@@ -48,6 +46,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _obscurePassword = true;
   bool _isLoggingIn = false;
   String? _loginError;
+
+  final List<Map<String, dynamic>> _userAddresses = [
+    {
+      'id': 'addr_1',
+      'type': 'Home',
+      'name': 'Tatukula Edukondalu',
+      'street': 'Flat 402, Luxury Heights, Jubilee Hills Road No. 36',
+      'city': 'Hyderabad',
+      'state': 'Telangana',
+      'pincode': '500033',
+      'phone': '+91 98765 43210',
+      'isDefault': true,
+    },
+    {
+      'id': 'addr_2',
+      'type': 'Work',
+      'name': 'Tatukula Edukondalu',
+      'street': 'Floor 5, Cyber Towers, HITEC City, Phase 2',
+      'city': 'Hyderabad',
+      'state': 'Telangana',
+      'pincode': '500081',
+      'phone': '+91 98765 43210',
+      'isDefault': false,
+    },
+  ];
 
   bool get _isRealUser => _currentUser != null && _currentUser!.id != 'guest_user';
 
@@ -506,8 +529,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('VEXA STYLE HUB', style: GoogleFonts.cinzel(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 2)),
-                          Text('WEAR CONFIDENCE • EST. 2026', style: GoogleFonts.outfit(fontSize: 11, color: _goldDark, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                          Text('WEAR CONFIDENCE • EST. 2026', style: GoogleFonts.outfit(fontSize: 12, color: _goldDark, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                         ],
                       ),
                     ],
@@ -1297,12 +1319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         const SizedBox(height: 20),
 
-        // 2. Quick Action Shortcuts Grid
-        _buildShortcutsGrid(),
-
-        const SizedBox(height: 20),
-
-        // 3. Preferences & Settings List Card
+        // 2. Preferences & Settings List Card
         _buildPreferencesCard(),
 
         const SizedBox(height: 24),
@@ -1352,11 +1369,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Center(
           child: Column(
             children: [
-              Text(
-                '✦  VEXA STYLE HUB  ✦',
-                style: GoogleFonts.cinzel(fontSize: 10, letterSpacing: 3, color: _goldDark, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
               Text(
                 'Version 1.0.0 (Production Build)',
                 style: GoogleFonts.outfit(fontSize: 10, color: _subtext),
@@ -1432,6 +1444,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _updateProfileAvatar(String newAvatarUrl) async {
     final user = _currentUser ?? UserModel(id: 'user_1', name: 'User', email: 'user@vexa.app', role: 'user');
     final updated = UserModel(
@@ -1498,6 +1511,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // ignore: unused_element
   void _showAvatarPickerModal(Function(String) onAvatarSelected) {
     showModalBottomSheet(
       context: context,
@@ -1641,6 +1655,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showCropImageModal(String imagePath, Function(String) onCropped) {
     if (imagePath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2114,7 +2129,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // 1. Edit Profile Full Screen View
   void _showEditProfileModal() {
     final nameCtrl = TextEditingController(text: _currentUser?.name ?? '');
-    final companyCtrl = TextEditingController(text: _currentUser?.companyName ?? 'VEXA Style Hub');
     final emailCtrl = TextEditingController(text: _currentUser?.email ?? '');
     final phoneCtrl = TextEditingController(text: '+91 98765 43210');
     final cityCtrl = TextEditingController(text: 'Hyderabad, Telangana');
@@ -2137,7 +2151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'EDIT ACCOUNT PROFILE',
                 style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
               ),
-              centerTitle: true,
+              centerTitle: false,
             ),
             body: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -2160,129 +2174,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    child: Column(
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            _showAvatarPickerModal((newUrl) {
-                              _updateProfileAvatar(newUrl);
-                              setModalState(() {
-                                selectedAvatar = newUrl;
-                              });
-                              _showCropImageModal(newUrl, (croppedUrl) {
-                                _updateProfileAvatar(croppedUrl);
-                                setModalState(() {
-                                  selectedAvatar = croppedUrl;
-                                });
-                              });
-                            });
-                          },
-                          child: Stack(
-                            children: [
-                              Container(
-                                width: 90,
-                                height: 90,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _gold.withAlpha(25),
-                                  border: Border.all(color: _gold, width: 3),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _gold.withAlpha(40),
-                                      blurRadius: 14,
-                                    ),
-                                  ],
-                                ),
-                                child: _buildAvatarWidget(selectedAvatar, nameCtrl.text, size: 90, fontSize: 36),
-                              ),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: _goldDark,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
-                                  child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                _showAvatarPickerModal((newUrl) {
-                                  _updateProfileAvatar(newUrl);
-                                  setModalState(() {
-                                    selectedAvatar = newUrl;
-                                  });
-                                  _showCropImageModal(newUrl, (croppedUrl) {
-                                    _updateProfileAvatar(croppedUrl);
-                                    setModalState(() {
-                                      selectedAvatar = croppedUrl;
-                                    });
-                                  });
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _surfaceBg,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: _border),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.photo_camera_rounded, size: 15, color: _goldDark),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Change Photo',
-                                      style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: _textDark),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            InkWell(
-                              onTap: () {
-                                _showCropImageModal(selectedAvatar, (croppedUrl) {
-                                  _updateProfileAvatar(croppedUrl);
-                                  setModalState(() {
-                                    selectedAvatar = croppedUrl;
-                                  });
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _gold.withAlpha(25),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: _gold.withAlpha(100)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.crop_rounded, size: 15, color: _goldDark),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Crop Image',
-                                      style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: _goldDark),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                    child: Center(
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _gold.withAlpha(25),
+                          border: Border.all(color: _gold, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _gold.withAlpha(40),
+                              blurRadius: 14,
                             ),
                           ],
                         ),
-                      ],
+                        child: _buildAvatarWidget(selectedAvatar, nameCtrl.text, size: 90, fontSize: 36),
+                      ),
                     ),
                   ),
 
@@ -2300,20 +2208,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       labelText: 'Full Name',
                       labelStyle: GoogleFonts.outfit(color: _subtext),
                       prefixIcon: const Icon(Icons.person_outline_rounded, color: _goldDark),
-                      filled: true,
-                      fillColor: _cardBg,
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: companyCtrl,
-                    style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600),
-                    decoration: InputDecoration(
-                      labelText: 'Company Name',
-                      labelStyle: GoogleFonts.outfit(color: _subtext),
-                      prefixIcon: const Icon(Icons.business_rounded, color: _goldDark),
                       filled: true,
                       fillColor: _cardBg,
                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
@@ -2378,7 +2272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         final updatedUser = UserModel(
                           id: _currentUser?.id ?? 'user_1',
                           name: nameCtrl.text.trim(),
-                          companyName: companyCtrl.text.trim().isNotEmpty ? companyCtrl.text.trim() : 'VEXA Style Hub',
+                          companyName: _currentUser?.companyName ?? 'VEXA Style Hub',
                           email: emailCtrl.text.trim(),
                           role: _currentUser?.role ?? 'user',
                           avatarUrl: selectedAvatar,
@@ -4028,1049 +3922,564 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
     );
   }
 
-  // 4. Coupons Full Screen View
-  void _showCouponsModal() {
-    final coupons = [
-      {
-        'code': 'VEXA30',
-        'title': 'Flat 30% OFF Storewide',
-        'desc': 'Valid on all 240 GSM drops & bespoke embroidered tees.',
-        'exp': 'Expires 30 Sep 2026',
-        'minOrder': 'Min. order ₹1,999',
-        'category': 'STOREWIDE',
-      },
-      {
-        'code': 'WELCOME100',
-        'title': 'Flat ₹100 OFF First Order',
-        'desc': 'Instant discount on your first VEXA purchase.',
-        'exp': 'Expires 15 Oct 2026',
-        'minOrder': 'No min. order',
-        'category': 'NEW USER',
-      },
-      {
-        'code': 'BESPOKE20',
-        'title': 'Flat 20% OFF Custom Drops',
-        'desc': 'Special privilege discount on custom embroidered drops.',
-        'exp': 'Expires 31 Dec 2026',
-        'minOrder': 'Min. order ₹2,499',
-        'category': 'VIP EXCLUSIVE',
-      },
-      {
-        'code': 'FREESHIP',
-        'title': 'Free Express Delivery',
-        'desc': 'Complimentary luxury courier delivery to your doorstep.',
-        'exp': 'Expires 31 Oct 2026',
-        'minOrder': 'Min. order ₹999',
-        'category': 'SHIPPING',
-      },
-    ];
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (ctx) => Scaffold(
-          backgroundColor: _bgColor,
-          appBar: AppBar(
-            backgroundColor: _cardBg,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: _textDark),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-            title: Text(
-              'VIP COUPONS & OFFERS',
-              style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
-            ),
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_goldDark, Color(0xFFC5A059), _gold],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _goldDark.withAlpha(50),
-                        blurRadius: 15,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(40),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.local_offer_rounded, color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Exclusive Member Perks',
-                              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '4 Coupons Available for Redemption',
-                              style: GoogleFonts.outfit(color: Colors.white.withAlpha(220), fontSize: 12.5),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'AVAILABLE PROMO CODES',
-                  style: GoogleFonts.cinzel(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
-                ),
-                const SizedBox(height: 12),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: coupons.length,
-                  separatorBuilder: (c, i) => const SizedBox(height: 14),
-                  itemBuilder: (c, i) {
-                    final item = coupons[i];
-                    return Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: _cardBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: _gold.withAlpha(80)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(8),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(color: _goldDark, borderRadius: BorderRadius.circular(8)),
-                                child: Text(
-                                  item['code']!,
-                                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 2),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: _gold.withAlpha(25), borderRadius: BorderRadius.circular(6)),
-                                child: Text(
-                                  item['category']!,
-                                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _goldDark),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(item['title']!, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: _textDark)),
-                          const SizedBox(height: 4),
-                          Text(item['desc']!, style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.3)),
-                          const Divider(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(item['minOrder']!, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: _subtext)),
-                                  Text(item['exp']!, style: GoogleFonts.outfit(fontSize: 11, color: _goldDark, fontWeight: FontWeight.w700)),
-                                ],
-                              ),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _goldDark,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                                onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: item['code']!));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Copied coupon code "${item['code']}" to clipboard!'),
-                                      backgroundColor: _goldDark,
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 14),
-                                label: Text('COPY CODE', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
-  // 5. Addresses Full Screen View
-  void _showAddressesModal() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (ctx) => Scaffold(
-          backgroundColor: _bgColor,
-          appBar: AppBar(
-            backgroundColor: _cardBg,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: _textDark),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-            title: Text(
-              'SAVED ADDRESSES',
-              style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
-            ),
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: _cardBg,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: _border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
-                        child: const Icon(Icons.location_on_outlined, color: _goldDark, size: 24),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Delivery Destinations', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14.5, color: _textDark)),
-                            Text('Manage your saved shipping locations for fast 1-click checkout', style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'YOUR ADDRESSES',
-                  style: GoogleFonts.cinzel(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: _cardBg,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: _gold, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _gold.withAlpha(20),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.home_rounded, color: _goldDark, size: 20),
-                              const SizedBox(width: 8),
-                              Text('Home (Primary)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: _textDark)),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(color: _gold.withAlpha(30), borderRadius: BorderRadius.circular(6)),
-                            child: Text('DEFAULT', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: _goldDark)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(_currentUser?.name ?? 'Tatukula Edukondalu', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14, color: _textDark)),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Flat 402, Luxury Heights, Jubilee Hills Road No. 36\nHyderabad, Telangana - 500033\nIndia',
-                        style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext, height: 1.4),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_outlined, size: 14, color: _subtext),
-                          const SizedBox(width: 6),
-                          Text('+91 98765 43210', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
-                        ],
-                      ),
-                      const Divider(height: 24),
-                      Row(
-                        children: [
-                          TextButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Editing home address...'), backgroundColor: _goldDark),
-                              );
-                            },
-                            icon: const Icon(Icons.edit_outlined, size: 16, color: _goldDark),
-                            label: Text('Edit', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _goldDark)),
-                          ),
-                          const SizedBox(width: 16),
-                          TextButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Cannot delete default address'), backgroundColor: _goldDark),
-                              );
-                            },
-                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.grey),
-                            label: Text('Remove', style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: _cardBg,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: _border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.business_rounded, color: _textDark, size: 20),
-                              const SizedBox(width: 8),
-                              Text('VEXA Design Studio (Work)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: _textDark)),
-                            ],
-                          ),
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                              side: const BorderSide(color: _border),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Set Work address as default'), backgroundColor: _goldDark),
-                              );
-                            },
-                            child: Text('Set Default', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _textDark)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(_currentUser?.name ?? 'Tatukula Edukondalu', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14, color: _textDark)),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Floor 5, Cyber Towers, HITEC City, Phase 2\nHyderabad, Telangana - 500081\nIndia',
-                        style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext, height: 1.4),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_outlined, size: 14, color: _subtext),
-                          const SizedBox(width: 6),
-                          Text('+91 98765 43210', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
-                        ],
-                      ),
-                      const Divider(height: 24),
-                      Row(
-                        children: [
-                          TextButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Editing work address...'), backgroundColor: _goldDark),
-                              );
-                            },
-                            icon: const Icon(Icons.edit_outlined, size: 16, color: _goldDark),
-                            label: Text('Edit', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _goldDark)),
-                          ),
-                          const SizedBox(width: 16),
-                          TextButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Removed work address'), backgroundColor: _goldDark),
-                              );
-                            },
-                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
-                            label: Text('Remove', style: GoogleFonts.outfit(fontSize: 12, color: Colors.redAccent)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _goldDark,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      elevation: 4,
-                    ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Address form feature ready!'), backgroundColor: _goldDark),
-                      );
-                    },
-                    icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
-                    label: Text('ADD NEW ADDRESS', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 1.5, color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // 5. Address Edit & Create Full Screen View
+  void _showEditAddressScreen({
+    required BuildContext context,
+    Map<String, dynamic>? addressToEdit,
+    required Function(Map<String, dynamic> updatedAddress) onSave,
+  }) {
+    final isEditing = addressToEdit != null;
+    final formKey = GlobalKey<FormState>();
 
-  // 6. Payments Full Screen View
-  void _showPaymentsModal() {
-    final List<Map<String, dynamic>> customModes = [];
+    String selectedType = addressToEdit?['type'] ?? 'Home';
+    final nameCtrl = TextEditingController(text: addressToEdit?['name'] ?? (_currentUser?.name ?? 'Tatukula Edukondalu'));
+    final phoneCtrl = TextEditingController(text: addressToEdit?['phone'] ?? '+91 98765 43210');
+    final streetCtrl = TextEditingController(text: addressToEdit?['street'] ?? '');
+    final cityCtrl = TextEditingController(text: addressToEdit?['city'] ?? 'Hyderabad');
+    final stateCtrl = TextEditingController(text: addressToEdit?['state'] ?? 'Telangana');
+    final pincodeCtrl = TextEditingController(text: addressToEdit?['pincode'] ?? '500033');
+    bool isDefault = addressToEdit?['isDefault'] ?? false;
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (ctx) => StatefulBuilder(
-          builder: (paymentsCtx, setPaymentState) => Scaffold(
-            backgroundColor: _bgColor,
-            appBar: AppBar(
-              backgroundColor: _cardBg,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: _textDark),
-                onPressed: () => Navigator.pop(ctx),
+          builder: (screenCtx, setScreenState) {
+            return Scaffold(
+              backgroundColor: _bgColor,
+              appBar: AppBar(
+                backgroundColor: _cardBg,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 18),
+                  onPressed: () => Navigator.pop(screenCtx),
+                ),
+                title: Text(
+                  isEditing ? 'EDIT SHIPPING ADDRESS' : 'ADD NEW ADDRESS',
+                  style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
+                ),
+                centerTitle: true,
               ),
-              title: Text(
-                'PAYMENT METHODS',
-                style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
-              ),
-              centerTitle: true,
-            ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: _cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: _border),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
-                          child: const Icon(Icons.security_rounded, color: _goldDark, size: 24),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _cardBg,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: _border),
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Encrypted & Secure Payments', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14.5, color: _textDark)),
-                              Text('256-bit SSL PCI-DSS compliant checkout protection', style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'SAVED PAYMENT MODES',
-                    style: GoogleFonts.cinzel(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF0C2340), width: 1.5),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: const Color(0xFF0C2340), borderRadius: BorderRadius.circular(6)),
-                          child: Text('Razorpay', style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
+                              child: Icon(isEditing ? Icons.edit_location_alt_rounded : Icons.add_location_alt_rounded, color: _goldDark, size: 22),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Flexible(
-                                    child: Text(
-                                      'Razorpay Payment Gateway',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5, color: _textDark),
-                                    ),
+                                  Text(
+                                    isEditing ? 'Update Destination Details' : 'New Shipping Destination',
+                                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: _textDark),
                                   ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: _successGreen.withAlpha(30), borderRadius: BorderRadius.circular(4)),
-                                    child: Text('PRIMARY', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _successGreen)),
+                                  Text(
+                                    'Ensure accurate address for express 24-48h courier delivery',
+                                    style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
-                              Text('Instant UPI, Cards, NetBanking & Wallets', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        const Icon(Icons.verified_rounded, color: Color(0xFF0C2340), size: 22),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: _gold, width: 1.5),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: _gold.withAlpha(20), borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.account_balance_wallet_rounded, color: _goldDark, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      'Google Pay / PhonePe UPI',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5, color: _textDark),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: _successGreen.withAlpha(30), borderRadius: BorderRadius.circular(4)),
-                                    child: Text('DEFAULT', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _successGreen)),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text('tatukulaedukondalu@okaxis', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.check_circle_rounded, color: _goldDark, size: 22),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: _border),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.credit_card_rounded, color: _goldDark, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('HDFC Bank Visa Credit Card', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: _textDark)),
-                              const SizedBox(height: 4),
-                              Text('•••• •••• •••• 4242 · Expires 08/28', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
-                            ],
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Card settings opened'), backgroundColor: _goldDark),
-                            );
-                          },
-                          child: Text('Manage', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _goldDark)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: _border),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.currency_rupee_rounded, color: _goldDark, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Cash on Delivery (COD)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: _textDark)),
-                              const SizedBox(height: 4),
-                              Text('Available on orders up to ₹15,000', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: Colors.green.withAlpha(20), borderRadius: BorderRadius.circular(6)),
-                          child: Text('ACTIVE', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green[700])),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                      const SizedBox(height: 20),
 
-                  // Dynamic custom added modes list
-                  ...customModes.map((mode) {
-                    return Container(
-                      margin: const EdgeInsets.only(top: 14),
-                      padding: const EdgeInsets.all(16),
+                      Text('ADDRESS LABEL', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 0.8)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: ['Home', 'Work', 'Other'].map((type) {
+                          final isSel = selectedType == type;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(
+                                type,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12.5,
+                                  fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                                  color: isSel ? Colors.white : _textDark,
+                                ),
+                              ),
+                              selected: isSel,
+                              selectedColor: _goldDark,
+                              backgroundColor: _surfaceBg,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(color: isSel ? _goldDark : _border),
+                              ),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setScreenState(() => selectedType = type);
+                                }
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 18),
+
+                      TextFormField(
+                        controller: nameCtrl,
+                        style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600, fontSize: 14),
+                        validator: (val) => val == null || val.trim().isEmpty ? 'Please enter recipient name' : null,
+                        decoration: InputDecoration(
+                          labelText: 'Full Name',
+                          labelStyle: GoogleFonts.outfit(color: _subtext, fontSize: 13),
+                          prefixIcon: const Icon(Icons.person_outline_rounded, color: _goldDark, size: 20),
+                          filled: true,
+                          fillColor: _cardBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      TextFormField(
+                        controller: phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600, fontSize: 14),
+                        validator: (val) => val == null || val.trim().isEmpty ? 'Please enter mobile number' : null,
+                        decoration: InputDecoration(
+                          labelText: 'Mobile Phone Number',
+                          labelStyle: GoogleFonts.outfit(color: _subtext, fontSize: 13),
+                          prefixIcon: const Icon(Icons.phone_outlined, color: _goldDark, size: 20),
+                          filled: true,
+                          fillColor: _cardBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      TextFormField(
+                        controller: streetCtrl,
+                        maxLines: 2,
+                        style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600, fontSize: 14),
+                        validator: (val) => val == null || val.trim().isEmpty ? 'Please enter street address' : null,
+                        decoration: InputDecoration(
+                          labelText: 'Flat / House No. / Building / Street Address',
+                          labelStyle: GoogleFonts.outfit(color: _subtext, fontSize: 13),
+                          prefixIcon: const Icon(Icons.home_outlined, color: _goldDark, size: 20),
+                          filled: true,
+                          fillColor: _cardBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: cityCtrl,
+                              style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600, fontSize: 14),
+                              validator: (val) => val == null || val.trim().isEmpty ? 'City required' : null,
+                              decoration: InputDecoration(
+                                labelText: 'City',
+                                labelStyle: GoogleFonts.outfit(color: _subtext, fontSize: 13),
+                                prefixIcon: const Icon(Icons.location_city_rounded, color: _goldDark, size: 20),
+                                filled: true,
+                                fillColor: _cardBg,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: stateCtrl,
+                              style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600, fontSize: 14),
+                              validator: (val) => val == null || val.trim().isEmpty ? 'State required' : null,
+                              decoration: InputDecoration(
+                                labelText: 'State',
+                                labelStyle: GoogleFonts.outfit(color: _subtext, fontSize: 13),
+                                prefixIcon: const Icon(Icons.map_outlined, color: _goldDark, size: 20),
+                                filled: true,
+                                fillColor: _cardBg,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      TextFormField(
+                        controller: pincodeCtrl,
+                        keyboardType: TextInputType.number,
+                        style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600, fontSize: 14),
+                        validator: (val) => val == null || val.trim().isEmpty ? 'Pincode required' : null,
+                        decoration: InputDecoration(
+                          labelText: 'Pincode / Postal Code',
+                          labelStyle: GoogleFonts.outfit(color: _subtext, fontSize: 13),
+                          prefixIcon: const Icon(Icons.pin_drop_outlined, color: _goldDark, size: 20),
+                          filled: true,
+                          fillColor: _cardBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: isDefault,
+                            activeColor: _goldDark,
+                            onChanged: (val) => setScreenState(() => isDefault = val ?? false),
+                          ),
+                          Text(
+                            'Set as primary default shipping destination',
+                            style: GoogleFonts.outfit(fontSize: 13, color: _textDark, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _goldDark,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 4,
+                          ),
+                          onPressed: () {
+                            if (!formKey.currentState!.validate()) return;
+                            final newOrUpdated = {
+                              'id': addressToEdit?['id'] ?? 'addr_${DateTime.now().millisecondsSinceEpoch}',
+                              'type': selectedType,
+                              'name': nameCtrl.text.trim(),
+                              'phone': phoneCtrl.text.trim(),
+                              'street': streetCtrl.text.trim(),
+                              'city': cityCtrl.text.trim(),
+                              'state': stateCtrl.text.trim(),
+                              'pincode': pincodeCtrl.text.trim(),
+                              'isDefault': isDefault,
+                            };
+                            onSave(newOrUpdated);
+                            Navigator.pop(screenCtx);
+                          },
+                          icon: const Icon(Icons.save_rounded, color: Colors.white, size: 18),
+                          label: Text(
+                            isEditing ? 'SAVE ADDRESS CHANGES' : 'SAVE NEW ADDRESS',
+                            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // 6. Addresses Full Screen View
+  void _showAddressesModal() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => StatefulBuilder(
+          builder: (modalCtx, setAddressState) {
+            void updateAddresses(Map<String, dynamic> updatedAddress) {
+              final index = _userAddresses.indexWhere((a) => a['id'] == updatedAddress['id']);
+              setAddressState(() {
+                if (updatedAddress['isDefault'] == true) {
+                  for (var a in _userAddresses) {
+                    a['isDefault'] = false;
+                  }
+                }
+                if (index != -1) {
+                  _userAddresses[index] = updatedAddress;
+                } else {
+                  _userAddresses.add(updatedAddress);
+                }
+              });
+              if (mounted) setState(() {});
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        index != -1 ? 'Address updated successfully!' : 'New address added successfully!',
+                        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: _successGreen,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            }
+
+            void deleteAddress(String id) {
+              setAddressState(() {
+                _userAddresses.removeWhere((a) => a['id'] == id);
+              });
+              if (mounted) setState(() {});
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Address removed', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+                  backgroundColor: _goldDark,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            }
+
+            void setDefaultAddress(String id) {
+              setAddressState(() {
+                for (var a in _userAddresses) {
+                  a['isDefault'] = (a['id'] == id);
+                }
+              });
+              if (mounted) setState(() {});
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Default address updated!', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+                  backgroundColor: _successGreen,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            }
+
+            return Scaffold(
+              backgroundColor: _bgColor,
+              appBar: AppBar(
+                backgroundColor: _cardBg,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 18),
+                  onPressed: () => Navigator.pop(modalCtx),
+                ),
+                title: Text(
+                  'SAVED ADDRESSES',
+                  style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
+                ),
+                centerTitle: true,
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         color: _cardBg,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: _goldDark, width: 1.2),
+                        border: Border.all(color: _border),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: _gold.withAlpha(20), borderRadius: BorderRadius.circular(12)),
-                            child: Icon(mode['icon'] as IconData, color: _goldDark, size: 24),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
+                            child: const Icon(Icons.location_on_outlined, color: _goldDark, size: 24),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Text('Delivery Destinations', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14.5, color: _textDark)),
+                                Text('Manage your saved shipping locations for fast 1-click checkout', style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'YOUR ADDRESSES',
+                      style: GoogleFonts.cinzel(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_userAddresses.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(28),
+                        decoration: BoxDecoration(
+                          color: _cardBg,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: _border),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.location_off_outlined, color: _subtext, size: 36),
+                            const SizedBox(height: 12),
+                            Text('No saved addresses yet', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: _textDark)),
+                            const SizedBox(height: 4),
+                            Text('Tap below to add your first delivery destination.', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                          ],
+                        ),
+                      )
+                    else
+                      Column(
+                        children: _userAddresses.map((addr) {
+                          final isDef = addr['isDefault'] == true;
+                          final type = addr['type'] ?? 'Home';
+                          final IconData typeIcon = type == 'Work'
+                              ? Icons.business_rounded
+                              : (type == 'Home' ? Icons.home_rounded : Icons.location_on_rounded);
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: _cardBg,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: isDef ? _gold : _border, width: isDef ? 1.5 : 1.0),
+                              boxShadow: isDef
+                                  ? [
+                                      BoxShadow(
+                                        color: _gold.withAlpha(20),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(typeIcon, color: isDef ? _goldDark : _textDark, size: 20),
+                                        const SizedBox(width: 8),
+                                        Text('$type Address', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: _textDark)),
+                                      ],
+                                    ),
+                                    if (isDef)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(color: _gold.withAlpha(30), borderRadius: BorderRadius.circular(6)),
+                                        child: Text('DEFAULT', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: _goldDark)),
+                                      )
+                                    else
+                                      OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                          side: const BorderSide(color: _border),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                        ),
+                                        onPressed: () => setDefaultAddress(addr['id']),
+                                        child: Text('Set Default', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _textDark)),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(addr['name'] ?? '', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14, color: _textDark)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${addr['street']}\n${addr['city']}, ${addr['state']} - ${addr['pincode']}\nIndia',
+                                  style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext, height: 1.4),
+                                ),
+                                const SizedBox(height: 8),
                                 Row(
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        mode['title'].toString(),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5, color: _textDark),
-                                      ),
-                                    ),
+                                    const Icon(Icons.phone_outlined, size: 14, color: _subtext),
                                     const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: _successGreen.withAlpha(30), borderRadius: BorderRadius.circular(4)),
-                                      child: Text(
-                                        mode['badge'].toString(),
-                                        style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _successGreen),
-                                      ),
+                                    Text(addr['phone'] ?? '', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
+                                  ],
+                                ),
+                                const Divider(height: 24),
+                                Row(
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        _showEditAddressScreen(
+                                          context: modalCtx,
+                                          addressToEdit: addr,
+                                          onSave: updateAddresses,
+                                        );
+                                      },
+                                      icon: const Icon(Icons.edit_outlined, size: 16, color: _goldDark),
+                                      label: Text('Edit', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _goldDark)),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    TextButton.icon(
+                                      onPressed: isDef && _userAddresses.length == 1
+                                          ? null
+                                          : () => deleteAddress(addr['id']),
+                                      icon: Icon(Icons.delete_outline, size: 16, color: (isDef && _userAddresses.length == 1) ? Colors.grey : Colors.redAccent),
+                                      label: Text('Remove', style: GoogleFonts.outfit(fontSize: 12, color: (isDef && _userAddresses.length == 1) ? Colors.grey : Colors.redAccent)),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(mode['subtitle'].toString(), style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
                               ],
                             ),
-                          ),
-                          const Icon(Icons.check_circle_rounded, color: _goldDark, size: 22),
-                        ],
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }),
-
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _goldDark,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 4,
-                      ),
-                      onPressed: () {
-                        _showAddNewPaymentMethodScreen(paymentsCtx, (newMode) {
-                          setPaymentState(() {
-                            customModes.add(newMode);
-                          });
-                        });
-                      },
-                      icon: const Icon(Icons.add_card_rounded, color: Colors.white),
-                      label: Text('ADD NEW PAYMENT METHOD', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 1.5, color: Colors.white)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAddNewPaymentMethodScreen(BuildContext parentContext, Function(Map<String, dynamic>) onAdded) {
-    final upiCtrl = TextEditingController();
-    final cardNameCtrl = TextEditingController();
-    final cardNumberCtrl = TextEditingController();
-    final expiryCtrl = TextEditingController();
-    final cvvCtrl = TextEditingController();
-    String selectedTab = 'UPI';
-    String selectedBank = 'HDFC Bank';
-
-    Navigator.push(
-      parentContext,
-      MaterialPageRoute(
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setSheetState) => Scaffold(
-            backgroundColor: _bgColor,
-            appBar: AppBar(
-              backgroundColor: _cardBg,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: _textDark),
-                onPressed: () => Navigator.pop(ctx),
-              ),
-              title: Text(
-                'ADD PAYMENT METHOD',
-                style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
-              ),
-              centerTitle: true,
-            ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header Info Card
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: _cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: _border),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
-                          child: const Icon(Icons.security_rounded, color: _goldDark, size: 24),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _goldDark,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 4,
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('PCI-DSS Vault Protection', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: _textDark)),
-                              Text('Your payment credentials are tokenized and encrypted.', style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Tab Selection: UPI, Credit/Debit Card, NetBanking
-                  Row(
-                    children: [
-                      for (final tab in ['UPI', 'Credit/Debit Card', 'NetBanking'])
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setSheetState(() => selectedTab = tab),
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: selectedTab == tab ? _goldDark : _cardBg,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: selectedTab == tab ? _goldDark : _border),
-                                boxShadow: selectedTab == tab
-                                    ? [BoxShadow(color: _goldDark.withAlpha(40), blurRadius: 6, offset: const Offset(0, 2))]
-                                    : null,
-                              ),
-                              child: Text(
-                                tab,
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: selectedTab == tab ? Colors.white : _subtext,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (selectedTab == 'UPI') ...[
-                    Text('UPI VPA DETAILS', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: upiCtrl,
-                      style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'UPI ID (VPA)',
-                        hintText: 'e.g. yourname@upi or 9876543210@paytm',
-                        labelStyle: GoogleFonts.outfit(color: _subtext),
-                        prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: _goldDark),
-                        filled: true,
-                        fillColor: _cardBg,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        onPressed: () {
+                          _showEditAddressScreen(
+                            context: modalCtx,
+                            addressToEdit: null,
+                            onSave: updateAddresses,
+                          );
+                        },
+                        icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
+                        label: Text('ADD NEW ADDRESS', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 1.5, color: Colors.white)),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Text('Supported: Google Pay, PhonePe, Paytm, BHIM & CRED UPI.', style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext)),
-                  ] else if (selectedTab == 'Credit/Debit Card') ...[
-                    Text('CARD INFORMATION', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: cardNameCtrl,
-                      style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Name on Card',
-                        labelStyle: GoogleFonts.outfit(color: _subtext),
-                        prefixIcon: const Icon(Icons.person_outline_rounded, color: _goldDark),
-                        filled: true,
-                        fillColor: _cardBg,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: cardNumberCtrl,
-                      keyboardType: TextInputType.number,
-                      style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Card Number',
-                        hintText: '4532 •••• •••• 8892',
-                        labelStyle: GoogleFonts.outfit(color: _subtext),
-                        prefixIcon: const Icon(Icons.credit_card_rounded, color: _goldDark),
-                        filled: true,
-                        fillColor: _cardBg,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: expiryCtrl,
-                            keyboardType: TextInputType.datetime,
-                            style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600),
-                            decoration: InputDecoration(
-                              labelText: 'Expiry (MM/YY)',
-                              hintText: '09/28',
-                              labelStyle: GoogleFonts.outfit(color: _subtext),
-                              prefixIcon: const Icon(Icons.calendar_today_rounded, color: _goldDark, size: 18),
-                              filled: true,
-                              fillColor: _cardBg,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: cvvCtrl,
-                            obscureText: true,
-                            keyboardType: TextInputType.number,
-                            style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600),
-                            decoration: InputDecoration(
-                              labelText: 'CVV Security Code',
-                              hintText: '•••',
-                              labelStyle: GoogleFonts.outfit(color: _subtext),
-                              prefixIcon: const Icon(Icons.lock_outline_rounded, color: _goldDark, size: 18),
-                              filled: true,
-                              fillColor: _cardBg,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    Text('PRIMARY NETBANKING ACCOUNT', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedBank,
-                      decoration: InputDecoration(
-                        labelText: 'Select Primary Bank',
-                        labelStyle: GoogleFonts.outfit(color: _subtext),
-                        prefixIcon: const Icon(Icons.account_balance_rounded, color: _goldDark),
-                        filled: true,
-                        fillColor: _cardBg,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _border)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                      ),
-                      items: ['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank', 'Punjab National Bank']
-                          .map((bank) => DropdownMenuItem(value: bank, child: Text(bank, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600))))
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) setSheetState(() => selectedBank = val);
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Text('Direct encrypted tokenization via NetBanking.', style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext)),
                   ],
-
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _goldDark,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 4,
-                      ),
-                      onPressed: () {
-                        Map<String, dynamic> newMode;
-                        if (selectedTab == 'UPI') {
-                          final vpa = upiCtrl.text.trim().isNotEmpty ? upiCtrl.text.trim() : 'collector@vexa.upi';
-                          newMode = {
-                            'title': 'Saved UPI ID ($vpa)',
-                            'subtitle': vpa,
-                            'badge': 'VERIFIED',
-                            'icon': Icons.account_balance_wallet_rounded,
-                          };
-                        } else if (selectedTab == 'Credit/Debit Card') {
-                          final name = cardNameCtrl.text.trim();
-                          final num = cardNumberCtrl.text.trim();
-                          final last4 = num.length >= 4 ? num.substring(num.length - 4) : '9981';
-                          final exp = expiryCtrl.text.trim().isNotEmpty ? expiryCtrl.text.trim() : '12/28';
-                          newMode = {
-                            'title': name.isNotEmpty ? '$name Card' : 'Saved Visa Card',
-                            'subtitle': '•••• •••• •••• $last4 · Expires $exp',
-                            'badge': 'NEW',
-                            'icon': Icons.credit_card_rounded,
-                          };
-                        } else {
-                          newMode = {
-                            'title': '$selectedBank NetBanking',
-                            'subtitle': 'Saved NetBanking Account',
-                            'badge': 'LINKED',
-                            'icon': Icons.account_balance_rounded,
-                          };
-                        }
-
-                        onAdded(newMode);
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(parentContext).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text('Payment method added & saved successfully!', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                                ),
-                              ],
-                            ),
-                            backgroundColor: _successGreen,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-                      label: Text('SAVE & VERIFY PAYMENT METHOD', style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1)),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -5078,348 +4487,404 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
 
 
 
-  // 7. Currency Modal
-  void _showCurrencyModal() {
-    final currencies = [
-      'India (INR ₹)',
-      'United States (USD \$)',
-      'United Kingdom (GBP £)',
-      'United Arab Emirates (AED)',
-    ];
 
-    showDialog(
-      context: context,
-      useSafeArea: false,
-      builder: (ctx) => Scaffold(
-        backgroundColor: _cardBg,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0.5,
-          leading: IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.black87, size: 24),
-            onPressed: () => Navigator.pop(ctx),
-          ),
-          title: Text(
-            'CURRENCY & REGION',
-            style: GoogleFonts.cinzel(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black87,
-              letterSpacing: 1.0,
-            ),
-          ),
-          centerTitle: true,
-        ),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Select your preferred currency and shopping region.',
-                  style: GoogleFonts.outfit(
-                    color: _subtext,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(8),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: List.generate(currencies.length, (index) {
-                      final c = currencies[index];
-                      final isSelected = _selectedCurrency == c;
-                      return Column(
-                        children: [
-                          ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            title: Text(
-                              c,
-                              style: GoogleFonts.outfit(
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                fontSize: 16,
-                                color: isSelected ? _goldDark : _textDark,
-                              ),
-                            ),
-                            trailing: isSelected
-                                ? const Icon(Icons.check_circle_rounded, color: _goldDark, size: 22)
-                                : const Icon(Icons.radio_button_unchecked_rounded, color: _subtext, size: 20),
-                            onTap: () {
-                              setState(() {
-                                _selectedCurrency = c;
-                              });
-                              Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Region set to $c'),
-                                  backgroundColor: _goldDark,
-                                ),
-                              );
-                            },
-                          ),
-                          if (index < currencies.length - 1)
-                            const Divider(height: 1, indent: 20, endIndent: 20),
-                        ],
-                      );
-                    }),
-                  ),
-                ),
-                const Spacer(),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _goldDark,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text(
-                      'Done',
-                      style: GoogleFonts.outfit(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
+
+
+
+
 
   // ── 1. USER HERO CARD ───────────────────────────────────────────────────
   Widget _buildUserHeroCard() {
+    String cleanText(String s) {
+      String str = s.replaceAll(RegExp(r'vexa', caseSensitive: false), '')
+                    .replaceAll(RegExp(r'\s+'), ' ')
+                    .trim();
+      final lower = str.toLowerCase();
+      if (lower.contains('tatukulaedukondalu')) {
+        str = str.replaceAll(RegExp(r'tatukulaedukondalu', caseSensitive: false), 'TATUKULA EDUKONDALU');
+      } else if (lower.contains('tatukula') && lower.contains('edukondalu') && !lower.contains('tatukula edukondalu')) {
+        str = str.replaceAll(RegExp(r'tatukula\s*edukondalu', caseSensitive: false), 'TATUKULA EDUKONDALU');
+      } else {
+        str = str.replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}');
+      }
+      return str.trim();
+    }
+
+    final rawUser = (_currentUser != null && _currentUser!.name.trim().isNotEmpty)
+        ? cleanText(_currentUser!.name)
+        : 'Guest Collector';
+    final nameText = rawUser.isNotEmpty ? rawUser : 'Guest Collector';
+    final emailText = _currentUser?.email.trim().isNotEmpty == true
+        ? _currentUser!.email.trim()
+        : 'guest@vexa.app';
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
-            color: _goldDark.withAlpha(20),
+            color: _goldDark.withAlpha(18),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Glowing Avatar Circle with Edit Icon
-              GestureDetector(
-                onTap: _showEditProfileModal,
-                child: Stack(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _gold.withAlpha(25),
-                        border: Border.all(color: _gold, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _gold.withAlpha(40),
-                            blurRadius: 12,
-                          ),
-                        ],
-                      ),
-                      child: _buildAvatarWidget(_currentUser?.avatarUrl, _currentUser?.name ?? 'Guest Collector', size: 64, fontSize: 26),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: _goldDark,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                        child: const Icon(Icons.edit, size: 10, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _currentUser?.name ?? 'Guest Collector',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: _textDark,
-                                ),
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                _currentUser?.companyName ?? 'VEXA Style Hub',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: _goldDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        InkWell(
-                          onTap: _showEditProfileModal,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: _gold.withAlpha(20),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: _gold.withAlpha(80)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.edit_outlined, size: 12, color: _goldDark),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Edit Profile',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: _goldDark,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _currentUser?.email ?? 'guest@vexa.app',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        color: _subtext,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── 2. SHORTCUTS GRID ───────────────────────────────────────────────────
-  Widget _buildShortcutsGrid() {
-    final shortcuts = [
-      (icon: Icons.account_balance_wallet_outlined, title: 'VEXA Wallet', badge: '₹${_walletBalance.toStringAsFixed(0)}', onTap: _showWalletModal),
-      (icon: Icons.confirmation_number_outlined, title: 'Coupons', badge: 'VIP Offers', onTap: _showCouponsModal),
-      (icon: Icons.location_on_outlined, title: 'Addresses', badge: 'Default', onTap: _showAddressesModal),
-      (icon: Icons.credit_card_rounded, title: 'Payments', badge: 'UPI & Cards', onTap: _showPaymentsModal),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 2.15,
-      ),
-      itemCount: shortcuts.length,
-      itemBuilder: (context, index) {
-        final s = shortcuts[index];
-        return InkWell(
-          onTap: s.onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: _cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(6),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
+      child: InkWell(
+        onTap: _showEditProfileModal,
+        borderRadius: BorderRadius.circular(22),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Glowing Avatar Circle
+            Stack(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
-                    color: _gold.withAlpha(20),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _gold.withAlpha(60)),
-                  ),
-                  child: Icon(s.icon, color: _goldDark, size: 20),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        s.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        s.badge,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext, fontWeight: FontWeight.w500),
+                    shape: BoxShape.circle,
+                    color: _gold.withAlpha(25),
+                    border: Border.all(color: _gold, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _gold.withAlpha(35),
+                        blurRadius: 10,
                       ),
                     ],
                   ),
+                  child: _buildAvatarWidget(
+                    _currentUser?.avatarUrl,
+                    nameText,
+                    size: 60,
+                    fontSize: 24,
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: _goldDark,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: const Icon(Icons.edit_rounded, size: 10, color: Colors.white),
+                  ),
                 ),
               ],
             ),
-          ),
-        );
-      },
+            const SizedBox(width: 14),
+
+            // User Info Column (Name, Email)
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    nameText.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cinzel(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _textDark,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    emailText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      color: _subtext,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
+
+  // ── 5. MY ORDERS FULL SCREEN VIEW ──────────────────────────────────────
+  void _showMyOrdersModal() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => Scaffold(
+          backgroundColor: _bgColor,
+          appBar: AppBar(
+            backgroundColor: _cardBg,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 18),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+            title: Text(
+              'MY ORDERS & PURCHASES',
+              style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.5),
+            ),
+            centerTitle: false,
+          ),
+          body: FutureBuilder<List<OrderModel>>(
+            future: OrderService.getOrders(email: _currentUser?.email),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: _goldDark),
+                );
+              }
+
+              final orders = snapshot.data ?? [];
+
+              if (orders.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: _gold.withAlpha(20),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.shopping_bag_outlined, color: _goldDark, size: 48),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'No Orders Placed Yet',
+                          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Explore our 240 GSM luxury collection and place your first order.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(fontSize: 13, color: _subtext, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                padding: const EdgeInsets.all(20),
+                itemCount: orders.length,
+                separatorBuilder: (c, i) => const SizedBox(height: 16),
+                itemBuilder: (c, i) {
+                  final order = orders[i];
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _cardBg,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: _border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(8),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              order.id,
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 15, color: _textDark, letterSpacing: 0.5),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: order.statusColor.withAlpha(25),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: order.statusColor.withAlpha(80)),
+                              ),
+                              child: Text(
+                                order.status.toUpperCase(),
+                                style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: order.statusColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Ordered on ${order.formattedDate} · ${order.paymentMethod}',
+                          style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                        ),
+                        const Divider(height: 20),
+                        Column(
+                          children: order.items.map((item) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Image.asset(
+                                      item.image,
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 44,
+                                        height: 44,
+                                        color: _surfaceBg,
+                                        child: const Icon(Icons.checkroom, color: _goldDark, size: 20),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: _textDark),
+                                        ),
+                                        Text(
+                                          'Size: ${item.size} · Color: ${item.color} · Qty: ${item.quantity}',
+                                          style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${(item.price * item.quantity).toStringAsFixed(0)}',
+                                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: _goldDark),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Total Amount', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 16, color: _textDark)),
+                              ],
+                            ),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  if (order.status.toLowerCase() != 'cancelled') ...[
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0C2340),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        elevation: 1,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      onPressed: () {
+                                        RazorpayGatewayModal.show(
+                                          context: context,
+                                          amount: order.totalAmount,
+                                          customerName: order.customerName,
+                                          customerPhone: order.phone,
+                                          onPaymentSuccess: (methodLabel) {
+                                            order.paymentMethod = methodLabel;
+                                            order.status = 'Confirmed';
+                                            OrderService.updateOrderStatusLocally(
+                                              order.id,
+                                              'Confirmed',
+                                              context: context,
+                                            );
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Payment of ₹${order.totalAmount.toStringAsFixed(0)} verified via Razorpay!',
+                                                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                                                ),
+                                                backgroundColor: const Color(0xFF00A859),
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                      icon: const Icon(Icons.bolt_rounded, color: Color(0xFFFFD700), size: 15),
+                                      label: Text('Pay Now', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: _goldDark),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (ctx) => OrderTrackingScreen(order: order),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.local_shipping_outlined, color: _goldDark, size: 16),
+                                    label: Text('Track Live', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _goldDark)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _goldDark,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (ctx) => OrderDetailsScreen(order: order),
+                                        ),
+                                      );
+                                    },
+                                    child: Text('Details', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+
 
   // ── 3. PREFERENCES CARD ─────────────────────────────────────────────────
   Widget _buildPreferencesCard() {
@@ -5443,33 +4908,29 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
             child: Column(
               children: [
                 _buildPreferenceTile(
-                  icon: Icons.notifications_none_rounded,
-                  title: 'Drop Alerts & Offers',
-                  subtitle: 'Get notified about limited 240 GSM drops',
-                  trailing: Switch.adaptive(
-                    value: _dropAlertsEnabled,
-                    activeTrackColor: _goldDark,
-                    onChanged: (val) {
-                      setState(() {
-                        _dropAlertsEnabled = val;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(val ? 'Drop alerts enabled!' : 'Drop alerts disabled'),
-                          backgroundColor: _goldDark,
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                  ),
+                  icon: Icons.shopping_bag_outlined,
+                  title: 'My Orders & Purchases',
+                  subtitle: 'View order history, status & track delivery',
+                  trailing: const Icon(Icons.chevron_right_rounded, color: _subtext),
+                  onTap: _showMyOrdersModal,
                 ),
                 const Divider(color: _border, height: 1),
                 _buildPreferenceTile(
-                  icon: Icons.language_rounded,
-                  title: 'Currency & Region',
-                  subtitle: _selectedCurrency,
+                  icon: Icons.location_on_outlined,
+                  title: 'Saved Delivery Addresses',
+                  subtitle: _userAddresses.any((a) => a['isDefault'] == true)
+                      ? '${_userAddresses.firstWhere((a) => a['isDefault'] == true)['city']}, ${_userAddresses.firstWhere((a) => a['isDefault'] == true)['type']} · Default'
+                      : 'Manage saved shipping locations',
                   trailing: const Icon(Icons.chevron_right_rounded, color: _subtext),
-                  onTap: _showCurrencyModal,
+                  onTap: _showAddressesModal,
+                ),
+                const Divider(color: _border, height: 1),
+                _buildPreferenceTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'VEXA Wallet & Rewards',
+                  subtitle: 'Balance: ₹${_walletBalance.toStringAsFixed(0)}',
+                  trailing: const Icon(Icons.chevron_right_rounded, color: _subtext),
+                  onTap: _showWalletModal,
                 ),
                 const Divider(color: _border, height: 1),
                 _buildPreferenceTile(

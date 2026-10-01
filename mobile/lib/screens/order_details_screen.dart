@@ -6,6 +6,7 @@ import '../services/order_service.dart';
 import '../services/websocket_service.dart';
 import 'order_tracking_screen.dart';
 import 'customer_support_screen.dart';
+import '../widgets/razorpay_gateway_modal.dart';
 
 const Color _gold = Color(0xFFB8860B);
 const Color _goldDark = Color(0xFF8B6508);
@@ -828,6 +829,53 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (!isCancelled) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0C2340),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 2,
+                    ),
+                    onPressed: () {
+                      RazorpayGatewayModal.show(
+                        context: context,
+                        amount: _currentOrder.totalAmount,
+                        customerName: _currentOrder.customerName,
+                        customerPhone: _currentOrder.phone,
+                        onPaymentSuccess: (methodLabel) {
+                          setState(() {
+                            _currentOrder.paymentMethod = methodLabel;
+                            _currentOrder.status = 'Confirmed';
+                          });
+                          OrderService.updateOrderStatusLocally(
+                            _currentOrder.id,
+                            'Confirmed',
+                            context: context,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Payment of ₹${_currentOrder.totalAmount.toStringAsFixed(0)} verified via Razorpay!',
+                                style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                              backgroundColor: const Color(0xFF00A859),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.bolt_rounded, color: Color(0xFFFFD700), size: 20),
+                    label: Text(
+                      'Pay Now via Razorpay',
+                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               Row(
                 children: [
                   if (!isCancelled && !isDelivered) ...[

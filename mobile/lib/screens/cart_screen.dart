@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import '../services/wallet_service.dart';
 import '../widgets/vexa_empty_state.dart';
+import 'login_screen.dart';
 import 'product_detail_screen.dart';
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
@@ -146,621 +147,712 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _showCheckoutDialog() async {
     final loggedInUser = await AuthService.getUser();
-    final nameController = TextEditingController(text: (loggedInUser != null && loggedInUser.name.isNotEmpty) ? loggedInUser.name : 'John Doe');
+    final isGuest = loggedInUser == null || loggedInUser.id == 'guest_user';
+
+    if (isGuest) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please sign in to proceed with checkout.',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: _goldDark,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      return;
+    }
+
+    final nameController = TextEditingController(text: loggedInUser.name.isNotEmpty ? loggedInUser.name : 'John Doe');
     final addressController = TextEditingController(text: '123 Luxury Avenue, Fashion District');
     final phoneController = TextEditingController(text: '+91 98765 43210');
     final pincodeController = TextEditingController(text: '400001');
 
     String selectedPayment = 'Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)';
-    String selectedRazorpayChannel = 'upi'; // 'upi', 'card', 'netbanking', 'wallet'
-    String selectedUpiApp = 'Google Pay';
-    String selectedBank = 'HDFC Bank';
-    String selectedWallet = 'Mobikwik Wallet';
+
+    String selectedSavedAddress = 'home'; // 'home' | 'work' | 'custom'
+    String selectedDeliverySpeed = 'express'; // 'express' | 'standard'
+    String selectedInstruction = 'Leave at Door';
 
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: _cardBg,
-      elevation: 16,
+      useSafeArea: true,
+      backgroundColor: _bgColor,
+      elevation: 20,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              top: 24,
-              left: 20,
-              right: 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle bar
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: _border,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+          return SizedBox(
+            height: MediaQuery.of(context).size.height * 0.92,
+            child: Column(
+              children: [
+                // ── 1. STICKY TOP HEADER WITH PROGRESS STEPS ─────────────────────────
+                Container(
+                  padding: const EdgeInsets.only(top: 16, bottom: 14, left: 20, right: 16),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                    boxShadow: [
+                      BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, 2)),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // Drag indicator handle bar
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4.5,
+                          decoration: BoxDecoration(
+                            color: _border,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'CHECKOUT & DELIVERY',
-                            style: GoogleFonts.cinzel(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.5,
-                              color: _textDark,
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: _gold.withAlpha(25),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.local_shipping_outlined, color: _goldDark, size: 20),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'CHECKOUT & DELIVERY',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.cinzel(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.0,
+                                          color: _textDark,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Fast Doorstep Shipping & Secure Checkout',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          color: _subtext,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Enter your shipping details below',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              color: _subtext,
-                            ),
+                          const SizedBox(width: 8),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0C2340),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.lock_rounded, color: Color(0xFFFFD700), size: 11),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '256-Bit SSL',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, color: _textDark, size: 22),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: _subtext),
-                        onPressed: () => Navigator.pop(context),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                ),
 
-                  // Full Name
-                  Text(
-                    'Full Name',
-                    style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: nameController,
-                    style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. John Doe',
-                      prefixIcon: const Icon(Icons.person_outline_rounded, color: _gold),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      filled: true,
-                      fillColor: _surfaceBg,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _gold, width: 1.5)),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+                // ── 2. SCROLLABLE FORM BODY ─────────────────────────────────────────
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
 
-                  // Address
-                  Text(
-                    'Delivery Address',
-                    style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: addressController,
-                    style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Street name, Apartment, Suite',
-                      prefixIcon: const Icon(Icons.location_on_outlined, color: _gold),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      filled: true,
-                      fillColor: _surfaceBg,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _gold, width: 1.5)),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  Row(
-                    children: [
-                      // Phone
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        // ── SECTION A: SAVED ADDRESS QUICK SELECT ────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Phone Number',
-                              style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold),
+                              '1. Select Shipping Address',
+                              style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 6),
-                            TextField(
-                              controller: phoneController,
-                              style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                              decoration: InputDecoration(
-                                hintText: '+91 98765 43210',
-                                prefixIcon: const Icon(Icons.phone_outlined, color: _gold),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                filled: true,
-                                fillColor: _surfaceBg,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _gold, width: 1.5)),
-                              ),
+                            Text(
+                              'Saved Locations',
+                              style: GoogleFonts.outfit(color: _goldDark, fontSize: 11.5, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Pincode
-                      SizedBox(
-                        width: 120,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 10),
+
+                        Row(
                           children: [
-                            Text(
-                              'PIN Code',
-                              style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 6),
-                            TextField(
-                              controller: pincodeController,
-                              style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                hintText: '400001',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                filled: true,
-                                fillColor: _surfaceBg,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _gold, width: 1.5)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Payment Method Selection Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Select Payment Method',
-                        style: GoogleFonts.outfit(color: _textDark, fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                        decoration: BoxDecoration(color: const Color(0xFF0C2340), borderRadius: BorderRadius.circular(5)),
-                        child: Text('256-Bit SSL', style: GoogleFonts.outfit(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Primary Payment Option Choices
-                  Column(
-                    children: [
-                      // 1. Razorpay Online Payment Option (Matching Web App)
-                      GestureDetector(
-                        onTap: () => setModalState(() => selectedPayment = 'Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)'),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340).withAlpha(12) : _surfaceBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340) : _border,
-                              width: selectedPayment.contains('Razorpay') ? 1.5 : 1.0,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0C2340),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.bolt_rounded, color: Color(0xFFFFD700), size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text('Razorpay Online Payment', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                          decoration: BoxDecoration(color: _successGreen, borderRadius: BorderRadius.circular(4)),
-                                          child: Text('OFFICIAL', style: GoogleFonts.outfit(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900)),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text('UPI, Cards, NetBanking & Wallets', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                selectedPayment.contains('Razorpay') ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                color: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340) : _subtext,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // 2. VEXA Pay Wallet Option
-                      GestureDetector(
-                        onTap: () => setModalState(() => selectedPayment = 'VEXA Pay Wallet'),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: selectedPayment == 'VEXA Pay Wallet' ? _gold.withAlpha(20) : _surfaceBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: selectedPayment == 'VEXA Pay Wallet' ? _gold : _border,
-                              width: selectedPayment == 'VEXA Pay Wallet' ? 1.5 : 1.0,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: _goldDark,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text('VEXA Pay Wallet', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF10B981).withAlpha(25),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
-                                          ),
-                                          child: Text(
-                                            '₹${WalletService.balance.toStringAsFixed(0)}',
-                                            style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text('Available Balance: ₹${WalletService.balance.toStringAsFixed(0)} • Instant 1-Click Checkout', style: GoogleFonts.outfit(fontSize: 11, color: _subtext, fontWeight: FontWeight.w500)),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                selectedPayment == 'VEXA Pay Wallet' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                color: selectedPayment == 'VEXA Pay Wallet' ? _goldDark : _subtext,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // 3. Cash on Delivery (COD) Option
-                      GestureDetector(
-                        onTap: () => setModalState(() => selectedPayment = 'Cash on Delivery'),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: selectedPayment == 'Cash on Delivery' ? _surfaceBg : _surfaceBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: selectedPayment == 'Cash on Delivery' ? _textDark : _border,
-                              width: selectedPayment == 'Cash on Delivery' ? 1.5 : 1.0,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: _textDark,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.payments_outlined, color: Colors.white, size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Cash on Delivery (COD)', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                                    const SizedBox(height: 2),
-                                    Text('Pay in cash upon doorstep delivery', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                selectedPayment == 'Cash on Delivery' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                color: selectedPayment == 'Cash on Delivery' ? _textDark : _subtext,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Dynamic Razorpay Channel Sub-Selection (UPI, Cards, NetBanking, Wallets)
-                  if (selectedPayment.contains('Razorpay')) ...[
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0C2340).withAlpha(10),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF0C2340).withAlpha(60)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Select Razorpay Payment Channel:', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark)),
-                              Text('Razorpay SDK v1', style: GoogleFonts.outfit(fontSize: 10, color: _goldDark, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-
-                          // Channel Selector Tabs
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                (id: 'upi', label: 'UPI', icon: Icons.qr_code_scanner_rounded),
-                                (id: 'card', label: 'Cards', icon: Icons.credit_card_rounded),
-                                (id: 'netbanking', label: 'NetBanking', icon: Icons.account_balance_rounded),
-                                (id: 'wallet', label: 'Wallets', icon: Icons.account_balance_wallet_rounded),
-                              ].map((channel) {
-                                final isChSel = selectedRazorpayChannel == channel.id;
-                                return GestureDetector(
-                                  onTap: () => setModalState(() => selectedRazorpayChannel = channel.id),
-                                  child: Container(
-                                    margin: const EdgeInsets.only(right: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                    decoration: BoxDecoration(
-                                      color: isChSel ? const Color(0xFF0C2340) : Colors.white,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: isChSel ? const Color(0xFF0C2340) : _border),
-                                      boxShadow: isChSel ? [BoxShadow(color: const Color(0xFF0C2340).withAlpha(40), blurRadius: 4)] : [],
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(channel.icon, size: 14, color: isChSel ? const Color(0xFFFFD700) : _textDark),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          channel.label,
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: isChSel ? Colors.white : _textDark,
-                                          ),
-                                        ),
-                                      ],
+                            (id: 'home', label: '🏠 Home (Default)', name: 'John Doe', addr: '123 Luxury Avenue, Fashion District', phone: '+91 98765 43210', pin: '400001'),
+                            (id: 'work', label: '🏢 Work', name: 'John Doe (Office)', addr: 'Corporate Tower B, Financial Center', phone: '+91 98765 11223', pin: '400051'),
+                          ].map((savedAddr) {
+                            final isSelected = selectedSavedAddress == savedAddr.id;
+                            return Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setModalState(() {
+                                    selectedSavedAddress = savedAddr.id;
+                                    nameController.text = savedAddr.name;
+                                    addressController.text = savedAddr.addr;
+                                    phoneController.text = savedAddr.phone;
+                                    pincodeController.text = savedAddr.pin;
+                                  });
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? _gold.withAlpha(20) : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected ? _goldDark : _border,
+                                      width: isSelected ? 1.5 : 1.0,
                                     ),
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Sub-Channel Details Preview Box
-                          if (selectedRazorpayChannel == 'upi') ...[
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: ['Google Pay', 'PhonePe', 'Paytm UPI', 'UPI ID / VPA', 'Scan QR'].map((upi) {
-                                final isUpiSelected = selectedUpiApp == upi;
-                                return GestureDetector(
-                                  onTap: () => setModalState(() => selectedUpiApp = upi),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: isUpiSelected ? _goldDark : Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: isUpiSelected ? _goldDark : _border),
-                                    ),
-                                    child: Text(
-                                      upi,
-                                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: isUpiSelected ? Colors.white : _textDark),
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            savedAddr.label,
+                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _textDark),
+                                          ),
+                                          if (isSelected)
+                                            const Icon(Icons.check_circle_rounded, color: _goldDark, size: 14),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        savedAddr.addr,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext),
+                                      ),
+                                    ],
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                          ] else if (selectedRazorpayChannel == 'card') ...[
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: _border)),
-                              child: Row(
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Input fields
+                        Text('Full Name', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: nameController,
+                          style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: 'e.g. John Doe',
+                            prefixIcon: const Icon(Icons.person_outline_rounded, color: _goldDark, size: 20),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Text('Delivery Address', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: addressController,
+                          style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: 'Street name, Apartment, Suite',
+                            prefixIcon: const Icon(Icons.location_on_outlined, color: _goldDark, size: 20),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.credit_card_rounded, color: _goldDark, size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Visa, Mastercard, RuPay, Amex & Diners Cards',
-                                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: _textDark),
+                                  Text('Phone Number', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: phoneController,
+                                    style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
+                                    decoration: InputDecoration(
+                                      hintText: '+91 98765 43210',
+                                      prefixIcon: const Icon(Icons.phone_outlined, color: _goldDark, size: 20),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ] else if (selectedRazorpayChannel == 'netbanking') ...[
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: ['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra'].map((bank) {
-                                final isBankSel = selectedBank == bank;
-                                return GestureDetector(
-                                  onTap: () => setModalState(() => selectedBank = bank),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: isBankSel ? _goldDark : Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: isBankSel ? _goldDark : _border),
-                                    ),
-                                    child: Text(
-                                      bank,
-                                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: isBankSel ? Colors.white : _textDark),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ] else if (selectedRazorpayChannel == 'wallet') ...[
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: ['Mobikwik Wallet', 'PayZapp Wallet', 'Airtel Money Wallet', 'Paytm Wallet'].map((w) {
-                                final isWSel = selectedWallet == w;
-                                return GestureDetector(
-                                  onTap: () => setModalState(() => selectedWallet = w),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: isWSel ? _goldDark : Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: isWSel ? _goldDark : _border),
-                                    ),
-                                    child: Text(
-                                      w,
-                                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: isWSel ? Colors.white : _textDark),
+                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: 120,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('PIN Code', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: pincodeController,
+                                    style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      hintText: '400001',
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
                                     ),
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 18),
-
-                  // Final Total Box
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _surfaceBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _gold.withAlpha(80)),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Items (${widget.cartItems.length}):', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
-                            Text('₹${_rawSubtotal.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 13, color: _textDark, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                        if (_discountAmount > 0) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Promo Discount ($_appliedCoupon):', style: GoogleFonts.outfit(fontSize: 13, color: _successGreen)),
-                              Text('-₹${_discountAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 13, color: _successGreen, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Shipping:', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
-                            Text('FREE', style: GoogleFonts.outfit(fontSize: 13, color: _successGreen, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const Divider(color: _border, height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Payable Amount:', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark)),
-                            Text(
-                              '₹${_finalTotal.toStringAsFixed(0)}',
-                              style: GoogleFonts.outfit(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: _goldDark,
+                                ],
                               ),
                             ),
                           ],
                         ),
+
+                        const SizedBox(height: 20),
+
+                        // ── SECTION B: DELIVERY SPEED & INSTRUCTIONS ─────────────────
+                        Text(
+                          '2. Delivery Speed & Preference',
+                          style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 10),
+
+                        Row(
+                          children: [
+                            (id: 'express', title: '⚡ Express Priority', subtitle: 'Tomorrow, 5 PM', fee: 'FREE'),
+                            (id: 'standard', title: '🚚 Standard Ground', subtitle: 'In 3-4 Business Days', fee: 'FREE'),
+                          ].map((speed) {
+                            final isSel = selectedDeliverySpeed == speed.id;
+                            return Expanded(
+                              child: GestureDetector(
+                                onTap: () => setModalState(() => selectedDeliverySpeed = speed.id),
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isSel ? _gold.withAlpha(20) : Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: isSel ? _goldDark : _border, width: isSel ? 1.5 : 1.0),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(speed.title, style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _textDark)),
+                                          Icon(isSel ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, size: 16, color: isSel ? _goldDark : _subtext),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(speed.subtitle, style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext)),
+                                      const SizedBox(height: 4),
+                                      Text(speed.fee, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _successGreen)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          children: ['🚪 Leave at Door', '📞 Call First', '🔔 Don\'t Ring Bell'].map((inst) {
+                            final isSel = selectedInstruction == inst;
+                            return ChoiceChip(
+                              label: Text(inst, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: isSel ? Colors.white : _textDark)),
+                              selected: isSel,
+                              selectedColor: _goldDark,
+                              backgroundColor: Colors.white,
+                              side: BorderSide(color: isSel ? _goldDark : _border),
+                              onSelected: (_) => setModalState(() => selectedInstruction = inst),
+                            );
+                          }).toList(),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── SECTION C: PAYMENT METHOD SELECTION ─────────────────────
+                        Text(
+                          '3. Select Payment Method',
+                          style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Payment Cards
+                        Column(
+                          children: [
+                            // 1. Razorpay
+                            GestureDetector(
+                              onTap: () => setModalState(() => selectedPayment = 'Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)'),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340).withAlpha(12) : Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340) : _border,
+                                    width: selectedPayment.contains('Razorpay') ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0C2340),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.bolt_rounded, color: Color(0xFFFFD700), size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text('Razorpay Online Payment', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                decoration: BoxDecoration(color: _successGreen, borderRadius: BorderRadius.circular(4)),
+                                                child: Text('OFFICIAL', style: GoogleFonts.outfit(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900)),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text('UPI, Cards, NetBanking & Wallets', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      selectedPayment.contains('Razorpay') ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                      color: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340) : _subtext,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // 2. VEXA Pay Wallet
+                            GestureDetector(
+                              onTap: () => setModalState(() => selectedPayment = 'VEXA Pay Wallet'),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: selectedPayment == 'VEXA Pay Wallet' ? _gold.withAlpha(20) : Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: selectedPayment == 'VEXA Pay Wallet' ? _goldDark : _border,
+                                    width: selectedPayment == 'VEXA Pay Wallet' ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: _goldDark,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text('VEXA Pay Wallet', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF10B981).withAlpha(25),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
+                                                ),
+                                                child: Text(
+                                                  '₹${WalletService.balance.toStringAsFixed(0)}',
+                                                  style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text('Available Balance: ₹${WalletService.balance.toStringAsFixed(0)} • Instant 1-Click Checkout', style: GoogleFonts.outfit(fontSize: 11, color: _subtext, fontWeight: FontWeight.w500)),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      selectedPayment == 'VEXA Pay Wallet' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                      color: selectedPayment == 'VEXA Pay Wallet' ? _goldDark : _subtext,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // 3. COD
+                            GestureDetector(
+                              onTap: () => setModalState(() => selectedPayment = 'Cash on Delivery'),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: selectedPayment == 'Cash on Delivery' ? Colors.white : Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: selectedPayment == 'Cash on Delivery' ? _textDark : _border,
+                                    width: selectedPayment == 'Cash on Delivery' ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: _textDark,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.payments_outlined, color: Colors.white, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Cash on Delivery (COD)', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                                          const SizedBox(height: 2),
+                                          Text('Pay in cash upon doorstep delivery', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      selectedPayment == 'Cash on Delivery' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                      color: selectedPayment == 'Cash on Delivery' ? _textDark : _subtext,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── SECTION D: ORDER BILL BREAKDOWN SUMMARY ───────────────────
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: _border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Order Bill Details', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                              const SizedBox(height: 10),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Items Subtotal (${widget.cartItems.length}):', style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext)),
+                                  Text('₹${_rawSubtotal.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 12.5, color: _textDark, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              if (_discountAmount > 0) ...[
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Promo Discount ($_appliedCoupon):', style: GoogleFonts.outfit(fontSize: 12.5, color: _successGreen)),
+                                    Text('-₹${_discountAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 12.5, color: _successGreen, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Delivery & Handing:', style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext)),
+                                  Text('FREE', style: GoogleFonts.outfit(fontSize: 12.5, color: _successGreen, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              const Divider(color: _border, height: 18),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Total Payable Amount:', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark)),
+                                  Text(
+                                    '₹${_finalTotal.toStringAsFixed(0)}',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w900,
+                                      color: _goldDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                ),
 
-                  // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340) : _goldDark,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: _isSubmittingOrder
-                          ? null
-                          : () {
-                              if (selectedPayment.contains('Razorpay')) {
-                                final subChoiceLabel = selectedRazorpayChannel == 'upi'
-                                    ? selectedUpiApp
-                                    : selectedRazorpayChannel == 'card'
-                                        ? 'Credit / Debit Card'
-                                        : selectedRazorpayChannel == 'netbanking'
-                                            ? selectedBank
-                                            : selectedWallet;
+                // ── 3. STICKY BOTTOM ACTION BAR ──────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x14000000), blurRadius: 12, offset: Offset(0, -3)),
+                    ],
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedPayment.contains('Razorpay') ? const Color(0xFF0C2340) : _goldDark,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: _isSubmittingOrder
+                            ? null
+                            : () {
+                                if (selectedPayment.contains('Razorpay')) {
+                                  // Launch Realtime Razorpay Gateway Flow
+                                  _showRazorpayGatewayModal(
+                                    amount: _finalTotal,
+                                    channel: 'upi',
+                                    subChoice: 'Razorpay Online (UPI/Cards/Netbanking)',
+                                    customerName: nameController.text,
+                                    customerPhone: phoneController.text,
+                                    onPaymentSuccess: (String methodLabel) async {
+                                      final orderItems = widget.cartItems.map((c) => OrderItem(
+                                        itemId: c.item.id,
+                                        name: c.item.name,
+                                        price: c.item.price,
+                                        quantity: c.quantity,
+                                        color: c.selectedColor,
+                                        size: c.selectedSize,
+                                        image: c.item.image,
+                                      )).toList();
 
-                                // Launch Realtime Razorpay Gateway Flow
-                                _showRazorpayGatewayModal(
-                                  amount: _finalTotal,
-                                  channel: selectedRazorpayChannel,
-                                  subChoice: subChoiceLabel,
-                                  customerName: nameController.text,
-                                  customerPhone: phoneController.text,
-                                  onPaymentSuccess: (String methodLabel) async {
+                                      final currentUser = await AuthService.getUser();
+                                      final placedOrder = await OrderService.createOrder(
+                                        customerName: nameController.text.isNotEmpty ? nameController.text : (currentUser?.name ?? 'Valued Customer'),
+                                        shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
+                                        phone: phoneController.text,
+                                        paymentMethod: methodLabel,
+                                        totalAmount: _finalTotal,
+                                        couponApplied: _appliedCoupon,
+                                        items: orderItems,
+                                        email: currentUser?.email,
+                                        context: mounted ? context : null,
+                                      );
+
+                                      if (!context.mounted) return;
+                                      setState(() {
+                                        widget.cartItems.clear();
+                                        _appliedCoupon = '';
+                                        _discountPercent = 0.0;
+                                      });
+                                      if (widget.onCartUpdated != null) widget.onCartUpdated!();
+
+                                      Navigator.pop(context);
+                                      _showOrderSuccessDialog(placedOrder);
+                                    },
+                                  );
+                                } else {
+                                  // Standard Wallet / COD flow
+                                  setModalState(() {
+                                    _isSubmittingOrder = true;
+                                  });
+
+                                  Future.microtask(() async {
                                     final orderItems = widget.cartItems.map((c) => OrderItem(
                                       itemId: c.item.id,
                                       name: c.item.name,
@@ -771,22 +863,19 @@ class _CartScreenState extends State<CartScreen> {
                                       image: c.item.image,
                                     )).toList();
 
-
-                                   final currentUser = await AuthService.getUser();
-                                   final placedOrder = await OrderService.createOrder(
-                                     customerName: nameController.text.isNotEmpty ? nameController.text : (currentUser?.name ?? 'Valued Customer'),
-                                     shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
-                                     phone: phoneController.text,
-                                     paymentMethod: methodLabel,
-                                     totalAmount: _finalTotal,
-                                     couponApplied: _appliedCoupon,
-                                     items: orderItems,
-                                     email: currentUser?.email,
-                                     context: mounted ? context : null,
-                                   );
+                                    final placedOrder = await OrderService.createOrder(
+                                      customerName: nameController.text,
+                                      shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
+                                      phone: phoneController.text,
+                                      paymentMethod: selectedPayment,
+                                      totalAmount: _finalTotal,
+                                      couponApplied: _appliedCoupon,
+                                      items: orderItems,
+                                    );
 
                                     if (!context.mounted) return;
                                     setState(() {
+                                      _isSubmittingOrder = false;
                                       widget.cartItems.clear();
                                       _appliedCoupon = '';
                                       _discountPercent = 0.0;
@@ -795,77 +884,37 @@ class _CartScreenState extends State<CartScreen> {
 
                                     Navigator.pop(context);
                                     _showOrderSuccessDialog(placedOrder);
-                                  },
-                                );
-                              } else {
-                                // Standard Wallet / COD flow
-                                setModalState(() {
-                                  _isSubmittingOrder = true;
-                                });
-
-                                Future.microtask(() async {
-                                  final orderItems = widget.cartItems.map((c) => OrderItem(
-                                    itemId: c.item.id,
-                                    name: c.item.name,
-                                    price: c.item.price,
-                                    quantity: c.quantity,
-                                    color: c.selectedColor,
-                                    size: c.selectedSize,
-                                    image: c.item.image,
-                                  )).toList();
-
-                                  final placedOrder = await OrderService.createOrder(
-                                    customerName: nameController.text,
-                                    shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
-                                    phone: phoneController.text,
-                                    paymentMethod: selectedPayment,
-                                    totalAmount: _finalTotal,
-                                    couponApplied: _appliedCoupon,
-                                    items: orderItems,
-                                  );
-
-                                  if (!context.mounted) return;
-                                  setState(() {
-                                    _isSubmittingOrder = false;
-                                    widget.cartItems.clear();
-                                    _appliedCoupon = '';
-                                    _discountPercent = 0.0;
                                   });
-                                  if (widget.onCartUpdated != null) widget.onCartUpdated!();
-
-                                  Navigator.pop(context);
-                                  _showOrderSuccessDialog(placedOrder);
-                                });
-                              }
-                            },
-                      child: _isSubmittingOrder
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  selectedPayment.contains('Razorpay') ? Icons.bolt_rounded : Icons.lock_outline_rounded,
-                                  color: selectedPayment.contains('Razorpay') ? const Color(0xFFFFD700) : Colors.white,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  selectedPayment.contains('Razorpay')
-                                      ? 'PAY VIA RAZORPAY • ₹${_finalTotal.toStringAsFixed(0)}'
-                                      : 'PLACE ORDER • ₹${_finalTotal.toStringAsFixed(0)}',
-                                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Colors.white),
-                                ),
-                              ],
-                            ),
+                                }
+                              },
+                        child: _isSubmittingOrder
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    selectedPayment.contains('Razorpay') ? Icons.bolt_rounded : Icons.lock_outline_rounded,
+                                    color: selectedPayment.contains('Razorpay') ? const Color(0xFFFFD700) : Colors.white,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    selectedPayment.contains('Razorpay')
+                                        ? 'PAY VIA RAZORPAY • ₹${_finalTotal.toStringAsFixed(0)}'
+                                        : 'PLACE ORDER • ₹${_finalTotal.toStringAsFixed(0)}',
+                                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         },
@@ -1800,7 +1849,7 @@ class _CartScreenState extends State<CartScreen> {
       },
     ),
   );
-  }
+}
 
   Widget _buildMiniAppBadge(String label, Color bg) {
     return Container(

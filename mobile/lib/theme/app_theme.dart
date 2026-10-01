@@ -16,6 +16,7 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      splashFactory: InkRipple.splashFactory,
       brightness: Brightness.light,
       scaffoldBackgroundColor: backgroundColor,
       primaryColor: primaryColor,

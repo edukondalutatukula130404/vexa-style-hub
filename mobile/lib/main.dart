@@ -32,6 +32,7 @@ class VexaMobileApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,
+      scrollBehavior: const ScrollBehavior().copyWith(overscroll: false),
       initialRoute: '/splash',
       builder: (context, child) {
         return ConnectivityWrapper(

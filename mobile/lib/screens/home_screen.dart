@@ -360,22 +360,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _handleBannerTap(String cta) {
-    if (cta.toLowerCase().contains('custom')) {
-      _showCustomTeeBottomSheet();
-    } else {
-      _navigateToScreen(
-        AllProductsScreen(
-          items: _items,
-          onAddToCart: (item, color, size, qty) => _addToCart(item, color, size, qty),
-          favoriteIds: _favoriteIds,
-          onToggleFavorite: (id) => setState(() => _favoriteIds.contains(id) ? _favoriteIds.remove(id) : _favoriteIds.add(id)),
-          cartItems: _cartItems,
-          onOpenCart: _openCartScreen,
-        ),
-      );
-    }
+    // Banners are purely for display/showcase - do not open any screens on click
+    return;
   }
 
+  // ignore: unused_element
   void _showCustomTeeBottomSheet() {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
@@ -754,7 +743,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } else if (hour >= 12 && hour < 17) {
       return (
         wish: 'Good Afternoon 🌤️',
-        subtitle: 'Elevate your mid-day style & exclusive fits',
+        subtitle: '',
       );
     } else if (hour >= 17 && hour < 22) {
       return (
@@ -818,17 +807,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               letterSpacing: 1,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            wish.subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.outfit(
-              fontSize: 12.5,
-              color: _subtext,
-              fontWeight: FontWeight.w500,
+          if (wish.subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              wish.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                color: _subtext,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

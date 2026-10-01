@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // ── HERO TOP HEADER REGION ──────────────────────────────────────
             Container(
               width: double.infinity,
-              height: 270 + topPadding,
+              height: 320 + topPadding,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -257,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
             // ── BOTTOM ROUNDED SHEET CONTAINER ──────────────────────────────
             Transform.translate(
-              offset: const Offset(0, -24),
+              offset: const Offset(0, 12),
               child: Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(

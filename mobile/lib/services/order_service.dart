@@ -40,6 +40,7 @@ class OrderItem {
   }
 
   Map<String, dynamic> toJson() => {
+        'id': itemId,
         'itemId': itemId,
         'name': name,
         'price': price,
@@ -55,7 +56,7 @@ class OrderModel {
   final String customerName;
   final String shippingAddress;
   final String phone;
-  final String paymentMethod;
+  String paymentMethod;
   final double totalAmount;
   final String couponApplied;
   String status;
@@ -229,7 +230,7 @@ class OrderService {
       shippingAddress: 'Flat 402, Royal Residency, Indiranagar, Bengaluru - 560038',
       phone: '+91 98765 43210',
       paymentMethod: 'Razorpay UPI (GPay)',
-      totalAmount: 3798.0,
+      totalAmount: 1899.0,
       status: 'Processing',
       createdAt: DateTime.now().subtract(const Duration(hours: 3)),
       items: [
@@ -241,15 +242,6 @@ class OrderService {
           color: 'Obsidian Black',
           size: 'M',
           image: 'assets/images/tee-black.jpg',
-        ),
-        OrderItem(
-          itemId: 'vx-02',
-          name: 'Ivory Minimalist Heavyweight Tee',
-          price: 1899.0,
-          quantity: 1,
-          color: 'Ivory White',
-          size: 'L',
-          image: 'assets/images/tee-white.jpg',
         ),
       ],
     ),
@@ -389,7 +381,7 @@ class OrderService {
           final List serverData = body['data'];
           final serverOrders = serverData.map((j) => OrderModel.fromJson(j)).toList();
 
-          // Merge server orders with local in-memory orders, matching strictly by ID
+          // Merge server orders with local in-memory orders, matching strictly by clean ID
           final Map<String, OrderModel> merged = {};
           for (var o in _inMemoryOrders) {
             final oClean = o.id.replaceAll('#', '').toLowerCase().trim();
@@ -397,7 +389,7 @@ class OrderService {
               o.status = 'Cancelled';
               o.cancelReason = _cancelledOrderReasons[oClean] ?? _cancelledOrderReasons[o.id];
             }
-            merged[o.id] = o;
+            merged[oClean] = o;
           }
 
           for (var s in serverOrders) {
@@ -409,31 +401,34 @@ class OrderService {
               s.cancelReason = _cancelledOrderReasons[sClean] ?? _cancelledOrderReasons[s.id] ?? 'Cancelled by customer';
             }
 
-            bool matchedInMemory = false;
-            for (var mem in _inMemoryOrders) {
-              final memClean = mem.id.replaceAll('#', '').toLowerCase().trim();
-              if (mem.id == s.id ||
-                  memClean == sClean ||
-                  (sClean.length >= 4 && sClean == memClean)) {
-                if (mem.status.toLowerCase() == 'cancelled' || isLocallyCancelled) {
-                  s.status = 'Cancelled';
-                  mem.status = 'Cancelled';
-                  if (mem.cancelReason != null && mem.cancelReason!.isNotEmpty) {
-                    s.cancelReason = mem.cancelReason;
-                  }
-                  merged[mem.id] = mem;
-                } else {
-                  mem.status = s.status;
-                  if (s.cancelReason != null && s.cancelReason!.isNotEmpty) {
-                    mem.cancelReason = s.cancelReason;
-                  }
-                  merged[mem.id] = s;
-                }
-                matchedInMemory = true;
+            String? matchedKey;
+            for (var key in merged.keys) {
+              if (key == sClean ||
+                  (sClean.length >= 4 && key.contains(sClean)) ||
+                  (key.length >= 4 && sClean.contains(key))) {
+                matchedKey = key;
+                break;
               }
             }
-            if (!matchedInMemory) {
-              merged[s.id] = s;
+
+            if (matchedKey != null) {
+              final existing = merged[matchedKey]!;
+              if (existing.status.toLowerCase() == 'cancelled' || isLocallyCancelled) {
+                s.status = 'Cancelled';
+                existing.status = 'Cancelled';
+                if (existing.cancelReason != null && existing.cancelReason!.isNotEmpty) {
+                  s.cancelReason = existing.cancelReason;
+                }
+                merged[matchedKey] = existing;
+              } else {
+                existing.status = s.status;
+                if (s.cancelReason != null && s.cancelReason!.isNotEmpty) {
+                  existing.cancelReason = s.cancelReason;
+                }
+                merged[matchedKey] = s;
+              }
+            } else {
+              merged[sClean] = s;
             }
           }
 
@@ -490,7 +485,9 @@ class OrderService {
       items: items,
     );
 
-    // 1. Save to local in-memory list immediately
+    // 1. Save to local in-memory list immediately (deduplicating by clean ID)
+    final cleanNewId = orderId.replaceAll('#', '').toLowerCase().trim();
+    _inMemoryOrders.removeWhere((o) => o.id.replaceAll('#', '').toLowerCase().trim() == cleanNewId);
     _inMemoryOrders.insert(0, newOrder);
 
     // 2. Add notification and notify all listening UI components

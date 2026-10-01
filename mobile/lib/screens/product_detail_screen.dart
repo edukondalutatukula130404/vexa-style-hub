@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/share_product_modal.dart';
 import '../widgets/vexa_feedback_snackbar.dart';
+import 'login_screen.dart';
 
 class _ReviewItem {
   final String id;
@@ -61,6 +63,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _showAllReviews = false;
 
   late PageController _pageController;
+  late TransformationController _transformationController;
+  TapDownDetails? _doubleTapDetails;
   int _activePageIndex = 0;
 
   final List<String> _availableSizes = ['S', 'M', 'L', 'XL'];
@@ -74,6 +78,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    _transformationController = TransformationController();
     _selectedColor = widget.item.colors.isNotEmpty ? widget.item.colors.first : widget.item.color;
     _currentDisplayImage = widget.item.image;
     _isFavorite = widget.favoriteIds?.contains(widget.item.id) ?? false;
@@ -124,8 +129,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _transformationController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleDoubleTap() {
+    if (_transformationController.value.getMaxScaleOnAxis() > 1.1) {
+      _transformationController.value = Matrix4.identity();
+    } else {
+      final position = _doubleTapDetails?.localPosition ?? const Offset(200, 200);
+      const double scale = 2.5;
+      final x = -position.dx * (scale - 1);
+      final y = -position.dy * (scale - 1);
+      _transformationController.value = Matrix4.identity()
+        // ignore: deprecated_member_use
+        ..translate(x, y)
+        // ignore: deprecated_member_use
+        ..scale(scale);
+    }
   }
 
   List<Map<String, dynamic>> get _gallerySlides {
@@ -216,9 +238,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   double get _averageRating {
-    if (_reviews.isEmpty) return 4.5;
+    if (_reviews.length == 4) {
+      return widget.item.rating;
+    }
     final total = _reviews.fold<double>(0, (sum, item) => sum + item.rating);
     return total / _reviews.length;
+  }
+
+  int get _effectiveReviewsCount {
+    return widget.item.reviewsCount + (_reviews.length - 4);
   }
 
 
@@ -434,11 +462,60 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  double _getSizePrice(String size) {
+    final basePrice = widget.item.price;
+    switch (size.toUpperCase()) {
+      case 'S':
+        return (basePrice - 50).clamp(1.0, double.infinity);
+      case 'M':
+        return basePrice;
+      case 'L':
+        return basePrice + 100;
+      case 'XL':
+        return basePrice + 200;
+      case 'XXL':
+        return basePrice + 300;
+      default:
+        return basePrice;
+    }
+  }
+
+  double? _getSizeOldPrice(String size) {
+    if (widget.item.oldPrice == null) return null;
+    final baseOldPrice = widget.item.oldPrice!;
+    switch (size.toUpperCase()) {
+      case 'S':
+        return (baseOldPrice - 50).clamp(1.0, double.infinity);
+      case 'M':
+        return baseOldPrice;
+      case 'L':
+        return baseOldPrice + 100;
+      case 'XL':
+        return baseOldPrice + 200;
+      case 'XXL':
+        return baseOldPrice + 300;
+      default:
+        return baseOldPrice;
+    }
+  }
+
+  double get _currentPrice => _getSizePrice(_selectedSize);
+  double? get _currentOldPrice => _getSizeOldPrice(_selectedSize);
+
+  int get _currentDiscountPercent {
+    final curPrice = _currentPrice;
+    final curOld = _currentOldPrice;
+    if (curOld != null && curOld > curPrice) {
+      return (((curOld - curPrice) / curOld) * 100).round();
+    }
+    return 25;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final discountPercent = widget.item.oldPrice != null && widget.item.oldPrice! > widget.item.price
-        ? (((widget.item.oldPrice! - widget.item.price) / widget.item.oldPrice!) * 100).round()
-        : 25;
+    final curPrice = _currentPrice;
+    final curOldPrice = _currentOldPrice;
+    final discountPercent = _currentDiscountPercent;
 
     // Filter similar products (exclude current product)
     final similarItemsList = _catalogItems.where((i) => i.id != widget.item.id).toList();
@@ -473,6 +550,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             onPageChanged: (index) {
                               setState(() {
                                 _activePageIndex = index;
+                                _transformationController.value = Matrix4.identity();
                               });
                             },
                             itemCount: slides.length,
@@ -481,15 +559,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               final type = slide['type'] as String;
                               final imgPath = slide['image'] as String;
 
-                              Widget imageWidget = InteractiveViewer(
-                                minScale: 1.0,
-                                maxScale: 4.5,
-                                clipBehavior: Clip.none,
-                                child: _buildProductImage(
-                                  imgPath,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
+                              Widget imageWidget = GestureDetector(
+                                onDoubleTapDown: (details) {
+                                  _doubleTapDetails = details;
+                                },
+                                onDoubleTap: _handleDoubleTap,
+                                child: InteractiveViewer(
+                                  transformationController: _transformationController,
+                                  minScale: 1.0,
+                                  maxScale: 4.5,
+                                  clipBehavior: Clip.none,
+                                  child: _buildProductImage(
+                                    imgPath,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               );
 
@@ -709,7 +794,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '${_reviews.length * 42}',
+                                    '$_effectiveReviewsCount',
                                     style: GoogleFonts.outfit(
                                       color: Colors.grey.shade700,
                                       fontSize: 12,
@@ -785,7 +870,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             textBaseline: TextBaseline.alphabetic,
                             children: [
                               Text(
-                                '₹${widget.item.price.toStringAsFixed(0)}',
+                                '₹${curPrice.toStringAsFixed(0)}',
                                 style: GoogleFonts.outfit(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
@@ -793,9 +878,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              if (widget.item.oldPrice != null) ...[
+                              if (curOldPrice != null) ...[
                                 Text(
-                                  '₹${widget.item.oldPrice!.toStringAsFixed(0)}',
+                                  '₹${curOldPrice.toStringAsFixed(0)}',
                                   style: GoogleFonts.outfit(
                                     fontSize: 15,
                                     color: AppTheme.subtextColor,
@@ -1063,15 +1148,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             const SizedBox(height: 14),
 
                             SizedBox(
-                              height: 230,
+                              height: 270,
                               child: ListView.builder(
                                 scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
                                 itemCount: similarItemsList.length,
                                 itemBuilder: (context, index) {
                                   final simItem = similarItemsList[index];
                                   final simDiscount = simItem.oldPrice != null && simItem.oldPrice! > simItem.price
                                       ? (((simItem.oldPrice! - simItem.price) / simItem.oldPrice!) * 100).round()
-                                      : 20;
+                                      : 25;
+                                  final isSimFav = widget.favoriteIds?.contains(simItem.id) ?? false;
 
                                   return GestureDetector(
                                     onTap: () {
@@ -1091,66 +1178,159 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       );
                                     },
                                     child: Container(
-                                      width: 145,
-                                      margin: const EdgeInsets.only(right: 14),
+                                      width: 165,
+                                      margin: const EdgeInsets.only(right: 16),
                                       decoration: BoxDecoration(
                                         color: AppTheme.cardColor,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: const Color(0xFF2D2D3A)),
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(color: const Color(0xFF2E2E3E), width: 1.2),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withAlpha(50),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
                                       ),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          // Similar Item Image
-                                          ClipRRect(
-                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                                            child: SizedBox(
-                                              height: 125,
-                                              width: double.infinity,
-                                              child: _buildProductImage(
-                                                simItem.image,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.all(10),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  simItem.name,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppTheme.textColor,
+                                          // Similar Item Image with Badge Overlay
+                                          Stack(
+                                            children: [
+                                              ClipRRect(
+                                                borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+                                                child: SizedBox(
+                                                  height: 155,
+                                                  width: double.infinity,
+                                                  child: _buildProductImage(
+                                                    simItem.image,
+                                                    fit: BoxFit.cover,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 4),
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      '₹${simItem.price.toStringAsFixed(0)}',
-                                                      style: GoogleFonts.outfit(
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w800,
-                                                        color: AppTheme.accentColor,
-                                                      ),
+                                              ),
+                                              // Top-Left Discount Badge Pill
+                                              Positioned(
+                                                top: 8,
+                                                left: 8,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme.primaryColor,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    '$simDiscount% OFF',
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: Colors.white,
                                                     ),
-                                                    const SizedBox(width: 6),
-                                                    Text(
-                                                      '$simDiscount% OFF',
-                                                      style: GoogleFonts.outfit(
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Colors.greenAccent,
-                                                      ),
-                                                    ),
-                                                  ],
+                                                  ),
                                                 ),
-                                              ],
+                                              ),
+                                              // Top-Right Favorite Button
+                                              if (widget.onToggleFavorite != null)
+                                                Positioned(
+                                                  top: 6,
+                                                  right: 6,
+                                                  child: GestureDetector(
+                                                    onTap: () {
+                                                      widget.onToggleFavorite!(simItem.id);
+                                                    },
+                                                    child: Container(
+                                                      width: 28,
+                                                      height: 28,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.black.withAlpha(140),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Icon(
+                                                        isSimFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                                        color: isSimFav ? Colors.redAccent : Colors.white,
+                                                        size: 15,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          // Product Details Section
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(10),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        simItem.category.toUpperCase(),
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 9.5,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: AppTheme.primaryColor,
+                                                          letterSpacing: 0.5,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        simItem.name,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: AppTheme.textColor,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                                    children: [
+                                                      Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          if (simItem.oldPrice != null)
+                                                            Text(
+                                                              '₹${simItem.oldPrice!.toStringAsFixed(0)}',
+                                                              style: GoogleFonts.outfit(
+                                                                fontSize: 11,
+                                                                color: AppTheme.subtextColor,
+                                                                decoration: TextDecoration.lineThrough,
+                                                              ),
+                                                            ),
+                                                          Text(
+                                                            '₹${simItem.price.toStringAsFixed(0)}',
+                                                            style: GoogleFonts.outfit(
+                                                              fontSize: 15,
+                                                              fontWeight: FontWeight.w900,
+                                                              color: AppTheme.textColor,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      Container(
+                                                        width: 28,
+                                                        height: 28,
+                                                        decoration: BoxDecoration(
+                                                          color: AppTheme.primaryColor.withAlpha(35),
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        child: const Icon(
+                                                          Icons.arrow_forward_rounded,
+                                                          color: AppTheme.primaryColor,
+                                                          size: 15,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1239,7 +1419,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            '${_reviews.length} ratings',
+                                            '$_effectiveReviewsCount ratings',
                                             style: GoogleFonts.outfit(
                                               fontSize: 11,
                                               color: AppTheme.subtextColor,
@@ -1573,8 +1753,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                               ),
                               onPressed: () {
+                                final sizedItem = widget.item.copyWith(
+                                  price: _currentPrice,
+                                  oldPrice: _currentOldPrice,
+                                );
                                 if (widget.onAddToCart != null) {
-                                  widget.onAddToCart!(widget.item, _selectedColor, _selectedSize, _quantity);
+                                  widget.onAddToCart!(sizedItem, _selectedColor, _selectedSize, _quantity);
                                 }
                                 VexaFeedback.showAddToCartSuccess(
                                   context,
@@ -1606,12 +1790,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              onPressed: () {
-                                if (widget.onBuyNow != null) {
-                                  widget.onBuyNow!(widget.item, _selectedColor, _selectedSize, _quantity);
-                                } else if (widget.onAddToCart != null) {
-                                  widget.onAddToCart!(widget.item, _selectedColor, _selectedSize, _quantity);
+                              onPressed: () async {
+                                final user = await AuthService.getUser();
+                                final isGuest = user == null || user.id == 'guest_user';
+
+                                if (isGuest) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Please sign in to proceed with your purchase.',
+                                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                                      ),
+                                      backgroundColor: AppTheme.primaryColor,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                  );
+                                  return;
                                 }
+
+                                final sizedItem = widget.item.copyWith(
+                                  price: _currentPrice,
+                                  oldPrice: _currentOldPrice,
+                                );
+                                if (widget.onBuyNow != null) {
+                                  widget.onBuyNow!(sizedItem, _selectedColor, _selectedSize, _quantity);
+                                } else if (widget.onAddToCart != null) {
+                                  widget.onAddToCart!(sizedItem, _selectedColor, _selectedSize, _quantity);
+                                }
+                                if (!context.mounted) return;
                                 Navigator.pop(context);
                                 if (widget.onOpenCart != null) {
                                   widget.onOpenCart!();

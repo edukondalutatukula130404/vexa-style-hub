@@ -109,6 +109,35 @@ class OrderModel {
     return '$day $month $year, $hour:$minute $ampm';
   }
 
+  bool get isPaid {
+    final pm = paymentMethod.toLowerCase();
+    final st = status.toLowerCase();
+    if (OrderService.isOrderPaidLocally(id)) return true;
+    if (st == 'delivered' || st == 'paid') return true;
+
+    // Cash on Delivery is NOT paid until delivered or locally paid
+    if (pm.contains('cash') || pm.contains('cod') || pm.contains('delivery')) {
+      return false;
+    }
+
+    if (pm.contains('razorpay') ||
+        pm.contains('online') ||
+        pm.contains('wallet') ||
+        pm.contains('card') ||
+        pm.contains('upi') ||
+        pm.contains('netbanking') ||
+        pm == 'paid') {
+      return true;
+    }
+    if (st == 'confirmed' ||
+        st == 'processing' ||
+        st == 'shipped' ||
+        st == 'out for delivery') {
+      return true;
+    }
+    return false;
+  }
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     List<OrderItem> itemsList = [];
     if (json['items'] is List) {
@@ -153,6 +182,7 @@ class OrderService {
 
   /// Track locally cancelled order IDs and reasons to prevent server syncs from overwriting cancelled status
   static final Map<String, String> _cancelledOrderReasons = {};
+  static final Set<String> _paidOrderIds = {};
 
   static void notifyOrdersChanged() {
     ordersChangeNotifier.value++;
@@ -175,14 +205,27 @@ class OrderService {
     return _cancelledOrderReasons.containsKey(clean) || _cancelledOrderReasons.containsKey(orderId);
   }
 
+  /// Check if an order ID has been paid locally
+  static bool isOrderPaidLocally(String orderId) {
+    final clean = orderId.replaceAll('#', '').toLowerCase().trim();
+    return _paidOrderIds.contains(clean) || _paidOrderIds.contains(orderId);
+  }
+
   /// Update order status locally in memory and notify listeners
   static void updateOrderStatusLocally(
     String orderId,
     String newStatus, {
+    String? paymentMethod,
     String? cancelReason,
     BuildContext? context,
   }) {
     final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+
+    final stLower = newStatus.toLowerCase();
+    if (stLower == 'confirmed' || stLower == 'paid' || (paymentMethod != null && paymentMethod.isNotEmpty && !paymentMethod.toLowerCase().contains('cod') && !paymentMethod.toLowerCase().contains('cash'))) {
+      _paidOrderIds.add(cleanTarget);
+      _paidOrderIds.add(orderId);
+    }
 
     if (newStatus.toLowerCase() == 'cancelled') {
       final reasonStr = (cancelReason != null && cancelReason.isNotEmpty)
@@ -201,6 +244,9 @@ class OrderService {
           cleanOrd.endsWith(cleanTarget) ||
           cleanTarget.endsWith(cleanOrd)) {
         order.status = newStatus;
+        if (paymentMethod != null && paymentMethod.isNotEmpty) {
+          order.paymentMethod = paymentMethod;
+        }
         if (cancelReason != null && cancelReason.isNotEmpty) {
           order.cancelReason = cancelReason;
         }

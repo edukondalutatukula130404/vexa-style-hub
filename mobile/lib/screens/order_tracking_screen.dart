@@ -3,15 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/order_service.dart';
 import '../services/websocket_service.dart';
-
-
-const Color _gold = Color(0xFFB8860B);
-const Color _goldDark = Color(0xFF8B6508);
-const Color _surfaceBg = Color(0xFFF1F5F9);
-const Color _bgColor = Color(0xFFFAFAFC);
-const Color _subtext = Color(0xFF64748B);
-const Color _border = Color(0xFFE2E8F0);
-const Color _textDark = Color(0xFF0F172A);
+import 'customer_support_screen.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final OrderModel order;
@@ -22,27 +14,15 @@ class OrderTrackingScreen extends StatefulWidget {
   State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
 }
 
-class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTickerProviderStateMixin {
+class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   late OrderModel _currentOrder;
   StreamSubscription? _wsSub;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
     _currentOrder = widget.order;
 
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.25).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    // Subscribe to live WebSocket events to update tracking status in real time
     _wsSub = VexaWebSocketService().stream.listen((event) {
       if (mounted) {
         final type = event['type'];
@@ -70,7 +50,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
   @override
   void dispose() {
     _wsSub?.cancel();
-    _pulseController.dispose();
     super.dispose();
   }
 
@@ -81,680 +60,344 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
     if (status.contains('out for delivery') || status.contains('courier')) return 3;
     if (status.contains('ship') || status.contains('transit')) return 2;
     if (status.contains('qc') || status.contains('prep') || status.contains('process')) return 1;
-    return 0; // Order Placed
+    return 0;
   }
 
-  String get _expectedDeliveryText {
-    final status = _currentOrder.status.toLowerCase();
-    if (status.contains('cancel')) return 'Order Cancelled';
-    if (status.contains('deliver')) return 'Delivered on ${_currentOrder.formattedDate}';
-    if (status.contains('out for delivery')) return 'Arriving Today by 6:00 PM';
-    if (status.contains('ship') || status.contains('transit')) return 'Expected Tomorrow by 2:00 PM';
-    return 'Expected in 2–3 Business Days';
+  String _formatDateShort(DateTime dt) {
+    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final dayName = dayNames[dt.weekday - 1];
+    final day = dt.day;
+    final suffix = (day == 1 || day == 21 || day == 31)
+        ? 'st'
+        : (day == 2 || day == 22)
+            ? 'nd'
+            : (day == 3 || day == 23)
+                ? 'rd'
+                : 'th';
+    final month = monthNames[dt.month - 1];
+    final yearShort = dt.year.toString().substring(2);
+    return '$dayName, $day$suffix $month \'$yearShort';
+  }
+
+  String _formatDateTimeShort(DateTime dt) {
+    final datePart = _formatDateShort(dt);
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    return '$datePart - $hour:$minute$ampm';
+  }
+
+  String get _destinationCity {
+    final addr = _currentOrder.shippingAddress.toLowerCase();
+    if (addr.contains('hyderabad')) return 'HYDERABAD';
+    if (addr.contains('mumbai')) return 'MUMBAI';
+    if (addr.contains('bengaluru') || addr.contains('bangalore')) return 'BENGALURU';
+    if (addr.contains('delhi')) return 'DELHI';
+    if (addr.contains('chennai')) return 'CHENNAI';
+    if (addr.contains('pune')) return 'PUNE';
+    return 'HYDERABAD';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isCancelled = _currentOrder.status.toLowerCase().contains('cancel');
-    final stepIdx = _currentStepIndex;
-
     return Scaffold(
-      backgroundColor: _bgColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 1,
-        shadowColor: Colors.black.withAlpha(15),
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.black87, size: 26),
           onPressed: () => Navigator.pop(context),
         ),
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTimelineView(),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF10B981)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CustomerSupportScreen(order: _currentOrder)),
+                );
+              },
+              icon: const Icon(Icons.headset_mic_outlined, color: Color(0xFF10B981), size: 18),
+              label: Text(
+                'Customer Support',
+                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimelineView() {
+    final stepIdx = _currentStepIndex;
+    final isCancelled = _currentOrder.status.toLowerCase().contains('cancel');
+
+    final baseDate = _currentOrder.createdAt;
+    final waybillNo = 'VX-EXPRESS-${_currentOrder.id.replaceAll('#', '').replaceAll('-', '').toUpperCase()}657034';
+    final city = _destinationCity;
+
+    final confirmedDateStr = _formatDateShort(baseDate);
+    final shippedDateStr = _formatDateShort(baseDate.add(const Duration(days: 1)));
+    final expectedDeliveryDateStr = _formatDateShort(baseDate.add(const Duration(days: 3)));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── 1. ORDER CONFIRMED NODE ──────────────────────────────────────────
+        _buildTimelineNode(
+          isDone: stepIdx >= 0 && !isCancelled,
+          showLineBelow: true,
+          lineIsDone: stepIdx >= 1 && !isCancelled,
+          title: 'Order Confirmed',
+          titleDate: confirmedDateStr,
           children: [
-            Row(
-              children: [
-                Text(
-                  'TRACK ORDER ${_currentOrder.id}',
-                  style: GoogleFonts.cinzel(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                    color: _textDark,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                ScaleTransition(
-                  scale: _pulseAnimation,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: isCancelled ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: (isCancelled ? const Color(0xFFEF4444) : const Color(0xFF10B981)).withAlpha(140),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+            _buildSubDetailItem(
+              title: 'Your Order has been placed.',
+              subtitle: _formatDateTimeShort(baseDate),
+            ),
+            const SizedBox(height: 12),
+            _buildSubDetailItem(
+              title: 'VEXA Brand Studio has processed your order.',
+              subtitle: _formatDateTimeShort(baseDate.add(const Duration(hours: 4))),
+            ),
+            const SizedBox(height: 12),
+            _buildSubDetailItem(
+              title: 'Your item has been picked up by VEXA delivery partner.',
+              subtitle: _formatDateTimeShort(baseDate.add(const Duration(hours: 12))),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 14),
+
+        // ── 2. SHIPPED NODE ──────────────────────────────────────────────────
+        _buildTimelineNode(
+          isDone: stepIdx >= 2 && !isCancelled,
+          showLineBelow: true,
+          lineIsDone: stepIdx >= 3 && !isCancelled,
+          title: 'Shipped',
+          titleDate: shippedDateStr,
+          children: [
+            Text(
+              'VEXA Express Logistics - $waybillNo',
+              style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Your luxury garment has been shipped.',
+              style: GoogleFonts.outfit(fontSize: 12.5, color: const Color(0xFF64748B)),
             ),
             Text(
-              'Real-Time Express Logistics Sync',
-              style: GoogleFonts.outfit(fontSize: 10, color: _subtext),
+              _formatDateTimeShort(baseDate.add(const Duration(days: 1, hours: 1))),
+              style: GoogleFonts.outfit(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 14),
+
+            // Nested VEXA Facility Movement Updates
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSubDetailItem(
+                    title: 'Your item has arrived at VEXA Central Hub',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 1, hours: 1)))} - BENGALURU',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSubDetailItem(
+                    title: 'Your item passed 240 GSM Quality Check',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 1, hours: 3)))} - BENGALURU',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSubDetailItem(
+                    title: 'Your item has left VEXA Central Hub',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 1, hours: 11)))} - BENGALURU',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSubDetailItem(
+                    title: 'Your item has arrived at VEXA Sorting Hub',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 2, hours: 17)))} - $city',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSubDetailItem(
+                    title: 'Your item has left VEXA Sorting Hub',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 3, hours: 2)))} - $city',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSubDetailItem(
+                    title: 'Your item has arrived at VEXA Express Facility',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 3, hours: 7)))} - $city',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSubDetailItem(
+                    title: 'Your item has departed VEXA Express Facility',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 3, hours: 11)))} - $city',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSubDetailItem(
+                    title: 'Your item has arrived at Local VEXA Hub',
+                    subtitle: '${_formatDateTimeShort(baseDate.add(const Duration(days: 3, hours: 14)))} - $city',
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+            Text(
+              'Item yet to reach doorstep delivery agent.',
+              style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w500, color: const Color(0xFF475569)),
             ),
           ],
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+
+        const SizedBox(height: 14),
+
+        // ── 3. OUT FOR DELIVERY NODE ─────────────────────────────────────────
+        _buildTimelineNode(
+          isDone: stepIdx >= 3 && !isCancelled,
+          showLineBelow: true,
+          lineIsDone: stepIdx >= 4 && !isCancelled,
+          title: 'Out For Delivery',
+          titleDate: '',
           children: [
-            // 1. REALTIME MAP & SHIPMENT OVERVIEW CARD
-            _buildRealtimeMapCard(isCancelled, stepIdx),
-
-            const SizedBox(height: 18),
-
-            // 2. COURIER AGENT & OTP VERIFICATION CARD (Only if active & not cancelled)
-            if (!isCancelled && stepIdx >= 2) ...[
-              _buildDeliveryAgentCard(),
-              const SizedBox(height: 18),
-            ],
-
-            // 3. 5-STEP INTERACTIVE TIMELINE
-            _buildInteractiveTimeline(isCancelled, stepIdx),
-
-            const SizedBox(height: 18),
-
-            // 4. SHIPPING RECIPIENT CARD
-            _buildShippingAddressCard(),
-
-            const SizedBox(height: 18),
-
-            // 5. PACKAGED ITEMS PREVIEW
-            _buildPackageItemsCard(),
-
-            const SizedBox(height: 24),
+            Text(
+              stepIdx >= 3 ? 'VEXA priority courier agent out for doorstep delivery.' : 'Item yet to be delivered.',
+              style: GoogleFonts.outfit(fontSize: 12.5, color: const Color(0xFF64748B)),
+            ),
           ],
         ),
-      ),
-    );
-  }
 
-  Widget _buildRealtimeMapCard(bool isCancelled, int stepIdx) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(6),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row inside Card
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ESTIMATED DELIVERY',
-                      style: GoogleFonts.outfit(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                        color: _goldDark,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _expectedDeliveryText,
-                      style: GoogleFonts.cinzel(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _textDark,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _currentOrder.statusColor.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _currentOrder.statusColor.withAlpha(100)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: _currentOrder.statusColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _currentOrder.status.toUpperCase(),
-                      style: GoogleFonts.outfit(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: _currentOrder.statusColor,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
+        const SizedBox(height: 14),
+
+        // ── 4. DELIVERY EXPECTED BY NODE ─────────────────────────────────────
+        _buildTimelineNode(
+          isDone: stepIdx == 4 && !isCancelled,
+          showLineBelow: false,
+          lineIsDone: false,
+          title: 'Delivery Expected By $expectedDeliveryDateStr',
+          titleDate: '',
+          children: [
+            Text(
+              stepIdx == 4 ? 'Package Delivered successfully!' : 'Item yet to be delivered.',
+              style: GoogleFonts.outfit(fontSize: 12.5, color: const Color(0xFF64748B)),
+            ),
+            if (stepIdx < 4) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Expected by $expectedDeliveryDateStr',
+                style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF94A3B8)),
               ),
             ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Route Nodes & Progress Line (clean layout without background block grid)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                // Base Track Line
-                Container(
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: _border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                // Solid Single Color Progress Line (Warehouse to QC Hub to Destination)
-                FractionallySizedBox(
-                  widthFactor: isCancelled ? 0.0 : ((stepIdx + 1) / 5).clamp(0.2, 1.0),
-                  child: Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: _goldDark,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-
-                // Route Nodes: Warehouse -> Hub -> Courier Van -> Destination
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0),
-                    _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1),
-                    _buildMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2, isActiveNode: stepIdx == 2 || stepIdx == 3),
-                    _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Live GPS Sync Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withAlpha(15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF10B981).withAlpha(50)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 12),
-                const SizedBox(width: 6),
-                Text(
-                  isCancelled
-                      ? 'Shipment Cancelled'
-                      : (stepIdx == 4 ? 'Package Delivered' : 'Live GPS Sync Active • Waybill #BD-98402'),
-                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapNodeIcon(IconData icon, String label, bool isReached, {bool isActiveNode = false}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: isActiveNode ? 36 : 28,
-          height: isActiveNode ? 36 : 28,
-          decoration: BoxDecoration(
-            color: isReached ? _goldDark : const Color(0xFFF1F5F9),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isReached ? _goldDark : _border,
-              width: isActiveNode ? 2.5 : 1.0,
-            ),
-            boxShadow: isActiveNode
-                ? [BoxShadow(color: _goldDark.withAlpha(100), blurRadius: 8)]
-                : null,
-          ),
-          child: Icon(
-            icon,
-            size: isActiveNode ? 18 : 14,
-            color: isReached ? Colors.white : _subtext,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 8.5,
-            fontWeight: isReached ? FontWeight.bold : FontWeight.w500,
-            color: isReached ? _textDark : _subtext,
-          ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildDeliveryAgentCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _gold.withAlpha(80)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(8),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _gold.withAlpha(30),
-              border: Border.all(color: _gold, width: 1.5),
-            ),
-            child: const Center(
-              child: Icon(Icons.person_pin_rounded, color: _goldDark, size: 26),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Vikram Singh',
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: _textDark,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star_rounded, size: 11, color: Color(0xFFD97706)),
-                          const SizedBox(width: 2),
-                          Text('4.9', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFD97706))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'VEXA Priority Logistics Partner',
-                  style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      'Delivery OTP: ',
-                      style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: _gold.withAlpha(20),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: _gold.withAlpha(80)),
-                      ),
-                      child: Text(
-                        '4892',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _goldDark, letterSpacing: 1),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981).withAlpha(25),
-              side: const BorderSide(color: Color(0xFF10B981)),
-            ),
-            icon: const Icon(Icons.phone_rounded, color: Color(0xFF10B981), size: 20),
-            onPressed: () {
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Calling Delivery Agent Vikram Singh (+91 98765 12345)...'),
-                  backgroundColor: Color(0xFF10B981),
-                  duration: Duration(seconds: 3),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInteractiveTimeline(bool isCancelled, int stepIdx) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(6),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'SHIPMENT TIMELINE',
-                style: GoogleFonts.cinzel(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  color: _textDark,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              Text(
-                isCancelled ? 'Cancelled' : '${stepIdx + 1} of 5 Completed',
-                style: GoogleFonts.outfit(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isCancelled ? const Color(0xFFEF4444) : _goldDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Divider(height: 1, color: _border),
-          const SizedBox(height: 14),
-
-          if (isCancelled) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withAlpha(20),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEF4444).withAlpha(80)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Order Cancelled', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444))),
-                        const SizedBox(height: 2),
-                        Text(
-                          _currentOrder.cancelReason ?? 'Cancelled per user request. Refund initiated to source.',
-                          style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            _buildTimelineStep(
-              stepNumber: '1',
-              title: 'Order Placed & Confirmed',
-              subtitle: 'Order ID ${_currentOrder.id} registered in VEXA system',
-              timeText: _currentOrder.formattedDate,
-              isDone: stepIdx >= 0,
-              isActive: stepIdx == 0,
-              isLast: false,
-            ),
-            _buildTimelineStep(
-              stepNumber: '2',
-              title: 'Garment QC & Custom Packaging',
-              subtitle: 'Combed bio-wash inspection passed at Bengaluru hub',
-              timeText: stepIdx >= 1 ? 'Inspection Completed' : 'Pending Warehouse Prep',
-              isDone: stepIdx >= 1,
-              isActive: stepIdx == 1,
-              isLast: false,
-            ),
-            _buildTimelineStep(
-              stepNumber: '3',
-              title: 'Dispatched via Express Courier',
-              subtitle: 'Handed to BlueDart Express • Waybill #BD-98402',
-              timeText: stepIdx >= 2 ? 'In Transit' : 'Scheduled',
-              isDone: stepIdx >= 2,
-              isActive: stepIdx == 2,
-              isLast: false,
-            ),
-            _buildTimelineStep(
-              stepNumber: '4',
-              title: 'Out for Delivery',
-              subtitle: 'Courier executive Vikram Singh assigned for final mile',
-              timeText: stepIdx >= 3 ? 'Out for Delivery' : 'Scheduled',
-              isDone: stepIdx >= 3,
-              isActive: stepIdx == 3,
-              isLast: false,
-            ),
-            _buildTimelineStep(
-              stepNumber: '5',
-              title: 'Delivered to Recipient',
-              subtitle: 'Package signed & delivered to ${_currentOrder.customerName}',
-              timeText: stepIdx == 4 ? _currentOrder.formattedDate : 'Pending',
-              isDone: stepIdx == 4,
-              isActive: stepIdx == 4,
-              isLast: true,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimelineStep({
-    required String stepNumber,
-    required String title,
-    required String subtitle,
-    required String timeText,
+  Widget _buildTimelineNode({
     required bool isDone,
-    required bool isActive,
-    required bool isLast,
+    required bool showLineBelow,
+    required bool lineIsDone,
+    required String title,
+    required String titleDate,
+    required List<Widget> children,
   }) {
-    final stepColor = isDone ? (isActive ? _goldDark : const Color(0xFF10B981)) : _subtext.withAlpha(100);
+    const greenColor = Color(0xFF16A34A);
+    const greyColor = Color(0xFFCBD5E1);
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: isDone ? stepColor : Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: stepColor, width: 2),
-                  boxShadow: isActive
-                      ? [BoxShadow(color: stepColor.withAlpha(120), blurRadius: 8)]
-                      : null,
-                ),
-                child: Center(
-                  child: isDone
-                      ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                      : Text(stepNumber, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: stepColor)),
-                ),
-              ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: isDone ? const Color(0xFF10B981) : _border,
+          // Indicator & Connecting Line Column
+          SizedBox(
+            width: 16,
+            child: Column(
+              children: [
+                const SizedBox(height: 5),
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: isDone ? greenColor : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDone ? greenColor : greyColor,
+                      width: isDone ? 0 : 2,
+                    ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: isDone ? FontWeight.bold : FontWeight.w600,
-                            color: isDone ? _textDark : _subtext,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        timeText,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: isDone ? FontWeight.bold : FontWeight.normal,
-                          color: isDone ? _goldDark : _subtext,
-                        ),
-                      ),
-                    ],
+                if (showLineBelow)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: lineIsDone ? greenColor : greyColor,
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
-                  ),
-                ],
-              ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShippingAddressCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: _gold.withAlpha(20),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.location_on_rounded, color: _goldDark, size: 20),
           ),
           const SizedBox(width: 12),
+
+          // Content Column
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'DELIVERY DESTINATION',
-                  style: GoogleFonts.cinzel(fontSize: 10.5, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 1.2),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _currentOrder.customerName,
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _currentOrder.shippingAddress,
-                  style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.35),
-                ),
-                const SizedBox(height: 6),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
-                    const Icon(Icons.phone_outlined, size: 12, color: _goldDark),
-                    const SizedBox(width: 4),
                     Text(
-                      _currentOrder.phone,
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: _textDark),
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDone ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                      ),
                     ),
+                    if (titleDate.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        titleDate,
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          color: isDone ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
+                const SizedBox(height: 6),
+                ...children,
+                const SizedBox(height: 10),
               ],
             ),
           ),
@@ -763,76 +406,20 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
     );
   }
 
-  Widget _buildPackageItemsCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'PACKAGE CONTENTS (${_currentOrder.items.length})',
-                style: GoogleFonts.cinzel(fontSize: 11.5, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
-              ),
-              Text(
-                'Total ₹${_currentOrder.totalAmount.toStringAsFixed(0)}',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: _goldDark),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ..._currentOrder.items.map((item) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: _surfaceBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: item.image.startsWith('assets/')
-                        ? Image.asset(item.image, width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 44, height: 44, color: Colors.white, child: const Icon(Icons.checkroom)))
-                        : Image.network(item.image, width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(width: 44, height: 44, color: Colors.white, child: const Icon(Icons.checkroom))),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.name,
-                          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: _textDark),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Size ${item.size} • Qty ${item.quantity}',
-                          style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '₹${(item.price * item.quantity).toStringAsFixed(0)}',
-                    style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800, color: _goldDark),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
+  Widget _buildSubDetailItem({required String title, required String subtitle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: const Color(0xFF334155)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: GoogleFonts.outfit(fontSize: 11.5, color: const Color(0xFF64748B)),
+        ),
+      ],
     );
   }
 }

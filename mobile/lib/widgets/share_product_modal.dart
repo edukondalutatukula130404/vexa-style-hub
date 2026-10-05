@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../config/api_config.dart';
 import '../models/item_model.dart';
 
 class ShareProductModal extends StatelessWidget {
@@ -31,11 +32,19 @@ class ShareProductModal extends StatelessWidget {
 
   String get _productUrl {
     final cleanId = item.id.toLowerCase().replaceAll(RegExp(r'[^a-z0-9-]'), '');
-    return 'https://vexa.style/p/${cleanId.isEmpty ? 'vx-00' : cleanId}';
+    final id = cleanId.isEmpty ? 'vx-01' : cleanId;
+
+    // Use active valid server domain so links resolve online without DNS errors
+    final base = ApiConfig.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
+    final validDomain = base.contains('http') && !base.contains('10.0.2.2')
+        ? base
+        : ApiConfig.productionUrl.replaceAll(RegExp(r'/api/?$'), '');
+
+    return '$validDomain/product?id=$id';
   }
 
   String get _shareText {
-    return 'Check out ${item.name} (₹${item.price.toStringAsFixed(0)}) on VEXA Style Hub! $_productUrl';
+    return '🛍️ *${item.name}*\nSpecial Price: ₹${item.price.toStringAsFixed(0)}\n\n🔗 Open product link in VEXA app:\n$_productUrl';
   }
 
   Future<void> _handleSystemShare(BuildContext context) async {
@@ -43,7 +52,7 @@ class ShareProductModal extends StatelessWidget {
     try {
       await Share.share(_shareText, subject: item.name);
     } catch (e) {
-      await Clipboard.setData(ClipboardData(text: _shareText));
+      await Clipboard.setData(ClipboardData(text: _productUrl));
       if (context.mounted) {
         _showSnackBar(context, '📋 Product link copied to clipboard!');
       }
@@ -55,7 +64,7 @@ class ShareProductModal extends StatelessWidget {
     final encodedUrl = Uri.encodeComponent(_productUrl);
 
     if (appName == 'Copy Link') {
-      await Clipboard.setData(ClipboardData(text: _shareText));
+      await Clipboard.setData(ClipboardData(text: _productUrl));
       if (!context.mounted) return;
       Navigator.pop(context);
       _showSnackBar(context, '📋 Product link copied to clipboard!');

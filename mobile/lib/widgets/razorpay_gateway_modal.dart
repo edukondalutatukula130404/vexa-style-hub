@@ -330,6 +330,30 @@ class RazorpayGatewayModal {
                         color: Colors.white,
                         child: Column(
                           children: [
+                            Container(
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              color: const Color(0xFF1E293B),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.language_rounded, size: 16, color: Colors.white70),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'api.razorpay.com/v1/gateway/mocksharp/payment',
+                                      style: GoogleFonts.outfit(color: Colors.white70, fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                                    onPressed: handleBankFailure,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            ),
                             Expanded(
                               child: Padding(
                                 padding: const EdgeInsets.all(28),

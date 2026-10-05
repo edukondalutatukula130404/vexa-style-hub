@@ -9,7 +9,9 @@ import '../services/order_service.dart';
 import '../services/wallet_service.dart';
 import 'order_tracking_screen.dart';
 import 'order_details_screen.dart';
+import 'customer_support_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
+import '../services/invoice_pdf_service.dart';
 
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
@@ -470,33 +472,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showBrandStoryModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: _cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-      builder: (sheetCtx) => SizedBox(
-        width: double.infinity,
-        height: MediaQuery.of(sheetCtx).size.height,
-        child: Scaffold(
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (sheetCtx) => Scaffold(
           backgroundColor: _cardBg,
           appBar: AppBar(
             backgroundColor: _cardBg,
             elevation: 0,
-            automaticallyImplyLeading: false,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+              onPressed: () => Navigator.pop(sheetCtx),
+            ),
             title: Text(
               'BRAND STORY & PHILOSOPHY',
               style: GoogleFonts.cinzel(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.close_rounded, color: _textDark, size: 26),
-                onPressed: () => Navigator.pop(sheetCtx),
-              ),
-            ],
+            centerTitle: false,
             bottom: const PreferredSize(
               preferredSize: Size.fromHeight(1),
               child: Divider(height: 1, color: _border),
@@ -608,40 +600,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showTermsModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: _cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-      builder: (sheetCtx) => SizedBox(
-        width: double.infinity,
-        height: MediaQuery.of(sheetCtx).size.height,
-        child: Scaffold(
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (sheetCtx) => Scaffold(
           backgroundColor: _cardBg,
           appBar: AppBar(
             backgroundColor: _cardBg,
             elevation: 0,
-            automaticallyImplyLeading: false,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+              onPressed: () => Navigator.pop(sheetCtx),
+            ),
             title: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
-                  child: const Icon(Icons.gavel_rounded, color: _goldDark, size: 20),
+                  child: const Icon(Icons.gavel_rounded, color: _goldDark, size: 18),
                 ),
                 const SizedBox(width: 10),
                 Text('TERMS & CONDITIONS', style: GoogleFonts.cinzel(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1)),
               ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.close_rounded, color: _textDark, size: 26),
-                onPressed: () => Navigator.pop(sheetCtx),
-              ),
-            ],
+            centerTitle: false,
             bottom: const PreferredSize(
               preferredSize: Size.fromHeight(1),
               child: Divider(height: 1, color: _border),
@@ -707,40 +689,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showPrivacyPolicyModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: _cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-      builder: (sheetCtx) => SizedBox(
-        width: double.infinity,
-        height: MediaQuery.of(sheetCtx).size.height,
-        child: Scaffold(
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (sheetCtx) => Scaffold(
           backgroundColor: _cardBg,
           appBar: AppBar(
             backgroundColor: _cardBg,
             elevation: 0,
-            automaticallyImplyLeading: false,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+              onPressed: () => Navigator.pop(sheetCtx),
+            ),
             title: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(color: _gold.withAlpha(25), shape: BoxShape.circle),
-                  child: const Icon(Icons.shield_outlined, color: _goldDark, size: 20),
+                  child: const Icon(Icons.shield_outlined, color: _goldDark, size: 18),
                 ),
                 const SizedBox(width: 10),
                 Text('PRIVACY POLICY', style: GoogleFonts.cinzel(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1)),
               ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.close_rounded, color: _textDark, size: 26),
-                onPressed: () => Navigator.pop(sheetCtx),
-              ),
-            ],
+            centerTitle: false,
             bottom: const PreferredSize(
               preferredSize: Size.fromHeight(1),
               child: Divider(height: 1, color: _border),
@@ -2592,70 +2564,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 
   Future<String?> _saveInvoiceFileToDisk(String invoiceNo, OrderModel order) async {
-    try {
-      String? downloadsPath;
-      if (Platform.isAndroid) {
-        final dir = Directory('/storage/emulated/0/Download');
-        if (await dir.exists()) {
-          downloadsPath = dir.path;
-        }
-      } else if (Platform.isWindows) {
-        final userProfile = Platform.environment['USERPROFILE'];
-        if (userProfile != null) {
-          downloadsPath = '$userProfile\\Downloads';
-        }
-      } else if (Platform.isLinux || Platform.isMacOS) {
-        final home = Platform.environment['HOME'];
-        if (home != null) {
-          downloadsPath = '$home/Downloads';
-        }
-      }
-
-      downloadsPath ??= Directory.systemTemp.path;
-
-      final file = File('$downloadsPath/$invoiceNo.pdf');
-      final content = '''
-============================================================
-                  VEXA LUXURY WEAR - TAX E-INVOICE
-                   Vexa Style Hub Pvt. Ltd.
-        100ft Road, Indiranagar, Bengaluru - 560038
-         GSTIN: 29AAACV9812F1Z4 | CIN: U74999KA2026PTC
-============================================================
-
-INVOICE NO   : $invoiceNo
-DATE         : ${order.formattedDate}
-ORDER ID     : ${order.id}
-PAYMENT      : ${order.paymentMethod}
-STATUS       : PAID
-
-BILLED TO:
-Name    : ${order.customerName}
-Address : ${order.shippingAddress}
-Phone   : ${order.phone}
-
-------------------------------------------------------------
-ITEMS PURCHASED:
-------------------------------------------------------------
-${order.items.map((i) => '${i.name.padRight(28)} Size:${i.size} Qty:${i.quantity} Price:₹${i.price} Total:₹${(i.price * i.quantity).toStringAsFixed(0)}').join('\n')}
-
-------------------------------------------------------------
-TAX BREAKDOWN:
-Subtotal (Taxable Value) : ₹${(order.totalAmount / 1.18).toStringAsFixed(2)}
-CGST (9%)               : ₹${((order.totalAmount - (order.totalAmount / 1.18)) / 2).toStringAsFixed(2)}
-SGST (9%)               : ₹${((order.totalAmount - (order.totalAmount / 1.18)) / 2).toStringAsFixed(2)}
-------------------------------------------------------------
-TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
-============================================================
-      Thank you for shopping with VEXA Luxury Wear!
-============================================================
-''';
-
-      await file.writeAsString(content);
-      return file.path;
-    } catch (e) {
-      debugPrint('Error saving invoice file: $e');
-      return null;
-    }
+    return InvoicePdfService.saveInvoiceToDisk(invoiceNo, order);
   }
 
   // ── TAX E-INVOICE GENERATOR & PREVIEW SCREEN (100% FULL SCREEN) ──────────
@@ -3251,7 +3160,9 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                       itemBuilder: (c, i) {
                         final tx = _walletTransactions[i];
                         final isCredit = tx['isCredit'] == true;
-                        return ListTile(
+                        return Material(
+                          color: Colors.transparent,
+                          child: ListTile(
                           leading: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
@@ -3274,7 +3185,8 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                               color: isCredit ? Colors.green[700] : Colors.redAccent,
                             ),
                           ),
-                        );
+                        ),
+                      );
                       },
                     ),
                   ),
@@ -4785,7 +4697,7 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Total Amount', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
+                                Text(order.isPaid ? 'Total Paid' : 'Amount to be paid', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
                                 Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 16, color: _textDark)),
                               ],
                             ),
@@ -4793,7 +4705,7 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                               scrollDirection: Axis.horizontal,
                               child: Row(
                                 children: [
-                                  if (order.status.toLowerCase() != 'cancelled') ...[
+                                  if (!order.isPaid && order.status.toLowerCase() != 'cancelled' && !order.paymentMethod.toLowerCase().contains('cash') && !order.paymentMethod.toLowerCase().contains('cod') && !order.paymentMethod.toLowerCase().contains('delivery')) ...[
                                     ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(0xFF0C2340),
@@ -4813,6 +4725,7 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                                             OrderService.updateOrderStatusLocally(
                                               order.id,
                                               'Confirmed',
+                                              paymentMethod: methodLabel,
                                               context: context,
                                             );
                                             ScaffoldMessenger.of(context).showSnackBar(
@@ -4939,158 +4852,9 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                   subtitle: 'Contact support@vexa.app or WhatsApp',
                   trailing: const Icon(Icons.chevron_right_rounded, color: _subtext),
                   onTap: () {
-                    showDialog(
-                      context: context,
-                      useSafeArea: false,
-                      builder: (context) => Scaffold(
-                        backgroundColor: _cardBg,
-                        appBar: AppBar(
-                          backgroundColor: Colors.white,
-                          elevation: 0.5,
-                          leading: IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Colors.black87, size: 24),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                          title: Text(
-                            'CUSTOMER CONCIERGE',
-                            style: GoogleFonts.cinzel(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.black87,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          centerTitle: true,
-                        ),
-                        body: SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Need assistance with custom sizing, orders, or delivery?',
-                                  style: GoogleFonts.outfit(
-                                    color: _subtext,
-                                    fontSize: 15,
-                                    height: 1.5,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: _border),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withAlpha(10),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      ListTile(
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                        leading: Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green.withAlpha(25),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.chat_rounded, color: Colors.green, size: 24),
-                                        ),
-                                        title: Text(
-                                          'WhatsApp Support',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                        subtitle: Text(
-                                          '+91 98765 43210',
-                                          style: GoogleFonts.outfit(fontSize: 13, color: _subtext),
-                                        ),
-                                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: _subtext),
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Opening WhatsApp Support chat...'),
-                                              backgroundColor: _goldDark,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                      const Divider(height: 1, indent: 20, endIndent: 20),
-                                      ListTile(
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                        leading: Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: _goldDark.withAlpha(25),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.email_rounded, color: _goldDark, size: 24),
-                                        ),
-                                        title: Text(
-                                          'Email Concierge',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                        subtitle: Text(
-                                          'support@vexa.app',
-                                          style: GoogleFonts.outfit(fontSize: 13, color: _subtext),
-                                        ),
-                                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: _subtext),
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Opening Email Concierge...'),
-                                              backgroundColor: _goldDark,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Spacer(),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 52,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _goldDark,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      elevation: 2,
-                                    ),
-                                    onPressed: () => Navigator.pop(context),
-                                    child: Text(
-                                      'Close',
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CustomerSupportScreen()),
                     );
                   },
                 ),

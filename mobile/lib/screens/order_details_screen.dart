@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/order_service.dart';
@@ -7,6 +6,7 @@ import '../services/websocket_service.dart';
 import 'order_tracking_screen.dart';
 import 'customer_support_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
+import '../services/invoice_pdf_service.dart';
 
 const Color _gold = Color(0xFFB8860B);
 const Color _goldDark = Color(0xFF8B6508);
@@ -73,70 +73,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<String?> _saveInvoiceFileToDisk(String invoiceNo, OrderModel order) async {
-    try {
-      String? downloadsPath;
-      if (Platform.isAndroid) {
-        final dir = Directory('/storage/emulated/0/Download');
-        if (await dir.exists()) {
-          downloadsPath = dir.path;
-        }
-      } else if (Platform.isWindows) {
-        final userProfile = Platform.environment['USERPROFILE'];
-        if (userProfile != null) {
-          downloadsPath = '$userProfile\\Downloads';
-        }
-      } else if (Platform.isLinux || Platform.isMacOS) {
-        final home = Platform.environment['HOME'];
-        if (home != null) {
-          downloadsPath = '$home/Downloads';
-        }
-      }
-
-      downloadsPath ??= Directory.systemTemp.path;
-
-      final file = File('$downloadsPath/$invoiceNo.pdf');
-      final content = '''
-============================================================
-                  VEXA LUXURY WEAR - TAX E-INVOICE
-                   Vexa Style Hub Pvt. Ltd.
-        100ft Road, Indiranagar, Bengaluru - 560038
-         GSTIN: 29AAACV9812F1Z4 | CIN: U74999KA2026PTC
-============================================================
-
-INVOICE NO   : $invoiceNo
-DATE         : ${order.formattedDate}
-ORDER ID     : ${order.id}
-PAYMENT      : ${order.paymentMethod}
-STATUS       : PAID
-
-BILLED TO:
-Name    : ${order.customerName}
-Address : ${order.shippingAddress}
-Phone   : ${order.phone}
-
-------------------------------------------------------------
-ITEMS PURCHASED:
-------------------------------------------------------------
-${order.items.map((i) => '${i.name.padRight(28)} Size:${i.size} Qty:${i.quantity} Price:₹${i.price} Total:₹${(i.price * i.quantity).toStringAsFixed(0)}').join('\n')}
-
-------------------------------------------------------------
-TAX BREAKDOWN:
-Subtotal (Taxable Value) : ₹${(order.totalAmount / 1.18).toStringAsFixed(2)}
-CGST (9%)               : ₹${((order.totalAmount - (order.totalAmount / 1.18)) / 2).toStringAsFixed(2)}
-SGST (9%)               : ₹${((order.totalAmount - (order.totalAmount / 1.18)) / 2).toStringAsFixed(2)}
-------------------------------------------------------------
-TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
-============================================================
-      Thank you for shopping with VEXA Luxury Wear!
-============================================================
-''';
-
-      await file.writeAsString(content);
-      return file.path;
-    } catch (e) {
-      debugPrint('Error saving invoice file: $e');
-      return null;
-    }
+    return InvoicePdfService.saveInvoiceToDisk(invoiceNo, order);
   }
 
   void _showInvoiceModal(BuildContext context, OrderModel order, {bool autoStartDownload = false}) {
@@ -523,6 +460,222 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
     );
   }
 
+  int get _currentStepIndex {
+    final status = _currentOrder.status.toLowerCase();
+    if (status.contains('cancel')) return -1;
+    if (status.contains('deliver')) return 4;
+    if (status.contains('out for delivery') || status.contains('courier')) return 3;
+    if (status.contains('ship') || status.contains('transit')) return 2;
+    if (status.contains('qc') || status.contains('prep') || status.contains('process')) return 1;
+    return 0;
+  }
+
+  String get _expectedDeliveryText {
+    final status = _currentOrder.status.toLowerCase();
+    if (status.contains('cancel')) return 'Order Cancelled';
+    if (status.contains('deliver')) return 'Delivered on ${_currentOrder.formattedDate}';
+    if (status.contains('out for delivery')) return 'Arriving Today by 6:00 PM';
+    if (status.contains('ship') || status.contains('transit')) return 'Expected Tomorrow by 2:00 PM';
+    return 'Expected in 2–3 Business Days';
+  }
+
+  Widget _buildRealtimeMapCard() {
+    final isCancelled = _currentOrder.status.toLowerCase().contains('cancel');
+    final stepIdx = _currentStepIndex;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _border, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(6),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row inside Card
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ESTIMATED DELIVERY',
+                      style: GoogleFonts.outfit(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: _goldDark,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _expectedDeliveryText,
+                      style: GoogleFonts.cinzel(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: _textDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _currentOrder.statusColor.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _currentOrder.statusColor.withAlpha(100)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: _currentOrder.statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _currentOrder.status.toUpperCase(),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: _currentOrder.statusColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // Route Nodes & Progress Line
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                // Base Track Line
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Solid Single Color Progress Line
+                FractionallySizedBox(
+                  widthFactor: isCancelled ? 0.0 : ((stepIdx + 1) / 5).clamp(0.2, 1.0),
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _goldDark,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                // Route Nodes: Warehouse -> QC Hub -> Express Van -> Your Home
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0),
+                    _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1),
+                    _buildMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2, isActiveNode: stepIdx == 2 || stepIdx == 3),
+                    _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Live GPS Sync Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withAlpha(15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF10B981).withAlpha(50)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 12),
+                const SizedBox(width: 6),
+                Text(
+                  isCancelled
+                      ? 'Shipment Cancelled'
+                      : (stepIdx == 4 ? 'Package Delivered' : 'Live GPS Sync Active • Waybill #BD-98402'),
+                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapNodeIcon(IconData icon, String label, bool isReached, {bool isActiveNode = false}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: isActiveNode ? 34 : 26,
+          height: isActiveNode ? 34 : 26,
+          decoration: BoxDecoration(
+            color: isReached ? _goldDark : const Color(0xFFF1F5F9),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isReached ? _goldDark : _border,
+              width: isActiveNode ? 2.5 : 1.0,
+            ),
+            boxShadow: isActiveNode
+                ? [BoxShadow(color: _goldDark.withAlpha(100), blurRadius: 8)]
+                : null,
+          ),
+          child: Icon(
+            icon,
+            size: isActiveNode ? 16 : 13,
+            color: isReached ? Colors.white : _subtext,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 9.5,
+            fontWeight: isReached ? FontWeight.bold : FontWeight.w500,
+            color: isReached ? _textDark : _subtext,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCancelled = _currentOrder.status.toLowerCase() == 'cancelled';
@@ -552,26 +705,6 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _currentOrder.statusColor.withAlpha(25),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _currentOrder.statusColor.withAlpha(90)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(width: 5, height: 5, decoration: BoxDecoration(color: _currentOrder.statusColor, shape: BoxShape.circle)),
-                            const SizedBox(width: 4),
-                            Text(
-                              _currentOrder.status.toUpperCase(),
-                              style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w800, color: _currentOrder.statusColor, letterSpacing: 0.5),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -585,11 +718,12 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                 ],
               ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download_rounded, color: _goldDark, size: 22),
-            tooltip: 'Download Invoice',
-            onPressed: () => _showInvoiceModal(context, _currentOrder, autoStartDownload: true),
-          ),
+          if (_currentOrder.isPaid)
+            IconButton(
+              icon: const Icon(Icons.download_rounded, color: _goldDark, size: 22),
+              tooltip: 'Download Invoice',
+              onPressed: () => _showInvoiceModal(context, _currentOrder, autoStartDownload: true),
+            ),
           IconButton(
             icon: const Icon(Icons.alt_route_rounded, color: _goldDark, size: 20),
             tooltip: 'Track Package',
@@ -639,6 +773,9 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
               ),
             ),
           ],
+
+          // 1.5 ESTIMATED DELIVERY & TRACKING PROGRESS CARD
+          _buildRealtimeMapCard(),
 
           // 2. SHIPPING ADDRESS BLOCK
           Text('SHIPPING ADDRESS', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
@@ -741,77 +878,190 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
           }),
           const SizedBox(height: 16),
 
-          // 4. PAYMENT & RECEIPT SUMMARY CARD
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _surfaceBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // 4. PRICE DETAILS & PAYMENT SUMMARY CARD
+          Text('PRICE DETAILS', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
+          const SizedBox(height: 8),
+          Builder(
+            builder: (context) {
+              final itemsSubtotal = _currentOrder.items.fold(0.0, (sum, i) => sum + (i.price * i.quantity));
+              final baseSubtotal = itemsSubtotal > 0 ? itemsSubtotal : _currentOrder.totalAmount;
+              final discountAmount = baseSubtotal > _currentOrder.totalAmount ? (baseSubtotal - _currentOrder.totalAmount) : 0.0;
+              final gstIncluded = _currentOrder.totalAmount - (_currentOrder.totalAmount / 1.18);
+              final hasCoupon = _currentOrder.couponApplied.isNotEmpty;
+              final totalSavings = 150.0 + discountAmount;
+
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _border),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 8, offset: const Offset(0, 2))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Item Subtotal Row
                     Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.payment_rounded, size: 16, color: _subtext),
-                        const SizedBox(width: 6),
-                        Text('Payment Method', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                        Text('Items Subtotal', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
+                        Text('₹${baseSubtotal.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark)),
                       ],
                     ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: _border)),
-                        child: Text(
-                          _currentOrder.paymentMethod,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _textDark),
+                    const SizedBox(height: 10),
+
+                    // Discount / Offer Row
+                    if (hasCoupon || discountAmount > 0) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.local_offer_rounded, size: 14, color: Color(0xFF10B981)),
+                              const SizedBox(width: 5),
+                              Text(
+                                hasCoupon ? 'Discount (${_currentOrder.couponApplied})' : 'Instant Order Discount',
+                                style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF10B981), fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '-₹${discountAmount.toStringAsFixed(0)}',
+                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                    // Shipping Fee Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.local_shipping_outlined, size: 15, color: _subtext),
+                            const SizedBox(width: 5),
+                            Text('Shipping Fee', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.local_shipping_outlined, size: 16, color: Color(0xFF10B981)),
-                        const SizedBox(width: 6),
-                        Text('Shipping Fee', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                        Row(
+                          children: [
+                            Text('₹150', style: GoogleFonts.outfit(fontSize: 12, color: _subtext, decoration: TextDecoration.lineThrough)),
+                            const SizedBox(width: 6),
+                            Text('FREE Express', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
+                          ],
+                        ),
                       ],
                     ),
-                    Text('FREE Express', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
-                  ],
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(height: 1, color: _border),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Total Amount Paid', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark)),
+                    const SizedBox(height: 10),
+
+                    // Taxes & Duties Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.receipt_long_rounded, size: 15, color: _subtext),
+                            const SizedBox(width: 5),
+                            Text('Taxes & Duties (GST 18%)', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
+                          ],
+                        ),
+                        Text('₹${gstIncluded.toStringAsFixed(0)} (Included)', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Payment Method Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.credit_card_rounded, size: 15, color: _subtext),
+                            const SizedBox(width: 5),
+                            Text('Payment Method', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: _surfaceBg, borderRadius: BorderRadius.circular(6), border: Border.all(color: _border)),
+                            child: Text(
+                              _currentOrder.paymentMethod,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _textDark),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(height: 1, color: _border),
+                    ),
+
+                    // Total Amount Paid Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Total Amount',
+                              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _currentOrder.isPaid ? 'Payment Received' : 'Payment Pending',
+                              style: GoogleFonts.outfit(fontSize: 11, color: _currentOrder.isPaid ? const Color(0xFF10B981) : const Color(0xFFEAB308), fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _goldDark,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [BoxShadow(color: _goldDark.withAlpha(60), blurRadius: 8, offset: const Offset(0, 2))],
+                          ),
+                          child: Text('₹${_currentOrder.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: _goldDark,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [BoxShadow(color: _goldDark.withAlpha(60), blurRadius: 8, offset: const Offset(0, 2))],
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
                       ),
-                      child: Text('₹${_currentOrder.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF059669)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'You saved ₹${totalSavings.toStringAsFixed(0)} on this order with FREE shipping & offers!',
+                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF047857)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
           const SizedBox(height: 10),
         ],
@@ -829,7 +1079,7 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isCancelled) ...[
+              if (!_currentOrder.isPaid && !isCancelled && !_currentOrder.paymentMethod.toLowerCase().contains('cash') && !_currentOrder.paymentMethod.toLowerCase().contains('cod') && !_currentOrder.paymentMethod.toLowerCase().contains('delivery')) ...[
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -853,6 +1103,7 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                           OrderService.updateOrderStatusLocally(
                             _currentOrder.id,
                             'Confirmed',
+                            paymentMethod: methodLabel,
                             context: context,
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -932,7 +1183,7 @@ TOTAL AMOUNT PAID        : ₹${order.totalAmount.toStringAsFixed(0)}
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => CustomerSupportScreen(order: widget.order)),
+                      MaterialPageRoute(builder: (_) => CustomerSupportScreen(order: _currentOrder)),
                     );
                   },
                   icon: const Icon(Icons.headset_mic_outlined, color: Color(0xFF10B981), size: 18),

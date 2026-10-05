@@ -5,7 +5,6 @@ import '../models/item_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
-import '../services/wallet_service.dart';
 import '../widgets/vexa_empty_state.dart';
 import 'login_screen.dart';
 import 'product_detail_screen.dart';
@@ -606,67 +605,7 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                             ),
 
-                            // 2. VEXA Pay Wallet
-                            GestureDetector(
-                              onTap: () => setModalState(() => selectedPayment = 'VEXA Pay Wallet'),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: selectedPayment == 'VEXA Pay Wallet' ? _gold.withAlpha(20) : Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: selectedPayment == 'VEXA Pay Wallet' ? _goldDark : _border,
-                                    width: selectedPayment == 'VEXA Pay Wallet' ? 1.5 : 1.0,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: _goldDark,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Text('VEXA Pay Wallet', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF10B981).withAlpha(25),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
-                                                ),
-                                                child: Text(
-                                                  '₹${WalletService.balance.toStringAsFixed(0)}',
-                                                  style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text('Available Balance: ₹${WalletService.balance.toStringAsFixed(0)} • Instant 1-Click Checkout', style: GoogleFonts.outfit(fontSize: 11, color: _subtext, fontWeight: FontWeight.w500)),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      selectedPayment == 'VEXA Pay Wallet' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                      color: selectedPayment == 'VEXA Pay Wallet' ? _goldDark : _subtext,
-                                      size: 20,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+
 
                             // 3. COD
                             GestureDetector(

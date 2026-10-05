@@ -15,6 +15,9 @@ class VexaWebSocketService {
   bool _isConnecting = false;
   bool _disposed = false;
 
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
+
   // Queue messages sent before connection is ready
   final List<Map<String, dynamic>> _sendQueue = [];
 
@@ -38,6 +41,7 @@ class VexaWebSocketService {
       _isConnecting = false;
 
       debugPrint('✅ [VexaWS] Connected! Flushing ${_sendQueue.length} queued messages.');
+      _reconnectAttempts = 0;
       _reconnectTimer?.cancel();
       _reconnectTimer = null;
 
@@ -85,8 +89,17 @@ class VexaWebSocketService {
 
   void _scheduleReconnect() {
     if (_disposed) return;
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      debugPrint('[VexaWS] Reached max reconnect attempts ($_maxReconnectAttempts). Pausing auto-reconnect.');
+      return;
+    }
     if (_reconnectTimer != null && _reconnectTimer!.isActive) return;
-    _reconnectTimer = Timer(const Duration(seconds: 3), () {
+
+    _reconnectAttempts++;
+    final delaySecs = (_reconnectAttempts * 4).clamp(4, 20);
+    debugPrint('[VexaWS] Reconnecting in ${delaySecs}s (Attempt $_reconnectAttempts/$_maxReconnectAttempts)...');
+
+    _reconnectTimer = Timer(Duration(seconds: delaySecs), () {
       _reconnectTimer = null;
       connect();
     });

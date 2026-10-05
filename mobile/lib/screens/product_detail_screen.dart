@@ -210,6 +210,166 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ShareProductModal.show(context, widget.item);
   }
 
+  void _openImagePopup(BuildContext context, String currentImg, int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) {
+          int popupIndex = initialIndex;
+          final slides = _gallerySlides;
+          final popupPageController = PageController(initialPage: initialIndex);
+          final popupTransformationController = TransformationController();
+
+          return Scaffold(
+            backgroundColor: Colors.black,
+            appBar: AppBar(
+              backgroundColor: Colors.black,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+              title: StatefulBuilder(
+                builder: (modalCtx, setHeaderState) {
+                  return Text(
+                    '${popupIndex + 1} of ${slides.length}',
+                    style: GoogleFonts.outfit(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+                  );
+                },
+              ),
+              centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                  onPressed: () => _openShareModalSheet(),
+                ),
+              ],
+            ),
+            body: StatefulBuilder(
+              builder: (modalCtx, setModalState) {
+                return Stack(
+                  children: [
+                    PageView.builder(
+                      controller: popupPageController,
+                      onPageChanged: (idx) {
+                        setModalState(() {
+                          popupIndex = idx;
+                          popupTransformationController.value = Matrix4.identity();
+                        });
+                      },
+                      itemCount: slides.length,
+                      itemBuilder: (c, idx) {
+                        final slide = slides[idx];
+                        final title = slide['title'] as String;
+                        final imgPath = slide['image'] as String;
+
+                        Widget popupImageWidget = _buildProductImage(
+                          imgPath,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.contain,
+                        );
+
+                        // Render full uncropped product image across all slides in popup
+
+
+                        return GestureDetector(
+                          onDoubleTap: () {
+                            if (popupTransformationController.value.getMaxScaleOnAxis() > 1.1) {
+                              popupTransformationController.value = Matrix4.identity();
+                            } else {
+                              // ignore: deprecated_member_use
+                              popupTransformationController.value = Matrix4.identity()..scale(2.5);
+                            }
+                          },
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Center(
+                                child: InteractiveViewer(
+                                  transformationController: popupTransformationController,
+                                  minScale: 1.0,
+                                  maxScale: 5.0,
+                                  child: popupImageWidget,
+                                ),
+                              ),
+                              Positioned(
+                                top: 16,
+                                left: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withAlpha(180),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppTheme.primaryColor.withAlpha(120)),
+                                  ),
+                                  child: Text(
+                                    title.toUpperCase(),
+                                    style: GoogleFonts.outfit(
+                                      color: AppTheme.primaryColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Bottom caption & thumbnail navigation dots
+                    Positioned(
+                      bottom: 30,
+                      left: 0,
+                      right: 0,
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withAlpha(190),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Text(
+                              '${widget.item.name} • ${slides[popupIndex]['title']}',
+                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(slides.length, (dotIdx) {
+                              final isCurrent = dotIdx == popupIndex;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: isCurrent ? 24 : 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: isCurrent ? AppTheme.primaryColor : Colors.white38,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
 
 
   Widget _buildProductImage(String src, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
@@ -541,8 +701,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          // Studio neutral background container so full uncropped image displays cleanly
-                          Container(color: const Color(0xFF1C1C1E)),
+                          // Studio neutral light-black background container so full uncropped image displays cleanly
+                          Container(color: const Color(0xFF2C2C2E)),
 
                           // Side-scrollable PageView of exact product image angles (Front Side, Back Side, Side Angle, Key Highlights)
                           PageView.builder(
@@ -560,6 +720,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               final imgPath = slide['image'] as String;
 
                               Widget imageWidget = GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => _openImagePopup(context, imgPath, index),
                                 onDoubleTapDown: (details) {
                                   _doubleTapDetails = details;
                                 },
@@ -578,16 +740,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                               );
 
-                              if (type == 'side') {
-                                // Side profile zoom focusing on side seam
-                                imageWidget = ClipRect(
-                                  child: Transform.scale(
-                                    scale: 1.35,
-                                    alignment: Alignment.centerLeft,
-                                    child: imageWidget,
-                                  ),
-                                );
-                              }
+
 
                               return Stack(
                                 fit: StackFit.expand,

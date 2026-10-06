@@ -50,6 +50,7 @@ import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL, setLoggedIn } from "@/lib/auth";
 import { useCart, addToCart, removeFromCart, updateCartQuantity, clearCart } from "@/lib/cart";
 import { useWishlist, removeFromWishlist, clearWishlist } from "@/lib/wishlist";
+import { vexaSocket } from "@/lib/socket";
 import { Footer } from "@/components/Footer";
 
 type OrderItem = {
@@ -940,8 +941,10 @@ export function UserDashboard() {
         const finalPaymentMethod = methodLabel || paymentMethod || "Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)";
         const displayMethod = paymentId ? `${finalPaymentMethod} (ID: ${paymentId})` : finalPaymentMethod;
 
+        const generatedId = "#VX-" + Math.floor(100000 + Math.random() * 900000);
         const demoOrderObj: OrderItem = {
-          _id: "ORD-" + Math.floor(100000 + Math.random() * 900000),
+          _id: generatedId,
+          id: generatedId,
           userEmail: email,
           userName: name,
           items: itemsToOrder,
@@ -974,9 +977,18 @@ export function UserDashboard() {
             window.dispatchEvent(new Event("vexa_inventory_updated"));
             window.dispatchEvent(new Event("vexa_items_updated"));
             window.dispatchEvent(new CustomEvent("vexa_orders_updated", { detail: demoOrderObj }));
+            window.dispatchEvent(new Event("storage"));
           } catch (e) {
             console.warn("Failed to cache order:", e);
           }
+        }
+
+        // Broadcast Real-time WebSocket event directly to Admin Dashboard
+        try {
+          vexaSocket.send("ORDER_CREATED", demoOrderObj);
+          vexaSocket.send("ORDERS_UPDATED", demoOrderObj);
+        } catch (err) {
+          console.warn("WebSocket send error:", err);
         }
 
         // 2. Clear Cart
@@ -996,11 +1008,13 @@ export function UserDashboard() {
           window.history.pushState({}, "", "/dashboard?tab=cart");
         }
 
-        // 5. Post to backend asynchronously in background
+        // 5. Post to backend asynchronously in background with id and _id
         fetch(`${API_URL}/orders`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            id: generatedId,
+            _id: generatedId,
             userEmail: email,
             userName: name,
             items: itemsToOrder,
@@ -1011,13 +1025,25 @@ export function UserDashboard() {
         })
           .then((res) => res.json())
           .then((data) => {
-            if (data && data.success && data.data && data.data._id) {
-              const realId = data.data._id;
+            if (data && data.success && data.data) {
+              const serverOrder = data.data;
+              const realId = serverOrder._id || serverOrder.id || generatedId;
               setMyOrders((prev) =>
                 prev.map((o) =>
-                  o._id === demoOrderObj._id ? { ...o, _id: realId, id: realId } : o
+                  (o._id === generatedId || o.id === generatedId) ? { ...o, _id: realId, id: realId } : o
                 )
               );
+
+              if (typeof window !== "undefined") {
+                try {
+                  const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+                  const updated = cached.map((o: any) =>
+                    (o._id === generatedId || o.id === generatedId) ? { ...o, _id: realId, id: realId } : o
+                  );
+                  localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
+                  window.dispatchEvent(new Event("vexa_orders_updated"));
+                } catch (e) {}
+              }
             }
           })
           .catch((err) => console.warn("Background order POST notice:", err));
@@ -1216,7 +1242,6 @@ export function UserDashboard() {
     { id: "orders", label: "My Orders", icon: Package },
     { id: "cart", label: "My Cart", icon: ShoppingBag },
     { id: "wishlist", label: "My Wishlist", icon: Heart },
-    { id: "booking", label: "Book New Tee", icon: Sparkles },
     { id: "addresses", label: "Addresses", icon: MapPin },
     { id: "support", label: "Support", icon: HelpCircle },
     { id: "logout", label: "Logout", icon: LogOut },
@@ -1226,7 +1251,7 @@ export function UserDashboard() {
   const CurrentIcon = currentNavItem.icon;
 
   return (
-    <div className="dashboard-page-root no-scrollbar min-h-screen bg-background pt-20 sm:pt-28 pb-8 sm:pb-12 overflow-x-hidden">
+    <div className="dashboard-page-root min-h-screen bg-background pt-20 sm:pt-24 pb-8 sm:pb-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="relative flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
           {/* MOBILE RESPONSIVE TAB STRIP (< lg) */}
@@ -1288,22 +1313,20 @@ export function UserDashboard() {
             </div>
           </div>
 
-          {/* DESKTOP SIDEBAR (>= lg): Permanently Fixed Navigation Panel (No Auto-Hide, No Hamburger) */}
-          <aside className="hidden lg:block fixed top-[112px] z-30 w-[280px]">
-            <div className="w-[280px] rounded-xl border border-gold/40 bg-card p-4 sm:p-5 shadow-sm">
-              <div className="flex items-center justify-between border-b border-border pb-4 gap-3">
-                <div className="flex items-center gap-3 shrink-0 overflow-hidden">
-                  {profilePic ? (
-                    <img src={profilePic} alt={profileName} className="size-10 rounded-full object-cover border border-gold shadow-sm shrink-0" />
-                  ) : (
-                    <div className="flex size-10 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-base font-bold text-gold shrink-0 shadow-sm">
-                      {(profileName || user?.name || "U")[0].toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex flex-col justify-center overflow-hidden">
-                    <h3 className="font-display text-base font-bold text-foreground truncate">{profileName}</h3>
-                    <p className="text-[11px] text-muted-foreground truncate">{profileEmail}</p>
+          {/* DESKTOP SIDEBAR (>= lg): Sticky Fixed User Control Panel */}
+          <aside className="hidden lg:block sticky top-20 sm:top-24 z-20 w-72 shrink-0 self-start">
+            <div className="w-full rounded-2xl border border-gold/40 bg-card p-5 shadow-sm">
+              <div className="flex items-center gap-3 border-b border-border pb-4 overflow-hidden">
+                {profilePic ? (
+                  <img src={profilePic} alt={profileName} className="size-11 rounded-full object-cover border border-gold shadow-sm shrink-0" />
+                ) : (
+                  <div className="flex size-11 items-center justify-center rounded-full border border-gold/50 bg-gold/15 font-display text-lg font-bold text-gold shrink-0 shadow-sm">
+                    {(profileName || user?.name || "U")[0].toUpperCase()}
                   </div>
+                )}
+                <div className="flex flex-col justify-center overflow-hidden min-w-0">
+                  <h3 className="font-display text-sm font-bold text-foreground truncate">{profileName || "VEXA Member"}</h3>
+                  <p className="text-[11px] text-muted-foreground truncate">{profileEmail || "user@vexa.com"}</p>
                 </div>
               </div>
 
@@ -1324,7 +1347,7 @@ export function UserDashboard() {
                           setActiveTab(item.id as TabType);
                         }
                       }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                      className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
                         isLogout
                           ? "text-muted-foreground hover:bg-destructive/15 hover:text-destructive mt-3 pt-3 border-t border-border/60"
                           : isActive
@@ -1336,6 +1359,7 @@ export function UserDashboard() {
                         <Icon className="size-4.5 shrink-0" />
                         <span>{item.label}</span>
                       </div>
+                      {isActive && <CheckCircle2 className="size-4 shrink-0" />}
                     </button>
                   );
                 })}
@@ -1343,13 +1367,11 @@ export function UserDashboard() {
             </div>
           </aside>
 
-          {/* DASHBOARD CONTENT COLUMN: Fixed left margin keeps content aligned beside fixed sidebar */}
-          <div className="flex-1 min-w-0 flex flex-col w-full lg:ml-[304px]">
-            {/* MAIN TAB CONTENT AREA */}
-            <main className="w-full flex-1 min-w-0 rounded-xl border-0 bg-transparent p-0 shadow-none lg:border lg:border-border lg:bg-card lg:p-8 lg:shadow-sm">
+          {/* DASHBOARD CONTENT MAIN AREA */}
+          <main className="flex-1 min-w-0 flex flex-col w-full space-y-6 self-start">
             {/* 1. MY PROFILE TAB */}
             {activeTab === "profile" && (
-              <div className="space-y-6 w-full pt-2 sm:pt-0">
+              <div className="space-y-6 w-full">
                 {/* Profile Header Avatar Card */}
                 <div className="flex flex-col sm:flex-row items-center gap-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
                   {/* Avatar Container with Hover Overlay */}
@@ -3129,13 +3151,11 @@ export function UserDashboard() {
                 )}
               </div>
             )}
-          </main>
-
             {/* Dashboard Aligned Footer */}
             <div className="w-full mt-auto pt-8">
               <Footer />
             </div>
-          </div>
+          </main>
         </div>
       </div>
 

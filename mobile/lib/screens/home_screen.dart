@@ -18,6 +18,7 @@ import 'profile_screen.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'order_tracking_screen.dart';
+import 'order_details_screen.dart';
 import 'customer_support_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
 import '../services/invoice_pdf_service.dart';
@@ -1359,6 +1360,426 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _handleNotificationTap(Map<String, dynamic> n) {
+    if (n['isRead'] == false) {
+      n['isRead'] = true;
+      NotificationService.markAsRead(n['id'] as String);
+      if (mounted) setState(() {});
+    }
+
+    _showNotificationDetailsModal(n);
+  }
+
+  void _showNotificationDetailsModal(Map<String, dynamic> n) {
+    final title = (n['title'] ?? 'Notification').toString();
+    final body = (n['body'] ?? '').toString();
+    final time = (n['time'] ?? 'Just now').toString();
+    final type = (n['type'] ?? '').toString();
+    final data = n['data'] as Map<String, dynamic>?;
+    final IconData icon = (n['icon'] is IconData) ? n['icon'] as IconData : Icons.notifications_active_rounded;
+    final Color color = (n['color'] is Color) ? n['color'] as Color : _gold;
+
+    // Extract reference information if present
+    String? orderId;
+    final orderMatch = RegExp(r'#VX-([A-Za-z0-9-]+)').firstMatch('$title $body');
+    if (orderMatch != null) {
+      orderId = orderMatch.group(1);
+    } else if (data != null && (data['orderId'] != null || data['_id'] != null)) {
+      orderId = (data['orderId'] ?? data['_id']).toString();
+    }
+
+    String? amount;
+    final amountMatch = RegExp(r'₹\s*([0-9,]+)').firstMatch('$title $body');
+    if (amountMatch != null) {
+      amount = '₹${amountMatch.group(1)}';
+    }
+
+    String categoryText = 'NOTIFICATION';
+    if (type.contains('ORDER') || title.toLowerCase().contains('order') || orderId != null) {
+      categoryText = 'ORDER UPDATE';
+    } else if (type.contains('DROP') || title.toLowerCase().contains('drop') || title.toLowerCase().contains('collection')) {
+      categoryText = 'EXCLUSIVE DROP';
+    } else if (title.toLowerCase().contains('welcome') || title.toLowerCase().contains('account')) {
+      categoryText = 'ACCOUNT ALERT';
+    } else if (title.toLowerCase().contains('point') || title.toLowerCase().contains('vip') || title.toLowerCase().contains('loyalty')) {
+      categoryText = 'LOYALTY REWARDS';
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (pageContext) {
+          return Scaffold(
+            backgroundColor: _bgColor,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 1,
+              shadowColor: Colors.black.withAlpha(15),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+                onPressed: () => Navigator.pop(pageContext),
+              ),
+              title: Text(
+                'NOTIFICATION DETAILS',
+                style: GoogleFonts.cinzel(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  color: _textDark,
+                ),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: color.withAlpha(80)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, size: 13, color: color),
+                          const SizedBox(width: 5),
+                          Text(
+                            categoryText,
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 12),
+                          // High-impact Icon Glow Avatar
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: color.withAlpha(20),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: color.withAlpha(90), width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withAlpha(40),
+                                  blurRadius: 24,
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Icon(icon, color: color, size: 48),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Large Notification Title
+                          Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.outfit(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              height: 1.3,
+                              color: _textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Time Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _surfaceBg,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: _border),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.access_time_rounded, size: 14, color: _subtext),
+                                const SizedBox(width: 6),
+                                Text(
+                                  time,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12.5,
+                                    color: _subtext,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+
+                          // Main Message Card
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: _border),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(8),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 4,
+                                      height: 18,
+                                      decoration: BoxDecoration(
+                                        color: color,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'MESSAGE SUMMARY',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.2,
+                                        color: _subtext,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  body,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14.5,
+                                    height: 1.6,
+                                    color: const Color(0xFF334155),
+                                  ),
+                                ),
+                                if (orderId != null || amount != null) ...[
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 16),
+                                    child: Divider(height: 1),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: [
+                                      if (orderId != null)
+                                        Column(
+                                          children: [
+                                            Text(
+                                              'ORDER REFERENCE',
+                                              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: _surfaceBg,
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                '#VX-$orderId',
+                                                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      if (amount != null)
+                                        Column(
+                                          children: [
+                                            Text(
+                                              'ORDER TOTAL',
+                                              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              amount,
+                                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: _goldDark),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Additional VEXA Service Badge Box
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: color.withAlpha(12),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: color.withAlpha(40)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.verified_user_outlined, color: color, size: 22),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Verified VEXA System Alert',
+                                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Official notification from your VEXA mobile account.',
+                                        style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Bottom Action Bar
+                  Container(
+                    padding: const EdgeInsets.all(20.0),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(12),
+                          blurRadius: 10,
+                          offset: const Offset(0, -4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(pageContext); // Close full screen details
+
+                              if (categoryText == 'ORDER UPDATE' || orderId != null) {
+                                final targetOrder = OrderModel(
+                                  id: orderId ?? '1726',
+                                  customerName: 'Valued Customer',
+                                  shippingAddress: 'Indiranagar 100ft Road, Bengaluru, Karnataka',
+                                  phone: '+91 98765 43210',
+                                  paymentMethod: 'VEXA Pay (Card)',
+                                  totalAmount: amount != null ? (double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1899.0) : 1899.0,
+                                  status: title.toLowerCase().contains('dispatched') ? 'Out for Delivery' : 'Confirmed',
+                                  createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+                                  items: [
+                                    OrderItem(
+                                      itemId: '1',
+                                      name: 'Urban Silhouette 240 GSM Oversized Tee',
+                                      price: amount != null ? (double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1899.0) : 1899.0,
+                                      quantity: 1,
+                                      color: 'Obsidian Black',
+                                      size: 'L',
+                                      image: 'assets/images/hero_luxury_tshirt.png',
+                                    ),
+                                  ],
+                                );
+
+                                if (Navigator.canPop(context)) {
+                                  Navigator.pop(context); // Close notifications sheet
+                                }
+                                _navigateToScreen(OrderDetailsScreen(
+                                  order: targetOrder,
+                                  onRefreshParent: _refreshOrders,
+                                ));
+                              } else if (categoryText == 'EXCLUSIVE DROP') {
+                                if (Navigator.canPop(context)) {
+                                  Navigator.pop(context); // Close notifications sheet
+                                }
+                                _navigateToScreen(AllProductsScreen(
+                                  items: _items,
+                                  favoriteIds: _favoriteIds,
+                                  onToggleFavorite: (id) {
+                                    setState(() {
+                                      if (_favoriteIds.contains(id)) {
+                                        _favoriteIds.remove(id);
+                                      } else {
+                                        _favoriteIds.add(id);
+                                      }
+                                    });
+                                  },
+                                  cartItems: _cartItems,
+                                ));
+                              } else if (categoryText == 'LOYALTY REWARDS' || categoryText == 'ACCOUNT ALERT') {
+                                if (Navigator.canPop(context)) {
+                                  Navigator.pop(context); // Close notifications sheet
+                                }
+                                setState(() {
+                                  _currentTabIndex = 4; // Navigate to Profile tab
+                                });
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _textDark,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              categoryText == 'ORDER UPDATE'
+                                  ? 'VIEW ORDER DETAILS'
+                                  : categoryText == 'EXCLUSIVE DROP'
+                                      ? 'EXPLORE COLLECTION'
+                                      : categoryText == 'LOYALTY REWARDS'
+                                          ? 'VIEW REWARDS & POINTS'
+                                          : 'OK, GOT IT',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showNotificationsSheet() {
     Navigator.push(
       context,
@@ -1577,15 +1998,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(16),
                                     onTap: () {
-                                      if (isUnread) {
-                                        setSheetState(() {
-                                          n['isRead'] = true;
-                                          // Handled by NotificationService
-                                        });
-                                        setState(() {
-                                          // Handled by NotificationService
-                                        });
-                                      }
+                                      setSheetState(() { n['isRead'] = true; }); _handleNotificationTap(n);
                                     },
                                     child: Container(
                                       padding: const EdgeInsets.all(16),
@@ -3236,9 +3649,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   builder: (context) {
                     final itemsSubtotal = order.items.fold(0.0, (sum, i) => sum + (i.price * i.quantity));
                     final baseSubtotal = itemsSubtotal > 0 ? itemsSubtotal : order.totalAmount;
-                    final discountAmount = baseSubtotal > order.totalAmount ? (baseSubtotal - order.totalAmount) : 0.0;
-                    final gstIncluded = order.totalAmount - (order.totalAmount / 1.18);
                     final hasCoupon = order.couponApplied.isNotEmpty;
+                    final discountAmount = hasCoupon ? (baseSubtotal * 0.10) : 0.0;
+                    final netSubtotal = (baseSubtotal - discountAmount).clamp(0.0, double.infinity);
+                    final taxAmount = netSubtotal * 0.18;
+                    final displayTotalAmount = netSubtotal + taxAmount;
                     final totalSavings = 150.0 + discountAmount;
 
                     return Container(
@@ -3312,7 +3727,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   Text('Taxes & Duties (GST 18%)', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
                                 ],
                               ),
-                              Text('₹${gstIncluded.toStringAsFixed(0)} (Included)', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                              Text('+₹${taxAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -3370,7 +3785,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   borderRadius: BorderRadius.circular(10),
                                   boxShadow: [BoxShadow(color: _goldDark.withAlpha(60), blurRadius: 8, offset: const Offset(0, 2))],
                                 ),
-                                child: Text('₹${order.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                                child: Text('₹${displayTotalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
                               ),
                             ],
                           ),
@@ -3815,11 +4230,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           return StatefulBuilder(
             builder: (modalCtx, setInvoiceState) {
               final invoiceNo = 'INV-2026-${order.id.replaceAll('#', '').replaceAll('-', '')}';
-              final totalAmt = order.totalAmount > 0 ? order.totalAmount : 1699.0;
-              final subtotal = totalAmt / 1.18;
-              final gstTotal = totalAmt - subtotal;
+              final itemsSubtotal = order.items.fold(0.0, (sum, i) => sum + (i.price * i.quantity));
+              final subtotal = itemsSubtotal > 0 ? itemsSubtotal : (order.totalAmount > 0 ? order.totalAmount : 1499.0);
+              final gstTotal = subtotal * 0.18;
               final cgst = gstTotal / 2;
               final sgst = gstTotal / 2;
+              final totalAmt = subtotal + gstTotal;
 
               void triggerDownload() async {
                 if (isDownloading || isDownloaded) return;

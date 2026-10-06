@@ -71,14 +71,42 @@ export const triggerWebTestPushNotification = (
   title = "⚡ VEXA Push Notification",
   body = "Push notifications are working perfectly on your web browser!"
 ) => {
-  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+
+  const fireNotification = () => {
     try {
-      new Notification(title, {
-        body,
-        icon: "/vexa_logo.png",
-      });
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+          if (reg && reg.showNotification) {
+            reg.showNotification(title, {
+              body,
+              icon: "/vexa_logo.png",
+              badge: "/vexa_logo.png",
+              tag: `vexa-notif-${Date.now()}`,
+            }).catch(() => {
+              new Notification(title, { body, icon: "/vexa_logo.png" });
+            });
+          } else {
+            new Notification(title, { body, icon: "/vexa_logo.png" });
+          }
+        }).catch(() => {
+          new Notification(title, { body, icon: "/vexa_logo.png" });
+        });
+      } else {
+        new Notification(title, { body, icon: "/vexa_logo.png" });
+      }
     } catch (e) {
       console.warn("Native browser notification warning:", e);
     }
+  };
+
+  if (Notification.permission === "granted") {
+    fireNotification();
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        fireNotification();
+      }
+    });
   }
 };

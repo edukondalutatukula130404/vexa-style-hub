@@ -71,6 +71,27 @@ function Layout() {
       });
       triggerWebTestPushNotification(title, body);
     });
+
+    // Listen to live WebSocket broadcast events for system push notifications
+    const unsubscribe = vexaSocket.subscribe((event) => {
+      const { type, data } = event;
+      if (type === "ADMIN_MESSAGE" || type === "ANNOUNCEMENT" || type === "NOTIFICATION") {
+        const title = data?.title || "Message from VEXA Admin 📢";
+        const body = data?.body || data?.message || "Notification from Admin";
+        toast.info(title, { description: body });
+        triggerWebTestPushNotification(title, body);
+      } else if (type === "ORDER_CREATED" || type === "ORDER_PLACED") {
+        const orderId = data?._id || data?.id || "#VX-ORDER";
+        const title = "Order Confirmed! 📦";
+        const body = `Order ${orderId} placed successfully.`;
+        toast.success(title, { description: body });
+        triggerWebTestPushNotification(title, body);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
   const hideFooter =
     location.pathname === "/dashboard" ||

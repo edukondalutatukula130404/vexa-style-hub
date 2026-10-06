@@ -2582,11 +2582,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return StatefulBuilder(
             builder: (modalCtx, setInvoiceState) {
               final invoiceNo = 'INV-2026-${order.id.replaceAll('#', '').replaceAll('-', '')}';
-              final totalAmt = order.totalAmount > 0 ? order.totalAmount : 1699.0;
-              final subtotal = totalAmt / 1.18;
-              final gstTotal = totalAmt - subtotal;
+              final itemsSubtotal = order.items.fold(0.0, (sum, i) => sum + (i.price * i.quantity));
+              final subtotal = itemsSubtotal > 0 ? itemsSubtotal : (order.totalAmount > 0 ? order.totalAmount : 1499.0);
+              final gstTotal = subtotal * 0.18;
               final cgst = gstTotal / 2;
               final sgst = gstTotal / 2;
+              final totalAmt = subtotal + gstTotal;
 
               void triggerDownload() async {
                 if (isDownloading || isDownloaded) return;

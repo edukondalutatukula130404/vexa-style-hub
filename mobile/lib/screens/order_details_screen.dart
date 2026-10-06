@@ -98,11 +98,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           return StatefulBuilder(
             builder: (modalCtx, setInvoiceState) {
               final invoiceNo = 'INV-2026-${order.id.replaceAll('#', '').replaceAll('-', '')}';
-              final totalAmt = order.totalAmount > 0 ? order.totalAmount : 1699.0;
-              final subtotal = totalAmt / 1.18;
-              final gstTotal = totalAmt - subtotal;
+              final itemsSubtotal = order.items.fold(0.0, (sum, i) => sum + (i.price * i.quantity));
+              final subtotal = itemsSubtotal > 0 ? itemsSubtotal : (order.totalAmount > 0 ? order.totalAmount : 1499.0);
+              final gstTotal = subtotal * 0.18;
               final cgst = gstTotal / 2;
               final sgst = gstTotal / 2;
+              final totalAmt = subtotal + gstTotal;
 
               void triggerDownload() async {
                 if (isDownloading || isDownloaded) return;
@@ -955,9 +956,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             builder: (context) {
               final itemsSubtotal = _currentOrder.items.fold(0.0, (sum, i) => sum + (i.price * i.quantity));
               final baseSubtotal = itemsSubtotal > 0 ? itemsSubtotal : _currentOrder.totalAmount;
-              final discountAmount = baseSubtotal > _currentOrder.totalAmount ? (baseSubtotal - _currentOrder.totalAmount) : 0.0;
-              final gstIncluded = _currentOrder.totalAmount - (_currentOrder.totalAmount / 1.18);
               final hasCoupon = _currentOrder.couponApplied.isNotEmpty;
+              final discountAmount = hasCoupon ? (baseSubtotal * 0.10) : 0.0;
+              final netSubtotal = (baseSubtotal - discountAmount).clamp(0.0, double.infinity);
+              final taxAmount = netSubtotal * 0.18;
+              final displayTotalAmount = netSubtotal + taxAmount;
               final totalSavings = 150.0 + discountAmount;
 
               return Container(
@@ -1027,7 +1030,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Taxes & Duties Row
+                    // Taxes & Duties Row (GST 18% Added)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1038,7 +1041,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             Text('Taxes & Duties (GST 18%)', style: GoogleFonts.outfit(fontSize: 13, color: _subtext)),
                           ],
                         ),
-                        Text('₹${gstIncluded.toStringAsFixed(0)} (Included)', style: GoogleFonts.outfit(fontSize: 12, color: _subtext)),
+                        Text('+₹${taxAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -1076,7 +1079,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       child: Divider(height: 1, color: _border),
                     ),
 
-                    // Total Amount Paid Row
+                    // Total Amount Paid Row (Base + Tax - Discount)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1101,7 +1104,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: [BoxShadow(color: _goldDark.withAlpha(60), blurRadius: 8, offset: const Offset(0, 2))],
                           ),
-                          child: Text('₹${_currentOrder.totalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                          child: Text('₹${displayTotalAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
                         ),
                       ],
                     ),

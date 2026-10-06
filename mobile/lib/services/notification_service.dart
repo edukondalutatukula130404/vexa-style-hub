@@ -98,6 +98,13 @@ class NotificationService {
       );
       debugPrint('FCM Authorization Status: ${settings.authorizationStatus}');
 
+      // Explicitly request Android 13+ runtime local notification permission
+      final androidLocalPlugin = localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidLocalPlugin != null) {
+        await androidLocalPlugin.requestNotificationsPermission();
+      }
+
       // Set up Flutter Local Notifications for Android Foreground Banners
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -115,12 +122,12 @@ class NotificationService {
         'high_importance_channel',
         'High Importance Notifications',
         description: 'This channel is used for VEXA Push Notifications.',
-        importance: Importance.high,
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
       );
 
-      await localNotifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
+      await androidLocalPlugin?.createNotificationChannel(channel);
 
       // Get FCM Token
       fcmToken = await messaging.getToken();
@@ -256,6 +263,9 @@ class NotificationService {
             icon: '@mipmap/ic_launcher',
             importance: Importance.max,
             priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            visibility: NotificationVisibility.public,
           ),
         ),
       );

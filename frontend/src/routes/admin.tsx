@@ -43,6 +43,7 @@ import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL } from "@/lib/auth";
 import { Footer } from "@/components/Footer";
 import { vexaSocket } from "@/lib/socket";
+import { triggerWebTestPushNotification } from "@/lib/firebase";
 
 type OrderItem = {
   _id: string;
@@ -186,6 +187,8 @@ export function Admin() {
     vexaSocket.send("ADMIN_MESSAGE", payload);
     vexaSocket.send("ANNOUNCEMENT", payload);
 
+    triggerWebTestPushNotification(broadcastTitle.trim(), broadcastBody.trim());
+
     const newNotif: NotificationItem = {
       id: `notif-broadcast-${Date.now()}`,
       title: broadcastTitle.trim(),
@@ -301,8 +304,12 @@ export function Admin() {
           if (customId) knownOrderIdsRef.current.add(customId);
           knownOrderIdsRef.current.add(cleanCode);
 
-          // Play Audio Chime
+          // Play Audio Chime & Trigger System Native Push Notification
           playNotifChime();
+          triggerWebTestPushNotification(
+            "⚡ Realtime Booking Received",
+            `New Order #${shortCode} placed by ${customerName} for ₹${amount.toLocaleString("en-IN")}`
+          );
 
           // Refresh orders list state automatically in real time
           fetchOrders();
@@ -1249,6 +1256,7 @@ export function Admin() {
 
     window.addEventListener("vexa_orders_updated", handleOrdersUpdated);
     window.addEventListener("vexa_ws_message", handleWsMsg);
+    window.addEventListener("storage", handleOrdersUpdated);
 
     // Poll every 2 seconds — fetchOrders() now detects new orders and fires toast/notification
     const interval = setInterval(() => {
@@ -1258,6 +1266,7 @@ export function Admin() {
     return () => {
       window.removeEventListener("vexa_orders_updated", handleOrdersUpdated);
       window.removeEventListener("vexa_ws_message", handleWsMsg);
+      window.removeEventListener("storage", handleOrdersUpdated);
       clearInterval(interval);
     };
   }, []);

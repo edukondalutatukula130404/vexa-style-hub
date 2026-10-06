@@ -98,7 +98,9 @@ class _CartScreenState extends State<CartScreen> {
 
   double get _discountAmount => _rawSubtotal * _discountPercent;
 
-  double get _finalTotal => (_rawSubtotal - _discountAmount).clamp(0, double.infinity);
+  double get _taxAmount => (_rawSubtotal - _discountAmount) * 0.18;
+
+  double get _finalTotal => (_rawSubtotal - _discountAmount + _taxAmount).clamp(0, double.infinity);
 
   void _applyCoupon() {
     FocusScope.of(context).unfocus();
@@ -690,8 +692,16 @@ class _CartScreenState extends State<CartScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Delivery & Handing:', style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext)),
+                                  Text('Delivery & Handling:', style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext)),
                                   Text('FREE', style: GoogleFonts.outfit(fontSize: 12.5, color: _successGreen, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Taxes & Duties (GST 18%):', style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext)),
+                                  Text('+₹${_taxAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 12.5, color: _textDark, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                               const Divider(color: _border, height: 18),
@@ -2171,8 +2181,8 @@ class _CartScreenState extends State<CartScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Shipping:', style: GoogleFonts.outfit(color: _subtext, fontSize: 13)),
-                    Text('FREE', style: GoogleFonts.outfit(color: _successGreen, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text('Taxes & Duties (GST 18%):', style: GoogleFonts.outfit(color: _subtext, fontSize: 13)),
+                    Text('+₹${_taxAmount.toStringAsFixed(0)}', style: GoogleFonts.outfit(color: _textDark, fontWeight: FontWeight.w600, fontSize: 13)),
                   ],
                 ),
                 const Divider(color: _border, height: 16),
@@ -2183,7 +2193,7 @@ class _CartScreenState extends State<CartScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Grand Total', style: GoogleFonts.cinzel(color: _textDark, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1)),
-                        Text('Taxes & duties included', style: GoogleFonts.outfit(color: _subtext, fontSize: 10)),
+                        Text('GST 18% tax included in total', style: GoogleFonts.outfit(color: _subtext, fontSize: 10)),
                       ],
                     ),
                     Text(

@@ -565,8 +565,15 @@ class OrderService {
       'items': items.map((i) => i.toJson()).toList(),
     };
 
+    // Broadcast over WebSocket directly for instant realtime Admin Dashboard update
+    try {
+      VexaWebSocketService().send('ORDER_CREATED', orderPayload);
+      VexaWebSocketService().send('ORDERS_UPDATED', orderPayload);
+    } catch (e) {
+      debugPrint('WebSocket direct send notice: $e');
+    }
+
     // 4. PRIMARY PATH: POST to backend REST API
-    bool backendSuccess = false;
     try {
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/orders'),
@@ -575,17 +582,10 @@ class OrderService {
       ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        backendSuccess = true;
         debugPrint('✅ [OrderService] Order synced to backend — WebSocket broadcast triggered automatically.');
       }
     } catch (e) {
       debugPrint('⚠️ [OrderService] Backend POST failed: $e');
-    }
-
-    if (!backendSuccess) {
-      debugPrint('⚡ [OrderService] Backend unreachable — sending ORDER_CREATED directly via WebSocket.');
-      VexaWebSocketService().send('ORDER_CREATED', orderPayload);
-      VexaWebSocketService().send('ORDERS_UPDATED', orderPayload);
     }
 
     return newOrder;

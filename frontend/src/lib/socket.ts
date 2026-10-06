@@ -135,6 +135,21 @@ class VexaSocketClient {
       this.connect(); // Ensure we're connecting
     }
   }
+
+  /** Subscribe to all incoming WebSocket events; returns unsubscribe function */
+  public subscribe(listener: (payload: { type: string; data: any; timestamp?: number }) => void): () => void {
+    if (typeof window === "undefined") return () => {};
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        listener(customEvent.detail);
+      }
+    };
+    window.addEventListener("vexa_ws_message", handler);
+    return () => {
+      window.removeEventListener("vexa_ws_message", handler);
+    };
+  }
 }
 
 export const vexaSocket = new VexaSocketClient();

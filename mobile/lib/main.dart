@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'config/api_config.dart';
 import 'services/websocket_service.dart';
+import 'services/notification_service.dart';
 import 'screens/cart_screen.dart';
 import 'screens/forget_password_screen.dart';
 import 'screens/home_screen.dart';
@@ -10,12 +11,16 @@ import 'screens/onboarding_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/product_detail_screen.dart';
+import 'services/api_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize ApiConfig asynchronously
   ApiConfig.init();
+  // Initialize Firebase Cloud Messaging for Push Notifications
+  await NotificationService.initializeFirebaseMessaging();
   // Initialize Realtime WebSocket Connection for immediate data updates without refresh
   VexaWebSocketService().connect();
   runApp(const VexaMobileApp());
@@ -38,6 +43,25 @@ class VexaMobileApp extends StatelessWidget {
         return ConnectivityWrapper(
           child: child ?? const SizedBox.shrink(),
         );
+      },
+      onGenerateRoute: (settings) {
+        final uri = Uri.parse(settings.name ?? '');
+        if (uri.path.startsWith('/product/') || uri.path == '/product') {
+          String? productId;
+          if (uri.path.startsWith('/product/')) {
+            productId = uri.path.replaceFirst('/product/', '');
+          } else {
+            productId = uri.queryParameters['id'];
+          }
+          if (productId != null && productId.isNotEmpty) {
+            final item = ApiService.getItemById(productId);
+            return MaterialPageRoute(
+              builder: (context) => ProductDetailScreen(item: item),
+              settings: settings,
+            );
+          }
+        }
+        return null;
       },
       routes: {
         '/splash': (context) => const SplashScreen(),

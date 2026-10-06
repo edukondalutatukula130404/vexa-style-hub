@@ -1,0 +1,84 @@
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
+
+export const firebaseConfig = {
+  apiKey: "AIzaSyAYcJD2bB-2M8Hsk8DgL_MswLbvoPouRBU",
+  authDomain: "vexa-c0fc4.firebaseapp.com",
+  projectId: "vexa-c0fc4",
+  storageBucket: "vexa-c0fc4.firebasestorage.app",
+  messagingSenderId: "141733607007",
+  appId: "1:141733607007:web:75805444471b582a3e0dea"
+};
+
+// Initialize Firebase App singleton
+export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+export const requestWebNotificationPermission = async (): Promise<string | null> => {
+  try {
+    const supported = await isSupported();
+    if (!supported) {
+      console.warn('Firebase Messaging is not supported in this browser environment.');
+      return null;
+    }
+
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      console.warn('Notifications not supported in environment.');
+      return null;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const messagingInstance = getMessaging(app);
+
+      // Register service worker if supported
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const token = await getToken(messagingInstance, {
+          serviceWorkerRegistration: registration,
+        }).catch((err) => {
+          console.warn('FCM Token generation warning:', err);
+          return null;
+        });
+        
+        if (token) {
+          console.log('Web FCM Token generated:', token);
+          return token;
+        }
+      }
+    } else {
+      console.warn('Notification permission denied by user.');
+    }
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+  }
+  return null;
+};
+
+export const onForegroundMessage = async (callback: (payload: any) => void) => {
+  try {
+    const supported = await isSupported();
+    if (!supported) return;
+    const messaging = getMessaging(app);
+    return onMessage(messaging, (payload) => {
+      callback(payload);
+    });
+  } catch (error) {
+    console.error('Error setting up foreground message listener:', error);
+  }
+};
+
+export const triggerWebTestPushNotification = (
+  title = "⚡ VEXA Push Notification",
+  body = "Push notifications are working perfectly on your web browser!"
+) => {
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, {
+        body,
+        icon: "/vexa_logo.png",
+      });
+    } catch (e) {
+      console.warn("Native browser notification warning:", e);
+    }
+  }
+};

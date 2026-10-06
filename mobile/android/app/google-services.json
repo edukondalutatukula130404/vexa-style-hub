@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "141733607007",
+    "project_id": "vexa-c0fc4",
+    "storage_bucket": "vexa-c0fc4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141733607007:android:75805444471b582a3e0dea",
+        "android_client_info": {
+          "package_name": "site.speshway.clothing"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYcJD2bB-2M8Hsk8DgL_MswLbvoPouRBU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

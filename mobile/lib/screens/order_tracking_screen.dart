@@ -59,8 +59,21 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     if (status.contains('deliver')) return 4;
     if (status.contains('out for delivery') || status.contains('courier')) return 3;
     if (status.contains('ship') || status.contains('transit')) return 2;
-    if (status.contains('qc') || status.contains('prep') || status.contains('process')) return 1;
-    return 0;
+    if (status.contains('qc')) return 1;
+
+    // Real-time time progression based on order creation
+    final elapsedSeconds = DateTime.now().difference(_currentOrder.createdAt).inSeconds;
+    if (elapsedSeconds < 25) {
+      return 0; // Warehouse
+    } else if (elapsedSeconds < 55) {
+      return 1; // QC Hub
+    } else if (elapsedSeconds < 110) {
+      return 2; // Express Van
+    } else if (elapsedSeconds < 180) {
+      return 3; // Out for Delivery
+    } else {
+      return 4; // Delivered
+    }
   }
 
   String _formatDateShort(DateTime dt) {

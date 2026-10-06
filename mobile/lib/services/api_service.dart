@@ -279,6 +279,14 @@ class ApiService {
     return getFallbackItems();
   }
 
+  static ItemModel getItemById(String id) {
+    final cleanId = id.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9-]'), '');
+    final catalog = getFallbackItems();
+    return catalog.firstWhere(
+      (item) => item.id.toLowerCase() == cleanId,
+      orElse: () => catalog.first,
+    );
+  }
 
   static List<ItemModel> getFallbackItems() {
     return [

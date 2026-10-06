@@ -261,7 +261,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       itemCount: slides.length,
                       itemBuilder: (c, idx) {
                         final slide = slides[idx];
-                        final title = slide['title'] as String;
                         final imgPath = slide['image'] as String;
 
                         Widget popupImageWidget = _buildProductImage(
@@ -294,56 +293,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   child: popupImageWidget,
                                 ),
                               ),
-                              Positioned(
-                                top: 16,
-                                left: 16,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withAlpha(180),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: AppTheme.primaryColor.withAlpha(120)),
-                                  ),
-                                  child: Text(
-                                    title.toUpperCase(),
-                                    style: GoogleFonts.outfit(
-                                      color: AppTheme.primaryColor,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         );
                       },
                     ),
 
-                    // Bottom caption & thumbnail navigation dots
+                    // Bottom navigation dots
                     Positioned(
                       bottom: 30,
                       left: 0,
                       right: 0,
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withAlpha(190),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: Text(
-                              '${widget.item.name} • ${slides[popupIndex]['title']}',
-                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(slides.length, (dotIdx) {
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(slides.length, (dotIdx) {
                               final isCurrent = dotIdx == popupIndex;
                               return AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
@@ -357,9 +320,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               );
                             }),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
                   ],
                 );
               },

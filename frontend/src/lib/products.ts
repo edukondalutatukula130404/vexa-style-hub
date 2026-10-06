@@ -324,7 +324,7 @@ function deduplicateProductKeys(list: Product[]): Product[] {
 
 export function useProducts() {
   const [allProducts, setAllProducts] = useState<Product[]>(() => products);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const fetchDbProducts = async () => {
     let apiProducts: Product[] = [];

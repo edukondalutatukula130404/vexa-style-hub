@@ -1,11 +1,15 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { MobileFrameWrapper } from "@/components/MobileFrameWrapper";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { NoInternetOverlay } from "@/components/NoInternetOverlay";
 import { vexaSocket } from "@/lib/socket";
+
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { requestWebNotificationPermission, onForegroundMessage, triggerWebTestPushNotification } from "@/lib/firebase";
 
 // Route Pages
 import { Home } from "@/routes/index";
@@ -20,6 +24,21 @@ import { About } from "@/routes/about";
 import { Contact } from "@/routes/contact";
 import { Faq } from "@/routes/faq";
 import { ResetPassword } from "@/routes/reset-password";
+
+function ProductQueryRedirect() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const productId = searchParams.get("id") || searchParams.get("product");
+    if (productId && (location.pathname === "/" || location.pathname === "")) {
+      navigate(`/product/${productId}`, { replace: true });
+    }
+  }, [location, navigate]);
+
+  return null;
+}
 
 function ScrollToTop() {
   const { pathname, search } = useLocation();
@@ -36,6 +55,22 @@ function Layout() {
 
   useEffect(() => {
     vexaSocket.connect();
+
+    // Initialize Web Push Notifications
+    requestWebNotificationPermission().then((token) => {
+      if (token) {
+        console.log("Firebase Web Push Notifications active. FCM Token:", token);
+      }
+    });
+
+    onForegroundMessage((payload) => {
+      const title = payload?.notification?.title || "VEXA Notification";
+      const body = payload?.notification?.body || "";
+      toast.info(title, {
+        description: body,
+      });
+      triggerWebTestPushNotification(title, body);
+    });
   }, []);
   const hideFooter =
     location.pathname === "/dashboard" ||
@@ -83,11 +118,14 @@ function NotFound() {
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" richColors />
       <NoInternetOverlay />
+      <ProductQueryRedirect />
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
+          <Route path="/product" element={<ProductDetailPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

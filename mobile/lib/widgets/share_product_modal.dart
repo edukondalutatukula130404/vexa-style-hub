@@ -40,7 +40,7 @@ class ShareProductModal extends StatelessWidget {
         ? base
         : ApiConfig.productionUrl.replaceAll(RegExp(r'/api/?$'), '');
 
-    return '$validDomain/product?id=$id';
+    return '$validDomain/?id=$id';
   }
 
   String get _shareText {

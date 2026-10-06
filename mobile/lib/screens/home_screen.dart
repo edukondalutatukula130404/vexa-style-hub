@@ -2370,22 +2370,51 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final firstItem = order.items.isNotEmpty ? order.items.first : null;
     final status = order.status.toLowerCase();
 
-    // Format status header string (e.g., Delivery expected by Oct 04 / Delivered on Jan 06 / Cancelled on Dec 30, 2025)
-    String headerText;
+    int stepIdx = 0;
     if (status.contains('cancel')) {
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      stepIdx = -1;
+    } else if (status.contains('deliver')) {
+      stepIdx = 4;
+    } else if (status.contains('out for delivery') || status.contains('courier')) {
+      stepIdx = 3;
+    } else if (status.contains('ship') || status.contains('transit')) {
+      stepIdx = 2;
+    } else if (status.contains('qc')) {
+      stepIdx = 1;
+    } else {
+      final elapsedSeconds = DateTime.now().difference(order.createdAt).inSeconds;
+      if (elapsedSeconds < 25) {
+        stepIdx = 0;
+      } else if (elapsedSeconds < 55) {
+        stepIdx = 1;
+      } else if (elapsedSeconds < 110) {
+        stepIdx = 2;
+      } else if (elapsedSeconds < 180) {
+        stepIdx = 3;
+      } else {
+        stepIdx = 4;
+      }
+    }
+
+    final isDelivered = stepIdx == 4 || status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'));
+    final isCancelled = stepIdx == -1 || status.contains('cancel');
+
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Format status header string (e.g., Delivered on Oct 06 / Delivery expected by Oct 09 / Cancelled on Dec 30)
+    String headerText;
+    if (isCancelled) {
       final m = months[order.createdAt.month - 1];
       final d = order.createdAt.day.toString().padLeft(2, '0');
       headerText = 'Cancelled on $m $d, ${order.createdAt.year}';
-    } else if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      final exp = order.createdAt.add(const Duration(days: 3));
-      final m = months[exp.month - 1];
-      final d = exp.day.toString().padLeft(2, '0');
+    } else if (isDelivered) {
+      final delDate = order.createdAt.add(const Duration(days: 2));
+      final delTime = delDate.isAfter(DateTime.now()) ? DateTime.now() : delDate;
+      final m = months[delTime.month - 1];
+      final d = delTime.day.toString().padLeft(2, '0');
       headerText = 'Delivered on $m $d';
     } else {
-      final exp = order.createdAt.add(const Duration(days: 4));
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final exp = order.createdAt.add(const Duration(days: 3));
       final m = months[exp.month - 1];
       final d = exp.day.toString().padLeft(2, '0');
       headerText = 'Delivery expected by $m $d';
@@ -2393,19 +2422,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Format status subtitle string
     String subtitleText;
-    if (status.contains('cancel')) {
+    if (isCancelled) {
       if (order.cancelReason != null && order.cancelReason!.isNotEmpty) {
         subtitleText = order.cancelReason!;
       } else {
         subtitleText = 'Your order was cancelled as per your request...';
       }
-    } else if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
-      subtitleText = firstItem != null ? firstItem.name : 'MOTREX Full Sleeve Colorblock Men Jacket';
+    } else if (isDelivered) {
+      subtitleText = firstItem != null ? 'Item delivered at doorstep • ${firstItem.name}' : 'Package delivered to customer successfully';
+    } else if (stepIdx == 0) {
+      subtitleText = 'Warehouse Dispatch Active • Packing Garment...';
+    } else if (stepIdx == 1) {
+      subtitleText = 'Quality Check Active at Central QC Hub...';
+    } else if (stepIdx == 2) {
+      subtitleText = 'In Transit via VEXA Express Courier...';
+    } else if (stepIdx == 3) {
+      subtitleText = 'Out for Delivery • Courier Agent En Route...';
     } else {
-      subtitleText = 'Today, Sep 30: Product has left the facility...';
+      subtitleText = 'Product in transit to your address...';
     }
 
-    final isUnpaidOrActive = !order.isPaid && !status.contains('cancel') && !status.contains('deliver');
+    final isUnpaidOrActive = !order.isPaid && !isCancelled && !isDelivered;
 
     return Container(
       color: Colors.white,
@@ -2694,25 +2731,90 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final status = order.status.toLowerCase();
 
     int stepIdx = 0;
-    if (status.contains('deliver')) {
+    if (status.contains('cancel')) {
+      stepIdx = -1;
+    } else if (status.contains('deliver')) {
       stepIdx = 4;
     } else if (status.contains('out for delivery') || status.contains('courier')) {
       stepIdx = 3;
     } else if (status.contains('ship') || status.contains('transit')) {
       stepIdx = 2;
-    } else if (status.contains('qc') || status.contains('prep') || status.contains('process')) {
+    } else if (status.contains('qc')) {
       stepIdx = 1;
+    } else {
+      // Real-time time progression based on order creation
+      final elapsedSeconds = DateTime.now().difference(order.createdAt).inSeconds;
+      if (elapsedSeconds < 25) {
+        stepIdx = 0; // Warehouse
+      } else if (elapsedSeconds < 55) {
+        stepIdx = 1; // QC Hub
+      } else if (elapsedSeconds < 110) {
+        stepIdx = 2; // Express Van
+      } else if (elapsedSeconds < 180) {
+        stepIdx = 3; // Out for Delivery
+      } else {
+        stepIdx = 4; // Delivered
+      }
     }
 
     String expectedText = 'Expected in 2–3 Business Days';
-    if (status.contains('cancel')) {
+    if (isCancelled) {
       expectedText = 'Order Cancelled';
-    } else if (status.contains('deliver')) {
-      expectedText = 'Delivered on ${order.formattedDate}';
-    } else if (status.contains('out for delivery')) {
+    } else if (stepIdx == 0) {
+      expectedText = 'Warehouse Dispatch Pending';
+    } else if (stepIdx == 1) {
+      expectedText = 'QC Inspection in Progress';
+    } else if (stepIdx == 2) {
+      expectedText = 'In Transit via Express Courier';
+    } else if (stepIdx == 3) {
       expectedText = 'Arriving Today by 6:00 PM';
-    } else if (status.contains('ship') || status.contains('transit')) {
-      expectedText = 'Expected Tomorrow by 2:00 PM';
+    } else if (stepIdx == 4) {
+      expectedText = 'Delivered on ${order.formattedDate}';
+    }
+
+    double progressWidthFactor = 0.0;
+    if (!isCancelled) {
+      if (stepIdx <= 0) {
+        progressWidthFactor = 0.12;
+      } else if (stepIdx == 1) {
+        progressWidthFactor = 0.38;
+      } else if (stepIdx == 2) {
+        progressWidthFactor = 0.65;
+      } else if (stepIdx == 3) {
+        progressWidthFactor = 0.88;
+      } else {
+        progressWidthFactor = 1.0;
+      }
+    }
+
+    String statusDisplay = order.status.toUpperCase();
+    if (!isCancelled) {
+      if (stepIdx == 0) {
+        statusDisplay = 'PROCESSING';
+      } else if (stepIdx == 1) {
+        statusDisplay = 'QC CHECK ACTIVE';
+      } else if (stepIdx == 2) {
+        statusDisplay = 'IN TRANSIT';
+      } else if (stepIdx == 3) {
+        statusDisplay = 'OUT FOR DELIVERY';
+      } else if (stepIdx == 4) {
+        statusDisplay = 'DELIVERED';
+      }
+    }
+
+    String gpsText = 'Live GPS Sync Active • Waybill #BD-98402';
+    if (isCancelled) {
+      gpsText = 'Shipment Cancelled';
+    } else if (stepIdx == 0) {
+      gpsText = 'Warehouse Dispatch Active • Packing Garment';
+    } else if (stepIdx == 1) {
+      gpsText = 'Quality Check Active at QC Hub • Waybill #BD-98402';
+    } else if (stepIdx == 2) {
+      gpsText = 'Live GPS Sync Active • Waybill #BD-98402';
+    } else if (stepIdx == 3) {
+      gpsText = 'Out for Delivery • Courier Arriving Soon';
+    } else if (stepIdx == 4) {
+      gpsText = 'Package Delivered';
     }
 
     return Container(
@@ -2785,7 +2887,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      order.status.toUpperCase(),
+                      statusDisplay,
                       style: GoogleFonts.outfit(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
@@ -2817,7 +2919,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 // Solid Single Color Progress Line
                 FractionallySizedBox(
-                  widthFactor: isCancelled ? 0.0 : ((stepIdx + 1) / 5).clamp(0.2, 1.0),
+                  widthFactor: progressWidthFactor,
                   child: Container(
                     height: 4,
                     decoration: BoxDecoration(
@@ -2831,10 +2933,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildHomeMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0),
-                    _buildHomeMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1),
+                    _buildHomeMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0, isActiveNode: stepIdx == 0),
+                    _buildHomeMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1, isActiveNode: stepIdx == 1),
                     _buildHomeMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2, isActiveNode: stepIdx == 2 || stepIdx == 3),
-                    _buildHomeMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4),
+                    _buildHomeMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4, isActiveNode: stepIdx == 4),
                   ],
                 ),
               ],
@@ -2857,9 +2959,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 12),
                 const SizedBox(width: 6),
                 Text(
-                  isCancelled
-                      ? 'Shipment Cancelled'
-                      : (stepIdx == 4 ? 'Package Delivered' : 'Live GPS Sync Active • Waybill #BD-98402'),
+                  gpsText,
                   style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
                 ),
               ],

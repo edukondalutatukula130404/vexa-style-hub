@@ -1,9 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: 'AIzaSyAYcJD2bB-2M8Hsk8DgL_MswLbvoPouRBU',
+      appId: '1:141733607007:android:75805444471b582a3e0dea',
+      messagingSenderId: '141733607007',
+      projectId: 'vexa-c0fc4',
+      storageBucket: 'vexa-c0fc4.firebasestorage.app',
+    ),
+  );
+  debugPrint("Handling a background FCM message: ${message.messageId}");
+}
 
 class NotificationService {
   /// Global notifier triggered whenever notifications change
   static final ValueNotifier<int> notificationNotifier = ValueNotifier<int>(0);
+
+  /// Flutter Local Notifications Plugin instance
+  static final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
+
+  /// FCM Token store
+  static String? fcmToken;
 
   /// Central notification list accessible across the app
   static final List<Map<String, dynamic>> notifications = [
@@ -43,6 +66,119 @@ class NotificationService {
 
   static void notifyListeners() {
     notificationNotifier.value++;
+  }
+
+  /// Initialize Firebase Messaging & Local Notifications for Mobile
+  static Future<void> initializeFirebaseMessaging() async {
+    try {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: 'AIzaSyAYcJD2bB-2M8Hsk8DgL_MswLbvoPouRBU',
+          appId: '1:141733607007:android:75805444471b582a3e0dea',
+          messagingSenderId: '141733607007',
+          projectId: 'vexa-c0fc4',
+          storageBucket: 'vexa-c0fc4.firebasestorage.app',
+        ),
+      );
+
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+      final messaging = FirebaseMessaging.instance;
+
+      // Request permissions (iOS & Android 13+)
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+      debugPrint('FCM Authorization Status: ${settings.authorizationStatus}');
+
+      // Set up Flutter Local Notifications for Android Foreground Banners
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const InitializationSettings initializationSettings =
+          InitializationSettings(android: initializationSettingsAndroid);
+      await localNotifications.initialize(settings: initializationSettings);
+
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'high_importance_channel',
+        'High Importance Notifications',
+        description: 'This channel is used for VEXA Push Notifications.',
+        importance: Importance.high,
+      );
+
+      await localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+
+      // Get FCM Token
+      fcmToken = await messaging.getToken();
+      debugPrint('FCM Mobile Token: $fcmToken');
+
+      messaging.onTokenRefresh.listen((token) {
+        fcmToken = token;
+        debugPrint('FCM Mobile Token Refreshed: $token');
+      });
+
+      // Handle Foreground Messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        final notification = message.notification;
+        final android = message.notification?.android;
+
+        if (notification != null) {
+          addNotification(
+            title: notification.title ?? 'VEXA Alert',
+            body: notification.body ?? '',
+            type: message.data['type']?.toString() ?? 'PUSH',
+            data: message.data,
+          );
+
+          if (android != null) {
+            localNotifications.show(
+              id: notification.hashCode,
+              title: notification.title,
+              body: notification.body,
+              notificationDetails: NotificationDetails(
+                android: AndroidNotificationDetails(
+                  channel.id,
+                  channel.name,
+                  channelDescription: channel.description,
+                  icon: '@mipmap/ic_launcher',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                ),
+              ),
+            );
+          }
+        }
+      });
+
+      // Handle message tap from background state
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        if (message.notification != null) {
+          addNotification(
+            title: message.notification!.title ?? 'VEXA Alert',
+            body: message.notification!.body ?? '',
+            type: message.data['type']?.toString() ?? 'PUSH',
+            data: message.data,
+          );
+        }
+      });
+
+      // Handle initial message from terminated state
+      final initialMessage = await messaging.getInitialMessage();
+      if (initialMessage != null && initialMessage.notification != null) {
+        addNotification(
+          title: initialMessage.notification!.title ?? 'VEXA Alert',
+          body: initialMessage.notification!.body ?? '',
+          type: initialMessage.data['type']?.toString() ?? 'PUSH',
+          data: initialMessage.data,
+        );
+      }
+    } catch (e) {
+      debugPrint('Firebase Messaging initialization error: $e');
+    }
   }
 
   /// Add a new notification to the app and trigger UI update + optional in-app banner
@@ -94,9 +230,42 @@ class NotificationService {
     notifications.insert(0, newNotif);
     notifyListeners();
 
+    // Trigger system notification banner
+    try {
+      localNotifications.show(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'high_importance_channel',
+            'High Importance Notifications',
+            channelDescription: 'This channel is used for VEXA Push Notifications.',
+            icon: '@mipmap/ic_launcher',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error triggering local notification banner: $e');
+    }
+
     if (context != null && context.mounted) {
       showInAppBanner(context, title: title, body: body, icon: icon, color: color);
     }
+  }
+
+  /// Send a test push notification to verify push notifications on mobile
+  static void sendTestNotification({BuildContext? context}) {
+    addNotification(
+      title: '⚡ VEXA Push Notification',
+      body: 'Push notifications are working perfectly on your mobile device!',
+      type: 'TEST_PUSH',
+      icon: Icons.notifications_active_rounded,
+      color: const Color(0xFFB8860B),
+      context: context,
+    );
   }
 
   /// Mark all notifications as read

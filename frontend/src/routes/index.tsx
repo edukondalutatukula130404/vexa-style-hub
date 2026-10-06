@@ -110,7 +110,25 @@ const promoCarouselBanners = [
 ];
 
 export function Home() {
+  const navigate = useNavigate();
   const { products } = useProducts();
+
+  // Immediate Product URL redirect for WhatsApp & external shared links
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const productId = searchParams.get("id") || searchParams.get("product");
+      if (productId) {
+        navigate(`/product/${productId}`, { replace: true });
+      }
+    }
+  }, [navigate]);
+
+  const hasProductIdInUrl =
+    typeof window !== "undefined" &&
+    (new URLSearchParams(window.location.search).has("id") ||
+      new URLSearchParams(window.location.search).has("product"));
+
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [featureIndex, setFeatureIndex] = useState(0);
@@ -239,6 +257,19 @@ export function Home() {
       (p.description || "").toLowerCase().includes(q)
     );
   }, [products, searchQuery]);
+
+  if (hasProductIdInUrl) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-24">
+        <div className="text-center space-y-4">
+          <div className="mx-auto size-10 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+          <p className="text-xs font-bold uppercase tracking-widest text-gold">
+            Opening Product…
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="home-page-root no-scrollbar w-full overflow-x-hidden pt-16 sm:pt-20 md:pt-28">

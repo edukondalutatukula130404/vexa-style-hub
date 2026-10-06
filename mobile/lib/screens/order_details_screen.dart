@@ -34,11 +34,19 @@ class OrderDetailsScreen extends StatefulWidget {
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   late OrderModel _currentOrder;
   StreamSubscription? _wsSub;
+  Timer? _realtimeTicker;
 
   @override
   void initState() {
     super.initState();
     _currentOrder = widget.order;
+
+    // Real-time tracking ticker updates progress in real-time every 2 seconds
+    _realtimeTicker = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
 
     // Subscribe to live WebSocket updates
     _wsSub = VexaWebSocketService().stream.listen((event) {
@@ -68,6 +76,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   @override
   void dispose() {
+    _realtimeTicker?.cancel();
     _wsSub?.cancel();
     super.dispose();
   }
@@ -466,22 +475,85 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (status.contains('deliver')) return 4;
     if (status.contains('out for delivery') || status.contains('courier')) return 3;
     if (status.contains('ship') || status.contains('transit')) return 2;
-    if (status.contains('qc') || status.contains('prep') || status.contains('process')) return 1;
-    return 0;
+    if (status.contains('qc')) return 1;
+
+    // Real-time time progression based on order creation
+    final elapsedSeconds = DateTime.now().difference(_currentOrder.createdAt).inSeconds;
+    if (elapsedSeconds < 25) {
+      return 0; // Warehouse
+    } else if (elapsedSeconds < 55) {
+      return 1; // QC Hub
+    } else if (elapsedSeconds < 110) {
+      return 2; // Express Van
+    } else if (elapsedSeconds < 180) {
+      return 3; // Out for Delivery
+    } else {
+      return 4; // Delivered
+    }
   }
 
   String get _expectedDeliveryText {
     final status = _currentOrder.status.toLowerCase();
     if (status.contains('cancel')) return 'Order Cancelled';
     if (status.contains('deliver')) return 'Delivered on ${_currentOrder.formattedDate}';
-    if (status.contains('out for delivery')) return 'Arriving Today by 6:00 PM';
-    if (status.contains('ship') || status.contains('transit')) return 'Expected Tomorrow by 2:00 PM';
+
+    final stepIdx = _currentStepIndex;
+    if (stepIdx == 0) return 'Warehouse Dispatch Pending';
+    if (stepIdx == 1) return 'QC Inspection in Progress';
+    if (stepIdx == 2) return 'In Transit via Express Courier';
+    if (stepIdx == 3) return 'Arriving Today by 6:00 PM';
+    if (stepIdx == 4) return 'Delivered on ${_currentOrder.formattedDate}';
     return 'Expected in 2–3 Business Days';
   }
 
   Widget _buildRealtimeMapCard() {
     final isCancelled = _currentOrder.status.toLowerCase().contains('cancel');
     final stepIdx = _currentStepIndex;
+
+    double progressWidthFactor = 0.0;
+    if (!isCancelled) {
+      if (stepIdx <= 0) {
+        progressWidthFactor = 0.12;
+      } else if (stepIdx == 1) {
+        progressWidthFactor = 0.38;
+      } else if (stepIdx == 2) {
+        progressWidthFactor = 0.65;
+      } else if (stepIdx == 3) {
+        progressWidthFactor = 0.88;
+      } else {
+        progressWidthFactor = 1.0;
+      }
+    }
+
+    String statusDisplay = _currentOrder.status.toUpperCase();
+    if (!isCancelled) {
+      if (stepIdx == 0) {
+        statusDisplay = 'PROCESSING';
+      } else if (stepIdx == 1) {
+        statusDisplay = 'QC CHECK ACTIVE';
+      } else if (stepIdx == 2) {
+        statusDisplay = 'IN TRANSIT';
+      } else if (stepIdx == 3) {
+        statusDisplay = 'OUT FOR DELIVERY';
+      } else if (stepIdx == 4) {
+        statusDisplay = 'DELIVERED';
+      }
+    }
+
+    String gpsText = 'Live GPS Sync Active • Waybill #BD-98402';
+    if (isCancelled) {
+      gpsText = 'Shipment Cancelled';
+    } else if (stepIdx == 0) {
+      gpsText = 'Warehouse Dispatch Active • Packing Garment';
+    } else if (stepIdx == 1) {
+      gpsText = 'Quality Check Active at QC Hub • Waybill #BD-98402';
+    } else if (stepIdx == 2) {
+      gpsText = 'Live GPS Sync Active • Waybill #BD-98402';
+    } else if (stepIdx == 3) {
+      gpsText = 'Out for Delivery • Courier Arriving Soon';
+    } else if (stepIdx == 4) {
+      gpsText = 'Package Delivered';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -553,7 +625,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      _currentOrder.status.toUpperCase(),
+                      statusDisplay,
                       style: GoogleFonts.outfit(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
@@ -585,7 +657,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
                 // Solid Single Color Progress Line
                 FractionallySizedBox(
-                  widthFactor: isCancelled ? 0.0 : ((stepIdx + 1) / 5).clamp(0.2, 1.0),
+                  widthFactor: progressWidthFactor,
                   child: Container(
                     height: 4,
                     decoration: BoxDecoration(
@@ -599,10 +671,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0),
-                    _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1),
+                    _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0, isActiveNode: stepIdx == 0),
+                    _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1, isActiveNode: stepIdx == 1),
                     _buildMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2, isActiveNode: stepIdx == 2 || stepIdx == 3),
-                    _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4),
+                    _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4, isActiveNode: stepIdx == 4),
                   ],
                 ),
               ],
@@ -625,9 +697,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 12),
                 const SizedBox(width: 6),
                 Text(
-                  isCancelled
-                      ? 'Shipment Cancelled'
-                      : (stepIdx == 4 ? 'Package Delivered' : 'Live GPS Sync Active • Waybill #BD-98402'),
+                  gpsText,
                   style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
                 ),
               ],

@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import {
   Star,
@@ -120,7 +120,10 @@ const defaultReviewsMap: Record<string, Review[]> = {
 };
 
 export function ProductDetailPage() {
-  const { id } = useParams();
+  const { id: pathId } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryId = searchParams.get("id") || searchParams.get("product");
+  const id = pathId || queryId;
   const navigate = useNavigate();
   const { products, loading } = useProducts();
   const { isLoggedIn, user } = useAuth();
@@ -128,9 +131,16 @@ export function ProductDetailPage() {
   // Find product by id
   const product = useMemo(() => {
     if (!products || products.length === 0) return null;
+    if (!id) return products[0];
+
+    const cleanId = id.toLowerCase().trim();
+    const cleanIdAlphaNum = cleanId.replace(/[^a-z0-9]/g, "");
+
     return (
       products.find((p) => p.id === id) ||
-      products.find((p) => p.id && id && p.id.toLowerCase() === id.toLowerCase()) ||
+      products.find((p) => p.id && p.id.toLowerCase() === cleanId) ||
+      products.find((p) => p.id && p.id.toLowerCase().replace(/[^a-z0-9]/g, "") === cleanIdAlphaNum) ||
+      products.find((p) => p.name && p.name.toLowerCase().includes(cleanId)) ||
       products[0]
     );
   }, [products, id]);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -21,6 +22,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class NotificationService {
   /// Global notifier triggered whenever notifications change
   static final ValueNotifier<int> notificationNotifier = ValueNotifier<int>(0);
+
+  /// Stream controller for user notification tap events
+  static final StreamController<String> onNotificationTap = StreamController<String>.broadcast();
 
   /// Flutter Local Notifications Plugin instance
   static final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
@@ -99,7 +103,13 @@ class NotificationService {
           AndroidInitializationSettings('@mipmap/ic_launcher');
       const InitializationSettings initializationSettings =
           InitializationSettings(android: initializationSettingsAndroid);
-      await localNotifications.initialize(settings: initializationSettings);
+      await localNotifications.initialize(
+        settings: initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          debugPrint('Local Notification Tapped! Payload: ${response.payload}');
+          onNotificationTap.add(response.payload ?? 'OPEN_NOTIFICATIONS');
+        },
+      );
 
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
         'high_importance_channel',
@@ -164,6 +174,7 @@ class NotificationService {
             data: message.data,
           );
         }
+        onNotificationTap.add('OPEN_NOTIFICATIONS');
       });
 
       // Handle initial message from terminated state
@@ -175,6 +186,7 @@ class NotificationService {
           type: initialMessage.data['type']?.toString() ?? 'PUSH',
           data: initialMessage.data,
         );
+        onNotificationTap.add('OPEN_NOTIFICATIONS');
       }
     } catch (e) {
       debugPrint('Firebase Messaging initialization error: $e');

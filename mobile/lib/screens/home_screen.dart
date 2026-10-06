@@ -127,6 +127,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await future;
   }
 
+  // Stream subscription for notification tap events
+  StreamSubscription<String>? _notifTapSub;
+
   // Main page scroll controller
   late final ScrollController _mainScrollController;
 
@@ -139,6 +142,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _mainScrollController = ScrollController();
     ApiConfig.baseUrlNotifier.addListener(_onServerUrlChanged);
     NotificationService.notificationNotifier.addListener(_onNotificationsChanged);
+    _notifTapSub = NotificationService.onNotificationTap.stream.listen((payload) {
+      if (mounted) {
+        _showNotificationsSheet();
+      }
+    });
     OrderService.ordersChangeNotifier.addListener(_refreshOrders);
     OrderService.startAutoPoll();
     _loadUserAndItems();
@@ -228,6 +236,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     NotificationService.notificationNotifier.removeListener(_onNotificationsChanged);
     OrderService.ordersChangeNotifier.removeListener(_refreshOrders);
     _wsSub?.cancel();
+    _notifTapSub?.cancel();
     _promoPageController.dispose();
     _mainScrollController.dispose();
     _tabAnimController.dispose();

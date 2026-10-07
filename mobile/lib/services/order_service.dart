@@ -218,6 +218,7 @@ class OrderService {
     String? paymentMethod,
     String? cancelReason,
     BuildContext? context,
+    bool createNotification = true,
   }) {
     final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
 
@@ -253,18 +254,20 @@ class OrderService {
       }
     }
 
-    final isCancelled = newStatus.toLowerCase() == 'cancelled';
-    NotificationService.addNotification(
-      title: isCancelled ? 'Order Cancelled ❌' : 'Order Status Update 🚚',
-      body: isCancelled
-          ? 'Order $orderId has been cancelled.${cancelReason != null && cancelReason.isNotEmpty ? " Reason: $cancelReason" : ""}'
-          : 'Order $orderId status changed to "$newStatus"${cancelReason != null && cancelReason.isNotEmpty ? " ($cancelReason)" : ""}.',
-      icon: isCancelled ? Icons.cancel_rounded : Icons.local_shipping_rounded,
-      color: isCancelled ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
-      type: isCancelled ? 'ORDER_CANCELLED' : 'ORDER_STATUS_UPDATED',
-      data: {'orderId': orderId, 'status': newStatus, 'cancelReason': cancelReason},
-      context: context,
-    );
+    if (createNotification) {
+      final isCancelled = newStatus.toLowerCase() == 'cancelled';
+      NotificationService.addNotification(
+        title: isCancelled ? 'Order Cancelled ❌' : 'Order Status Update 🚚',
+        body: isCancelled
+            ? 'Order $orderId has been cancelled.${cancelReason != null && cancelReason.isNotEmpty ? " Reason: $cancelReason" : ""}'
+            : 'Order $orderId status changed to "$newStatus"${cancelReason != null && cancelReason.isNotEmpty ? " ($cancelReason)" : ""}.',
+        icon: isCancelled ? Icons.cancel_rounded : Icons.local_shipping_rounded,
+        color: isCancelled ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+        type: isCancelled ? 'ORDER_CANCELLED' : 'ORDER_STATUS_UPDATED',
+        data: {'orderId': orderId, 'status': newStatus, 'cancelReason': cancelReason},
+        context: context,
+      );
+    }
 
     notifyOrdersChanged();
   }

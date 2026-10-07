@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
+import 'notification_service.dart';
 
 class AuthService {
   static const String _keyToken = 'auth_token';
@@ -11,6 +12,10 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyToken, token);
     await prefs.setString(_keyUser, jsonEncode(user.toJson()));
+    if (user.email.isNotEmpty) {
+      await prefs.setString('vexa_user_email', user.email.toLowerCase().trim());
+      NotificationService.registerFcmTokenWithBackend(email: user.email);
+    }
   }
 
   static Future<String?> getToken() async {

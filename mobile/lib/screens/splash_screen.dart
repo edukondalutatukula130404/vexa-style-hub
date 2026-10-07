@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../config/api_config.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -161,6 +162,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   Future<void> _checkAuthAndNavigate() async {
     final user = await AuthService.getUser();
+    if (user != null && user.email.isNotEmpty) {
+      NotificationService.registerFcmTokenWithBackend(email: user.email);
+      NotificationService.syncRemoteNotifications(user.email);
+    }
     if (!mounted) return;
     if (user != null && user.id != 'guest_user') {
       _navigateToNextScreen(const HomeScreen());

@@ -143,8 +143,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _mainScrollController = ScrollController();
     ApiConfig.baseUrlNotifier.addListener(_onServerUrlChanged);
     NotificationService.notificationNotifier.addListener(_onNotificationsChanged);
-    _notifTapSub = NotificationService.onNotificationTap.stream.listen((payload) {
+    _notifTapSub = NotificationService.onNotificationTap.stream.listen((payload) async {
       if (mounted) {
+        if (payload.isNotEmpty && payload != 'OPEN_NOTIFICATIONS') {
+          final orders = await OrderService.getOrders(email: _currentUser?.email);
+          final cleanPayload = payload.replaceAll('#', '').toLowerCase().trim();
+          OrderModel? targetOrder;
+          for (var o in orders) {
+            final cleanId = o.id.replaceAll('#', '').toLowerCase().trim();
+            if (cleanId == cleanPayload || cleanId.endsWith(cleanPayload) || cleanPayload.endsWith(cleanId)) {
+              targetOrder = o;
+              break;
+            }
+          }
+
+          if (targetOrder != null && mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OrderDetailsScreen(
+                  order: targetOrder!,
+                  onRefreshParent: _refreshOrders,
+                ),
+              ),
+            );
+            return;
+          }
+        }
         _showNotificationsSheet();
       }
     });
@@ -198,6 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 'Cancelled',
                 cancelReason: cancelReason,
                 context: context,
+                createNotification: false,
               );
             }
           }
@@ -207,11 +233,68 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             final orderId = (data['_id'] ?? data['id'] ?? '').toString();
             final status = (data['status'] ?? '').toString();
             final cancelReason = data['cancelReason']?.toString();
+            final cleanId = orderId.replaceAll('#', '').trim();
+            final shortCode = cleanId.length > 8 ? cleanId.substring(cleanId.length - 8).toUpperCase() : cleanId.toUpperCase();
+
             if (orderId.isNotEmpty && status.isNotEmpty) {
               OrderService.updateOrderStatusLocally(
                 orderId,
                 status,
                 cancelReason: cancelReason,
+                context: context,
+                createNotification: false,
+              );
+
+              // Build Mobile Push Notification details based on status
+              String title = 'Order Status Updated 📦';
+              String body = 'Order #$shortCode status changed to $status.';
+              IconData icon = Icons.local_shipping_rounded;
+              Color color = const Color(0xFF2563EB);
+
+              if (status == 'Order Placed') {
+                title = 'Order Placed 📦';
+                body = 'Your order #$shortCode has been placed successfully.';
+                icon = Icons.shopping_bag_rounded;
+                color = const Color(0xFFD4AF37);
+              } else if (status == 'Order Confirmed') {
+                title = 'Order Confirmed 🎉';
+                body = 'Your order #$shortCode has been confirmed.';
+                icon = Icons.verified_rounded;
+                color = const Color(0xFF10B981);
+              } else if (status == 'Processing') {
+                title = 'Order Processing ⚙️';
+                body = 'Your order #$shortCode is now being prepared.';
+                icon = Icons.inventory_2_rounded;
+                color = const Color(0xFFB8860B);
+              } else if (status == 'Shipped') {
+                title = 'Order Shipped 📦';
+                body = 'Your order #$shortCode has been shipped.';
+                icon = Icons.local_shipping_rounded;
+                color = const Color(0xFF2563EB);
+              } else if (status == 'Out for Delivery') {
+                title = 'Out for Delivery 🚚';
+                body = 'Your order #$shortCode is out for delivery.';
+                icon = Icons.delivery_dining_rounded;
+                color = const Color(0xFFF59E0B);
+              } else if (status == 'Delivered') {
+                title = 'Order Delivered ✅';
+                body = 'Your order #$shortCode has been delivered successfully.';
+                icon = Icons.check_circle_rounded;
+                color = const Color(0xFF10B981);
+              } else if (status == 'Cancelled') {
+                title = 'Order Cancelled ❌';
+                body = 'Your order #$shortCode has been cancelled.${cancelReason != null && cancelReason.isNotEmpty ? " Reason: $cancelReason" : ""}';
+                icon = Icons.cancel_rounded;
+                color = const Color(0xFFEF4444);
+              }
+
+              NotificationService.addNotification(
+                title: title,
+                body: body,
+                icon: icon,
+                color: color,
+                type: 'ORDER_STATUS_UPDATED',
+                data: Map<String, dynamic>.from(data),
                 context: context,
               );
             }
@@ -287,6 +370,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _isRealUser = realUser;
         if (user != null) {
           _updateUserNotifications(user);
+          if (user.email.isNotEmpty) {
+            NotificationService.registerFcmTokenWithBackend(email: user.email);
+            NotificationService.syncRemoteNotifications(user.email);
+          }
         }
       });
       _refreshOrders();

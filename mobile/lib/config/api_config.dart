@@ -11,7 +11,7 @@ class ApiConfig {
   static const bool isProduction = false;
 
   static const String productionUrl = 'https://clothing.speshway.site/api';
-  static const String localWifiUrl = 'http://192.168.1.31:5000/api';
+  static const String localWifiUrl = 'http://192.168.1.6:5000/api';
   static const String _defaultAndroidUrl = 'http://10.0.2.2:5000/api';
   static const String _defaultStandardUrl = productionUrl;
 
@@ -37,6 +37,7 @@ class ApiConfig {
     localWifiUrl,
     'http://localhost:5000/api',
     _defaultAndroidUrl,
+    'http://192.168.1.31:5000/api',
     'http://192.168.1.100:5000/api',
     'http://192.168.0.100:5000/api',
     productionUrl,

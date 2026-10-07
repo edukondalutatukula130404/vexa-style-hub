@@ -79,7 +79,7 @@ export function ProductCard({ product }: { product: Product }) {
           {/* Top-Right Badges & Favorite Heart Icon */}
           <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1.5">
             {off > 0 && (
-              <span className="btn-gold rounded-full px-2 py-0.5 text-[9px] font-extrabold shadow-sm">
+              <span className="hidden sm:inline-block btn-gold rounded-full px-2 py-0.5 text-[9px] font-extrabold shadow-sm">
                 {off}% OFF
               </span>
             )}

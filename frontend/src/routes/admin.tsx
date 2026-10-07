@@ -15,6 +15,7 @@ import {
   LogOut,
   Sparkles,
   Search,
+  Filter,
   ChevronDown,
   Image,
   Upload,
@@ -43,7 +44,8 @@ import { Reveal } from "@/components/Reveal";
 import { useAuth, API_URL } from "@/lib/auth";
 import { Footer } from "@/components/Footer";
 import { vexaSocket } from "@/lib/socket";
-import { triggerWebTestPushNotification } from "@/lib/firebase";
+import { triggerWebTestPushNotification, requestWebNotificationPermission } from "@/lib/firebase";
+import { toast } from "sonner";
 
 type OrderItem = {
   _id: string;
@@ -59,7 +61,7 @@ type OrderItem = {
     image: string;
   }>;
   totalAmount: number;
-  status: "Processing" | "Shipped" | "Delivered" | "Cancelled";
+  status: "Order Placed" | "Order Confirmed" | "Processing" | "Shipped" | "Out for Delivery" | "Delivered" | "Cancelled" | string;
   cancelReason?: string;
   paymentMethod: string;
   shippingAddress: string;
@@ -161,7 +163,42 @@ export function Admin() {
 
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
+  const notifPopoverRef = useRef<HTMLDivElement>(null);
+  const notifListRef = useRef<HTMLDivElement>(null);
   const unreadNotifCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  // Isolate scroll strictly to the notification card: do not allow the background page to scroll
+  useEffect(() => {
+    const popover = notifPopoverRef.current;
+    if (!popover || !notifOpen) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const list = notifListRef.current;
+      if (!list) {
+        e.preventDefault();
+        return;
+      }
+
+      if (list.contains(e.target as Node)) {
+        const { deltaY } = e;
+        const isAtTop = list.scrollTop <= 0;
+        const isAtBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+
+        // If trying to scroll past top or bottom boundaries of the notifications list, lock the page scroll!
+        if ((deltaY < 0 && isAtTop) || (deltaY > 0 && isAtBottom)) {
+          e.preventDefault();
+        }
+      } else {
+        // If cursor is over popover header, actions, or empty spaces, prevent page scrolling
+        e.preventDefault();
+      }
+    };
+
+    popover.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      popover.removeEventListener("wheel", handleWheel);
+    };
+  }, [notifOpen]);
 
   // Track known order IDs so polling can detect brand-new orders and fire toast/notification
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
@@ -1132,10 +1169,10 @@ export function Admin() {
 
           const existing = map.get(matchedKey);
           if (existing) {
-            map.set(matchedKey, {
+          map.set(matchedKey, {
               ...existing,
-              status: cached.status || existing.status,
-              cancelReason: cached.cancelReason || (existing as any).cancelReason,
+              status: existing.status || cached.status,
+              cancelReason: (existing as any).cancelReason || cached.cancelReason,
             });
           } else {
             map.set(cachedKey, cached);
@@ -1199,7 +1236,15 @@ export function Admin() {
               return [newNotif, ...prev];
             });
 
-            // Fire audio chime
+            // Fire toast & system pop-up push notification & audio chime
+            toast.success(`⚡ New Order Booking #${shortCode}`, {
+              description: `Placed by ${customerName} for ₹${amount.toLocaleString("en-IN")} (${itemsCount} item${itemsCount > 1 ? "s" : ""})`,
+              duration: 6000,
+            });
+            triggerWebTestPushNotification(
+              `⚡ New Order Booking #${shortCode}`,
+              `Placed by ${customerName} for ₹${amount.toLocaleString("en-IN")}`
+            );
             playNotifChime();
           }
         });
@@ -1363,37 +1408,68 @@ export function Admin() {
       }
     }
 
-    setStatusUpdatedMsg(`Booking #${String(orderId).slice(-8).toUpperCase()} status updated to "${newStatus}"!`);
-    setTimeout(() => setStatusUpdatedMsg(""), 3500);
-
-    // Sync status update to local demo orders in localStorage & dispatch update event
-    if (typeof window !== "undefined") {
-      try {
-        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
-        const updated = cached.map((o: any) => {
-          const oId = String(o._id || o.id || "").toUpperCase();
-          if (o._id === orderId || o.id === orderId || oId === cleanTargetId || oId.slice(-8) === cleanTargetId) {
-            return { ...o, status: newStatus, cancelReason };
-          }
-          return o;
-        });
-        localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
-        window.dispatchEvent(new Event("vexa_orders_updated"));
-      } catch (e) {
-        console.warn("Failed to update cached demo orders:", e);
-      }
-    }
-
     try {
-      await fetch(`${API_URL}/orders/${orderId}/status`, {
+      const res = await fetch(`${API_URL}/orders/${orderId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus, cancelReason }),
       });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        if (data.data) {
+          const updated = data.data;
+          setOrders((prev) =>
+            prev.map((o) => {
+              if (o._id === updated._id || (o as any).id === updated.id || String(o._id).slice(-8) === cleanTargetId) {
+                return { ...o, ...updated };
+              }
+              return o;
+            })
+          );
+          if (selectedOrderDetails) {
+            setSelectedOrderDetails((prev) => (prev ? { ...prev, ...updated } : null));
+          }
+        }
+
+        if (data.message === "Status unchanged") {
+          toast.info(`Status Unchanged`, {
+            description: `Order #${String(orderId).slice(-8).toUpperCase()} is already set to "${newStatus}".`,
+          });
+          setStatusUpdatedMsg(`Order #${String(orderId).slice(-8).toUpperCase()} status unchanged.`);
+        } else {
+          toast.success(`Status Updated Successfully`, {
+            description: `Order #${String(orderId).slice(-8).toUpperCase()} status updated to "${newStatus}".`,
+          });
+          setStatusUpdatedMsg(`Status updated to "${newStatus}" successfully.`);
+        }
+      } else {
+        setStatusUpdatedMsg(`Status updated to "${newStatus}".`);
+      }
+
+      // Sync status update to local demo orders in localStorage & dispatch update event
+      if (typeof window !== "undefined") {
+        try {
+          const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+          const updated = cached.map((o: any) => {
+            const oId = String(o._id || o.id || "").toUpperCase();
+            if (o._id === orderId || o.id === orderId || oId === cleanTargetId || oId.slice(-8) === cleanTargetId) {
+              return { ...o, status: newStatus, cancelReason };
+            }
+            return o;
+          });
+          localStorage.setItem("vexa_demo_orders", JSON.stringify(updated));
+          window.dispatchEvent(new Event("vexa_orders_updated"));
+        } catch (e) {
+          console.warn("Failed to update cached demo orders:", e);
+        }
+      }
+
       vexaSocket.send("ORDER_STATUS_UPDATED", { id: orderId, _id: orderId, status: newStatus, cancelReason });
       vexaSocket.send("ORDERS_UPDATED", { id: orderId, _id: orderId, status: newStatus, cancelReason });
     } catch (err) {
       console.warn("Status update error:", err);
+      setStatusUpdatedMsg(`Status updated to "${newStatus}".`);
     }
   };
 
@@ -1420,59 +1496,14 @@ export function Admin() {
                   </span>
                 </div>
               </div>
-            </div>
-
-            {/* Custom Mobile Dropdown Menu */}
-            <div className="relative">
               <button
                 type="button"
-                onClick={() => setMobileNavOpen(!mobileNavOpen)}
-                className="flex w-full items-center justify-between rounded-xl border border-gold/50 bg-card py-3.5 px-4 text-xs font-bold uppercase tracking-wider text-foreground shadow-goldy transition-all hover:border-gold cursor-pointer"
+                onClick={() => setSidebarCollapsed((prev) => !prev)}
+                className="p-2 rounded-xl border border-gold/40 bg-gold/10 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer"
+                title="Toggle Admin Menu"
               >
-                <div className="flex items-center gap-2.5">
-                  <Boxes className="size-4 text-gold shrink-0" />
-                  <span>
-                    {adminTabsList.find((t) => t.id === activeTab)?.label || "Admin Navigation"}
-                  </span>
-                </div>
-                <ChevronDown className={`size-4 text-gold transition-transform duration-300 ${mobileNavOpen ? "rotate-180" : ""}`} />
+                <Menu className="size-5" />
               </button>
-
-              {mobileNavOpen && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-2 space-y-1 rounded-xl border border-gold/50 bg-background/95 p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
-                  {adminTabsList.filter((t) => !t.isLogout).map((t) => {
-                    const Icon = t.icon;
-                    const isSelected = activeTab === t.id && !t.isLogout;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => {
-                          if (t.isLogout) {
-                            logout();
-                          } else {
-                            setActiveTab(t.id as any);
-                          }
-                          setMobileNavOpen(false);
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3.5 py-3 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                          t.isLogout
-                            ? "text-destructive hover:bg-destructive/10 border-t border-border/60 mt-1 pt-3"
-                            : isSelected
-                            ? "bg-gold text-primary-foreground shadow-goldy"
-                            : "text-muted-foreground hover:bg-surface hover:text-gold"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="size-4 shrink-0" />
-                          <span>{t.label}</span>
-                        </div>
-                        {isSelected && <CheckCircle2 className="size-4 text-primary-foreground" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           </div>
 
@@ -1586,7 +1617,6 @@ export function Admin() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-
                 {/* REALTIME ADMIN NOTIFICATION BELL */}
               <div ref={notifRef} className="relative shrink-0">
                 <button
@@ -1606,7 +1636,11 @@ export function Admin() {
 
                 {/* Realtime Notification Popover Dropdown */}
                 {notifOpen && (
-                  <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 rounded-2xl border border-gold/50 bg-card/98 backdrop-blur-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200">
+                  <div
+                    ref={notifPopoverRef}
+                    className="absolute right-0 top-full mt-3 w-80 sm:w-96 rounded-2xl border border-gold/50 bg-card/98 backdrop-blur-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200 overscroll-contain"
+                    style={{ overscrollBehavior: "contain", overscrollBehaviorY: "contain" }}
+                  >
                     {/* Header with READ ALL & DELETE ALL Buttons */}
                     <div className="flex items-center justify-between border-b border-border/80 pb-3 gap-2">
                       <div className="flex items-center gap-2 overflow-hidden">
@@ -1656,7 +1690,11 @@ export function Admin() {
                     </div>
 
                     {/* Notifications Scrollable List */}
-                    <div className="my-3 max-h-80 space-y-2 overflow-y-auto no-scrollbar pr-1">
+                    <div
+                      ref={notifListRef}
+                      className="my-3 max-h-80 space-y-2 overflow-y-auto notif-scroll-container pr-1"
+                      style={{ overscrollBehavior: "contain", overscrollBehaviorY: "contain" }}
+                    >
                       {notifications.length === 0 ? (
                         <div className="py-8 text-center space-y-3">
                           <Bell className="size-8 text-gold/40 mx-auto" />
@@ -2120,7 +2158,7 @@ export function Admin() {
                             onChange={(e) => {
                               const newStatus = e.target.value as any;
                               handleStatusSelectChange(
-                                selectedOrderDetails._id,
+                                selectedOrderDetails._id || (selectedOrderDetails as any).id,
                                 newStatus,
                                 String(selectedOrderDetails._id || (selectedOrderDetails as any).id || "ORD").slice(-8).toUpperCase()
                               );
@@ -2135,8 +2173,11 @@ export function Admin() {
                                 : "border-gold/60 bg-gold/10 text-gold"
                             }`}
                           >
+                            <option value="Order Placed">Order Placed</option>
+                            <option value="Order Confirmed">Order Confirmed</option>
                             <option value="Processing">Processing</option>
                             <option value="Shipped">Shipped</option>
+                            <option value="Out for Delivery">Out for Delivery</option>
                             <option value="Delivered">Delivered</option>
                             <option value="Cancelled">Cancelled</option>
                           </select>
@@ -2281,33 +2322,60 @@ export function Admin() {
                     </div>
                   )}
 
-                  {/* Filter Controls & Search */}
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex flex-wrap gap-2">
-                      {["All", "Processing", "Shipped", "Delivered", "Cancelled"].map((st) => (
-                        <button
-                          key={st}
-                          onClick={() => setOrderStatusFilter(st)}
-                          className={`rounded-full px-4 py-1.5 text-[10px] uppercase tracking-wider font-bold transition-all ${
-                            orderStatusFilter === st
-                              ? "bg-gold text-primary-foreground shadow-goldy"
-                              : "border border-border bg-card text-muted-foreground hover:border-gold hover:text-gold"
-                          }`}
-                        >
-                          {st}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="relative min-w-[240px]">
+                  {/* Filter Controls & Search: Left Search, Right Filter Dropdown */}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+                    {/* Left Side: Search Option */}
+                    <div className="relative w-full sm:w-80">
                       <Search className="absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                       <input
                         type="text"
                         value={orderSearchQuery}
                         onChange={(e) => setOrderSearchQuery(e.target.value)}
                         placeholder="Search customer, email or ID..."
-                        className="w-full rounded-sm border border-border bg-card py-2 pl-9 pr-3 text-xs outline-none focus:border-gold placeholder:text-muted-foreground/60"
+                        className="w-full rounded-lg border border-border bg-surface/70 py-2 pl-9 pr-8 text-xs outline-none focus:border-gold placeholder:text-muted-foreground/60 shadow-sm"
                       />
+                      {orderSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setOrderSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                          title="Clear search"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Right Side: Status Filter Dropdown */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="relative min-w-[145px]">
+                        <select
+                          value={orderStatusFilter}
+                          onChange={(e) => setOrderStatusFilter(e.target.value)}
+                          className="w-full appearance-none rounded-md border border-border bg-surface/70 py-1.5 pl-2.5 pr-7 text-[11px] font-bold text-foreground outline-none cursor-pointer focus:border-gold hover:border-gold/60 transition-all shadow-sm"
+                        >
+                          <option value="All">All ({orders.length})</option>
+                          <option value="Order Placed">Order Placed</option>
+                          <option value="Order Confirmed">Order Confirmed</option>
+                          <option value="Processing">Processing</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="Out for Delivery">Out for Delivery</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                      {orderStatusFilter !== "All" && (
+                        <button
+                          type="button"
+                          onClick={() => setOrderStatusFilter("All")}
+                          className="flex items-center gap-1.5 rounded-full bg-gold/15 border border-gold/40 px-3 py-1 text-[11px] font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm"
+                          title="Clear filter"
+                        >
+                          <span>{orderStatusFilter}</span>
+                          <X className="size-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -2323,13 +2391,7 @@ export function Admin() {
                                 <span className="rounded-md bg-gold/10 px-2 py-0.5 text-[10px] text-gold font-mono font-bold border border-gold/30">
                                   #{String(ord._id || ord.id || "ORD").slice(-8).toUpperCase()}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedOrderDetails(ord)}
-                                  className="text-[10px] font-bold text-gold hover:underline uppercase tracking-wider ml-2 cursor-pointer"
-                                >
-                                  View Details →
-                                </button>
+
                               </div>
                               <h4 className="font-display text-base font-bold text-foreground mt-1">
                                 Customer: {ord.userName || "Customer"}
@@ -2352,7 +2414,7 @@ export function Admin() {
                                 value={ord.status || "Processing"}
                                 onChange={(e) =>
                                   handleStatusSelectChange(
-                                    ord._id,
+                                    ord._id || (ord as any).id,
                                     e.target.value,
                                     String(ord._id || ord.id || "ORD").slice(-8).toUpperCase()
                                   )
@@ -2360,15 +2422,18 @@ export function Admin() {
                                 className={`rounded-lg border px-3 py-2 text-xs font-bold outline-none cursor-pointer transition-colors ${
                                   ord.status === "Delivered"
                                     ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600"
-                                    : ord.status === "Shipped"
+                                    : ord.status === "Shipped" || ord.status === "Out for Delivery"
                                     ? "border-blue-500/50 bg-blue-500/10 text-blue-600"
                                     : ord.status === "Cancelled"
                                     ? "border-destructive/50 bg-destructive/10 text-destructive"
                                     : "border-gold/60 bg-gold/10 text-gold"
                                 }`}
                               >
+                                <option value="Order Placed">Order Placed</option>
+                                <option value="Order Confirmed">Order Confirmed</option>
                                 <option value="Processing">Processing</option>
                                 <option value="Shipped">Shipped</option>
+                                <option value="Out for Delivery">Out for Delivery</option>
                                 <option value="Delivered">Delivered</option>
                                 <option value="Cancelled">Cancelled</option>
                               </select>
@@ -2384,9 +2449,6 @@ export function Admin() {
 
                           {/* Items List */}
                           <div className="space-y-3 pt-1">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                              Booked Items (Click product to view order details)
-                            </span>
                             {(ord.items || []).map((item, idx) => (
                               <div
                                 key={idx}
@@ -2413,7 +2475,7 @@ export function Admin() {
                                   <span className="font-semibold text-foreground">
                                     ₹{((item?.price || 0) * (item?.quantity || 1)).toLocaleString("en-IN")}
                                   </span>
-                                  <span className="text-[10px] font-bold text-gold opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="text-[10px] font-bold text-gold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                     View Details →
                                   </span>
                                 </div>
@@ -3235,16 +3297,7 @@ export function Admin() {
                               {new Date(u.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                             </td>
                             <td className="p-4 text-right">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedUserDetails(u);
-                                }}
-                                className="text-xs font-bold text-gold hover:underline uppercase tracking-wider cursor-pointer"
-                              >
-                                View Details →
-                              </button>
+
                             </td>
                           </tr>
                         ))

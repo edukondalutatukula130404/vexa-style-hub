@@ -1240,6 +1240,7 @@ export function UserDashboard() {
     { id: "profile", label: "My Profile", icon: UserIcon },
     { id: "wallet", label: "VEXA Wallet", icon: Wallet },
     { id: "orders", label: "My Orders", icon: Package },
+    { id: "booking", label: "Book Custom Tee", icon: Sparkles },
     { id: "cart", label: "My Cart", icon: ShoppingBag },
     { id: "wishlist", label: "My Wishlist", icon: Heart },
     { id: "addresses", label: "Addresses", icon: MapPin },
@@ -1314,8 +1315,8 @@ export function UserDashboard() {
           </div>
 
           {/* DESKTOP SIDEBAR (>= lg): Sticky Fixed User Control Panel */}
-          <aside className="hidden lg:block sticky top-20 sm:top-24 z-20 w-72 shrink-0 self-start">
-            <div className="w-full rounded-2xl border border-gold/40 bg-card p-5 shadow-sm">
+          <aside className="hidden lg:block sticky top-24 z-20 w-72 shrink-0 self-start">
+            <div className="w-full rounded-2xl border border-gold/40 bg-card p-5 shadow-sm max-h-[calc(100vh-7.5rem)] overflow-y-auto no-scrollbar">
               <div className="flex items-center gap-3 border-b border-border pb-4 overflow-hidden">
                 {profilePic ? (
                   <img src={profilePic} alt={profileName} className="size-11 rounded-full object-cover border border-gold shadow-sm shrink-0" />

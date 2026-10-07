@@ -95,7 +95,7 @@ const promoCarouselBanners = [
     subtitle: "PERSONALIZED EMBROIDERY & BULK ORDERS",
     text: "Personalize colorways, custom embroidery & bulk orders directly from your user dashboard with live tracking and concierge support.",
     ctaText: "BOOK CUSTOM TEE",
-    ctaLink: "/dashboard",
+    ctaLink: "/dashboard?tab=booking",
     image: promoBanner2,
   },
   {
@@ -184,7 +184,7 @@ export function Home() {
       ctaText: "EXPLORE COLLECTION",
       ctaLink: "/products",
       image: banner1ImgState,
-      imgPosition: "object-right sm:object-[80%_center]",
+      imgPosition: "object-top md:object-right",
     },
     {
       tag: "BESPOKE CUSTOMISATION",
@@ -192,9 +192,9 @@ export function Home() {
       subtitle: "PERSONALIZED EMBROIDERY & BULK ORDERS",
       text: "Personalize colorways, custom embroidery & bulk orders directly from your user dashboard with live tracking and concierge support.",
       ctaText: "BOOK CUSTOM TEE",
-      ctaLink: "/dashboard",
+      ctaLink: "/dashboard?tab=booking",
       image: banner2ImgState,
-      imgPosition: "object-right sm:object-[85%_center]",
+      imgPosition: "object-top md:object-right",
     },
     {
       tag: "VEXA SIGNATURE ESSENTIALS",
@@ -204,7 +204,7 @@ export function Home() {
       ctaText: "SHOP CATALOG",
       ctaLink: "/products",
       image: heroImgState,
-      imgPosition: "object-[15%_center]",
+      imgPosition: "object-top md:object-[15%_center]",
     },
   ], [banner1ImgState, banner2ImgState, heroImgState]);
 
@@ -215,12 +215,7 @@ export function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const bannerTimer = setInterval(() => {
-      setBannerIndex((prev) => (prev + 1) % activePromoBanners.length);
-    }, 4500);
-    return () => clearInterval(bannerTimer);
-  }, [activePromoBanners.length]);
+
 
   useEffect(() => {
     const heroTimer = setInterval(() => {
@@ -273,43 +268,37 @@ export function Home() {
 
   return (
     <div className="home-page-root no-scrollbar w-full overflow-x-hidden pt-16 sm:pt-20 md:pt-28">
-      {/* 0. HERO BANNER SECTION (Visible on Desktop View >= md) */}
-      <section className="hidden md:block mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-12 border-b border-border/30">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-center">
+      {/* 0. HERO BANNER SECTION (Visible on all viewports, optimized for Mobile Responsive) */}
+      <section className="block mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-2 sm:pt-4 pb-8 sm:pb-12 border-b border-border/30">
+        <div className="grid grid-cols-1 gap-8 sm:gap-10 lg:grid-cols-2 lg:items-center">
           <Reveal>
-            <div className="space-y-6">
-              <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-extrabold uppercase tracking-tight leading-[1.05] text-foreground">
+            <div className="space-y-4 sm:space-y-6">
+              <h1 className="font-display text-3xl xs:text-4xl sm:text-6xl lg:text-7xl font-extrabold uppercase tracking-tight leading-[1.08] sm:leading-[1.05] text-foreground">
                 PREMIUM<br />
                 T-SHIRT<br />
                 <span className="text-[#B8860B]">COLLECTION</span>
               </h1>
-              <p className="max-w-xl text-sm sm:text-base leading-relaxed text-muted-foreground font-normal">
+              <p className="max-w-xl text-xs xs:text-sm sm:text-base leading-relaxed text-muted-foreground font-normal">
                 Engineered in 240 GSM heavyweight cotton, finished by hand, and cut for the modern oversized silhouette. This is VEXA — wear confidence, wear style.
               </p>
-              <div className="flex flex-wrap items-center gap-4 pt-2">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1 sm:pt-2">
                 <Link
                   to="/products"
-                  className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-sm px-8 py-3.5 text-xs font-bold uppercase tracking-wider shadow-md"
+                  className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2 rounded-sm px-6 py-3 sm:px-8 sm:py-3.5 text-xs font-bold uppercase tracking-wider shadow-md"
                 >
                   SHOP THE DROP <ArrowRight className="size-4" />
-                </Link>
-                <Link
-                  to="/about"
-                  className="btn-outline-gold inline-flex items-center gap-2 rounded-sm px-8 py-3.5 text-xs font-bold uppercase tracking-wider hover:bg-gold hover:text-primary-foreground"
-                >
-                  OUR STORY
                 </Link>
               </div>
             </div>
           </Reveal>
           <Reveal delay={200}>
-            <div className="relative mx-auto max-w-lg overflow-hidden rounded-[36px] border-2 border-[#B8860B]/40 bg-card p-3 shadow-2xl">
+            <div className="relative mx-auto max-w-lg overflow-hidden rounded-[28px] sm:rounded-[36px] border-2 border-[#B8860B]/40 bg-card p-2.5 sm:p-3 shadow-2xl">
               <img
                 src={heroImgState}
                 alt="VEXA Premium T-Shirt Collection"
-                className="h-[420px] sm:h-[480px] lg:h-[520px] w-full object-cover rounded-[28px]"
+                className="h-[280px] xs:h-[340px] sm:h-[480px] lg:h-[520px] w-full object-cover rounded-[20px] sm:rounded-[28px]"
               />
-              <span className="absolute left-7 top-7 rounded-full border border-[#B8860B]/30 bg-[#f4efe6] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#1c1917] shadow-md">
+              <span className="absolute left-5 sm:left-7 top-5 sm:top-7 rounded-full border border-[#B8860B]/30 bg-[#f4efe6] px-3.5 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#1c1917] shadow-md">
                 CUSTOM SERVICE
               </span>
             </div>
@@ -327,61 +316,74 @@ export function Home() {
         </Reveal>
 
         <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-[#B8860B]/40 bg-card shadow-2xl transition-all hover:border-[#B8860B]">
-          <div className="relative min-h-[340px] xs:min-h-[380px] sm:min-h-[440px] md:min-h-[540px] lg:min-h-[580px] xl:min-h-[620px] w-full overflow-hidden">
-            {/* Full Width Background Image Across Entire Card */}
-            <img
-              src={activePromoBanners[bannerIndex].image}
-              alt={activePromoBanners[bannerIndex].title}
-              className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ${
-                activePromoBanners[bannerIndex].imgPosition || "object-right"
-              }`}
-            />
-            {/* Soft gradient overlay for text readability on left side */}
-            <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/65 to-transparent max-w-3xl lg:max-w-4xl" />
+          <div className="relative min-h-[440px] sm:min-h-[480px] lg:min-h-[520px] w-full overflow-hidden flex flex-col md:flex-row items-stretch">
+            {/* Background / Right Side Image Container */}
+            <div className="absolute inset-0 md:left-auto md:right-0 md:w-1/2 lg:w-[48%] h-full overflow-hidden">
+              <img
+                src={activePromoBanners[bannerIndex].image}
+                alt={activePromoBanners[bannerIndex].title}
+                className="h-full w-full object-cover object-top md:object-center transition-all duration-700"
+              />
+              {/* Desktop Left-to-Right Blend Gradient */}
+              <div className="hidden md:block absolute inset-y-0 left-0 w-28 bg-gradient-to-r from-card via-card/80 to-transparent pointer-events-none" />
+            </div>
 
-            {/* Left Side Content Container */}
-            <div className="relative z-10 flex h-full min-h-[340px] xs:min-h-[380px] sm:min-h-[440px] md:min-h-[540px] lg:min-h-[580px] xl:min-h-[620px] max-w-2xl lg:max-w-3xl flex-col justify-center p-6 sm:p-12 lg:p-20 xl:p-24">
-              <span className="inline-block w-fit rounded-full border border-[#B8860B]/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] sm:text-xs md:px-5 md:py-1.5 md:text-xs font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-md">
+            {/* Mobile Direct Tap Link */}
+            <Link
+              to={activePromoBanners[bannerIndex].ctaLink}
+              className="md:hidden absolute inset-0 z-10"
+              aria-label={activePromoBanners[bannerIndex].title}
+            />
+
+            {/* Desktop Left Side Content Container (Hidden on Mobile to keep image clean) */}
+            <div className="hidden md:flex relative z-10 flex-col justify-center w-full md:w-1/2 lg:w-[55%] p-6 sm:p-10 lg:p-14 pl-14 sm:pl-20 lg:pl-24 pr-6 sm:pr-8 space-y-3.5 sm:space-y-4.5">
+              <span className="inline-block w-fit rounded-full border border-[#B8860B]/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-sm">
                 {activePromoBanners[bannerIndex].tag}
               </span>
 
-              <h3 className="mt-3 sm:mt-5 font-display text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold leading-[1.1] text-foreground">
+              <h3 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold uppercase leading-[1.12] text-foreground tracking-tight max-w-xl">
                 {activePromoBanners[bannerIndex].title}
               </h3>
 
-              <p className="mt-2.5 sm:mt-3 text-xs sm:text-sm md:text-base lg:text-lg font-extrabold uppercase tracking-wider text-[#B8860B]">
-                ✨ {activePromoBanners[bannerIndex].subtitle} ✨
-              </p>
-
-              <p className="mt-3 text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed text-muted-foreground hidden xs:block font-normal max-w-xl">
+              <p className="text-xs sm:text-sm md:text-base leading-relaxed text-muted-foreground font-normal max-w-lg">
                 {activePromoBanners[bannerIndex].text}
               </p>
 
-              <div className="mt-6 sm:mt-8 md:mt-10">
+              <div className="pt-2 sm:pt-4">
                 <Link
                   to={activePromoBanners[bannerIndex].ctaLink}
-                  className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2.5 rounded-sm px-7 py-3 sm:px-8 sm:py-3.5 md:px-10 md:py-4 text-xs md:text-sm font-bold uppercase tracking-wider shadow-md"
+                  className="btn-gold hover:btn-gold-hover inline-flex items-center gap-2.5 rounded-sm px-6 py-3 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider shadow-md"
                 >
                   {activePromoBanners[bannerIndex].ctaText} <ArrowRight className="size-4 md:size-5" />
                 </Link>
               </div>
             </div>
+
+            {/* Left Navigation Arrow Button */}
+            <button
+              type="button"
+              onClick={() => setBannerIndex((prev) => (prev - 1 + activePromoBanners.length) % activePromoBanners.length)}
+              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 flex size-9 sm:size-11 items-center justify-center rounded-full border border-[#B8860B]/50 bg-background/90 text-[#B8860B] shadow-lg backdrop-blur-md transition-all hover:bg-[#B8860B] hover:text-primary-foreground hover:scale-110 active:scale-95 cursor-pointer"
+              aria-label="Previous Showcase Banner"
+              title="Previous Banner"
+            >
+              <ChevronLeft className="size-5 sm:size-6" />
+            </button>
+
+            {/* Right Navigation Arrow Button */}
+            <button
+              type="button"
+              onClick={() => setBannerIndex((prev) => (prev + 1) % activePromoBanners.length)}
+              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 flex size-9 sm:size-11 items-center justify-center rounded-full border border-[#B8860B]/50 bg-background/90 text-[#B8860B] shadow-lg backdrop-blur-md transition-all hover:bg-[#B8860B] hover:text-primary-foreground hover:scale-110 active:scale-95 cursor-pointer"
+              aria-label="Next Showcase Banner"
+              title="Next Banner"
+            >
+              <ChevronRight className="size-5 sm:size-6" />
+            </button>
           </div>
         </div>
 
-        {/* Carousel Indicators */}
-        <div className="mt-4 flex justify-center gap-2">
-          {activePromoBanners.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setBannerIndex(idx)}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                idx === bannerIndex ? "w-8 bg-[#B8860B]" : "w-2 bg-border hover:bg-[#B8860B]/50"
-              }`}
-              title={`Go to slide ${idx + 1}`}
-            />
-          ))}
-        </div>
+
       </section>
 
       {/* 2. NEW ARRIVALS */}
@@ -397,7 +399,7 @@ export function Home() {
             to="/products"
             className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gold hover:bg-gold hover:text-primary-foreground transition-all shrink-0"
           >
-            Explore All ({products.length}) <ArrowRight className="size-3.5" />
+            Explore All <ArrowRight className="size-3.5" />
           </Link>
         </div>
 
@@ -425,10 +427,15 @@ export function Home() {
       <section className="mx-auto max-w-7xl px-4 sm:px-5 py-8 border-t border-border/30">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold">Explore the catalog</p>
-            <h2 className="mt-0.5 font-display text-2xl sm:text-4xl font-bold">Featured Collection</h2>
+            <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-gold font-bold">Explore the catalog</p>
+            <h2 className="mt-0.5 font-display text-2xl sm:text-4xl font-bold text-foreground">Featured Collection</h2>
           </div>
-          <span className="text-xs text-muted-foreground font-semibold">{filteredProducts.length} items</span>
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gold hover:bg-gold hover:text-primary-foreground transition-all shrink-0"
+          >
+            View All <ArrowRight className="size-3.5" />
+          </Link>
         </div>
 
         {/* Featured Collection Horizontal Scroll */}

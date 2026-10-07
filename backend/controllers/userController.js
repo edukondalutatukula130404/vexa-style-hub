@@ -318,3 +318,55 @@ exports.resetPassword = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Register or update user FCM device token
+// @route   POST /api/users/fcm-token
+// @access  Public
+exports.updateFcmToken = async (req, res, next) => {
+  try {
+    const { email, fcmToken } = req.body;
+
+    if (!email || !fcmToken) {
+      return res.status(400).json({ success: false, message: 'Please provide email and fcmToken' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanToken = fcmToken.trim();
+
+    let user = await User.findOne({ email: cleanEmail });
+
+    if (!user) {
+      user = await User.findOne({
+        email: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found' });
+    }
+
+    // Store primary FCM token
+    user.fcmToken = cleanToken;
+
+    // Maintain fcmTokens array without duplicates
+    if (!user.fcmTokens) user.fcmTokens = [];
+    if (!user.fcmTokens.includes(cleanToken)) {
+      user.fcmTokens.push(cleanToken);
+    }
+
+    await user.save();
+    console.log(`📱 Updated FCM token for ${user.email} (${user.fcmTokens.length} active device tokens)`);
+
+    res.status(200).json({
+      success: true,
+      message: 'FCM token updated successfully',
+      data: {
+        email: user.email,
+        activeTokensCount: user.fcmTokens.length
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

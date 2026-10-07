@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -52,7 +56,8 @@ class NotificationService {
       'isRead': false,
       'icon': Icons.local_shipping_outlined,
       'color': const Color(0xFF2563EB),
-      'type': 'ORDER_STATUS',
+      'type': 'order_status_update',
+      'data': {'orderId': '#VX-8834'},
     },
     {
       'id': '3',
@@ -70,6 +75,105 @@ class NotificationService {
 
   static void notifyListeners() {
     notificationNotifier.value++;
+  }
+
+  /// Register/Sync user FCM token with backend server
+  static Future<void> registerFcmTokenWithBackend({String? email, String? token}) async {
+    final targetToken = token ?? fcmToken;
+    if (targetToken == null || targetToken.trim().isEmpty) return;
+
+    String userEmail = email?.trim() ?? '';
+    if (userEmail.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        userEmail = prefs.getString('vexa_user_email') ?? '';
+        if (userEmail.isEmpty) {
+          final userJson = prefs.getString('auth_user');
+          if (userJson != null) {
+            final Map<String, dynamic> map = jsonDecode(userJson);
+            userEmail = (map['email'] ?? '').toString().trim();
+            if (userEmail.isNotEmpty) {
+              await prefs.setString('vexa_user_email', userEmail.toLowerCase().trim());
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (userEmail.isEmpty) return;
+
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/users/fcm-token');
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': userEmail.toLowerCase().trim(),
+          'fcmToken': targetToken.trim()
+        }),
+      );
+      if (res.statusCode == 200) {
+        debugPrint('✅ FCM device token synced with backend server for $userEmail');
+      }
+    } catch (e) {
+      debugPrint('FCM token registration note: $e');
+    }
+  }
+
+  /// Sync notification history from backend for specific logged-in user
+  static Future<void> syncRemoteNotifications(String email) async {
+    if (email.isEmpty) return;
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/notifications?email=${Uri.encodeComponent(email)}');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        final list = body['data'] as List?;
+        if (list != null && list.isNotEmpty) {
+          for (var item in list) {
+            final id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
+            final title = item['title']?.toString() ?? 'Order Notification';
+            final message = item['message']?.toString() ?? '';
+            final status = item['status']?.toString() ?? '';
+            final orderId = item['orderId']?.toString() ?? '';
+            final isRead = item['read'] == true;
+
+            final exists = notifications.any((n) => n['id'] == id || (n['title'] == title && n['body'] == message));
+            if (!exists) {
+              notifications.insert(0, {
+                'id': id.isNotEmpty ? id : 'notif_${DateTime.now().millisecondsSinceEpoch}',
+                'title': title,
+                'body': message,
+                'time': 'Just now',
+                'isRead': isRead,
+                'icon': _getIconForStatus(status),
+                'color': _getColorForStatus(status),
+                'type': item['type']?.toString() ?? 'order_status_update',
+                'data': {'orderId': orderId, 'status': status},
+              });
+            }
+          }
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Sync remote notifications note: $e');
+    }
+  }
+
+  static IconData _getIconForStatus(String status) {
+    if (status == 'Shipped' || status == 'Out for Delivery') return Icons.local_shipping_rounded;
+    if (status == 'Delivered') return Icons.check_circle_rounded;
+    if (status == 'Cancelled') return Icons.cancel_rounded;
+    if (status == 'Order Confirmed') return Icons.verified_rounded;
+    return Icons.inventory_2_rounded;
+  }
+
+  static Color _getColorForStatus(String status) {
+    if (status == 'Delivered') return const Color(0xFF10B981);
+    if (status == 'Cancelled') return const Color(0xFFEF4444);
+    if (status == 'Shipped' || status == 'Out for Delivery') return const Color(0xFF2563EB);
+    return const Color(0xFFB8860B);
   }
 
   /// Initialize Firebase Messaging & Local Notifications for Mobile
@@ -132,68 +236,101 @@ class NotificationService {
       // Get FCM Token
       fcmToken = await messaging.getToken();
       debugPrint('FCM Mobile Token: $fcmToken');
+      if (fcmToken != null) {
+        registerFcmTokenWithBackend(token: fcmToken);
+      }
 
       messaging.onTokenRefresh.listen((token) {
         fcmToken = token;
         debugPrint('FCM Mobile Token Refreshed: $token');
+        registerFcmTokenWithBackend(token: token);
       });
 
       // Handle Foreground Messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         final notification = message.notification;
         final android = message.notification?.android;
+        final data = message.data;
 
-        if (notification != null) {
-          addNotification(
-            title: notification.title ?? 'VEXA Alert',
-            body: notification.body ?? '',
-            type: message.data['type']?.toString() ?? 'PUSH',
-            data: message.data,
-          );
+        final title = notification?.title ?? data['title'] ?? 'VEXA Order Update 📦';
+        final body = notification?.body ?? data['body'] ?? data['message'] ?? '';
+        final status = data['status']?.toString() ?? '';
+        final orderId = data['orderId']?.toString() ?? data['id']?.toString() ?? '';
 
-          if (android != null) {
-            localNotifications.show(
-              id: notification.hashCode,
-              title: notification.title,
-              body: notification.body,
-              notificationDetails: NotificationDetails(
-                android: AndroidNotificationDetails(
-                  channel.id,
-                  channel.name,
-                  channelDescription: channel.description,
-                  icon: '@mipmap/ic_launcher',
-                  importance: Importance.max,
-                  priority: Priority.high,
-                ),
+        addNotification(
+          title: title,
+          body: body,
+          type: data['type']?.toString() ?? 'order_status_update',
+          icon: _getIconForStatus(status),
+          color: _getColorForStatus(status),
+          data: data,
+        );
+
+        if (android != null || notification != null) {
+          localNotifications.show(
+            id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            title: title,
+            body: body,
+            payload: orderId.isNotEmpty ? orderId : 'OPEN_NOTIFICATIONS',
+            notificationDetails: NotificationDetails(
+              android: AndroidNotificationDetails(
+                channel.id,
+                channel.name,
+                channelDescription: channel.description,
+                icon: '@mipmap/ic_launcher',
+                importance: Importance.max,
+                priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
               ),
-            );
-          }
+            ),
+          );
         }
       });
 
       // Handle message tap from background state
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        if (message.notification != null) {
-          addNotification(
-            title: message.notification!.title ?? 'VEXA Alert',
-            body: message.notification!.body ?? '',
-            type: message.data['type']?.toString() ?? 'PUSH',
-            data: message.data,
-          );
-        }
-        onNotificationTap.add('OPEN_NOTIFICATIONS');
+        final notification = message.notification;
+        final data = message.data;
+
+        final title = notification?.title ?? data['title'] ?? 'VEXA Order Update 📦';
+        final body = notification?.body ?? data['body'] ?? data['message'] ?? '';
+        final status = data['status']?.toString() ?? '';
+        final targetOrderId = data['orderId']?.toString() ?? data['id']?.toString();
+
+        addNotification(
+          title: title,
+          body: body,
+          type: data['type']?.toString() ?? 'order_status_update',
+          icon: _getIconForStatus(status),
+          color: _getColorForStatus(status),
+          data: data,
+        );
+
+        onNotificationTap.add(targetOrderId ?? 'OPEN_NOTIFICATIONS');
       });
 
       // Handle initial message from terminated state
       final initialMessage = await messaging.getInitialMessage();
-      if (initialMessage != null && initialMessage.notification != null) {
+      if (initialMessage != null) {
+        final notification = initialMessage.notification;
+        final data = initialMessage.data;
+
+        final title = notification?.title ?? data['title'] ?? 'VEXA Order Update 📦';
+        final body = notification?.body ?? data['body'] ?? data['message'] ?? '';
+        final status = data['status']?.toString() ?? '';
+        final targetOrderId = data['orderId']?.toString() ?? data['id']?.toString();
+
         addNotification(
-          title: initialMessage.notification!.title ?? 'VEXA Alert',
-          body: initialMessage.notification!.body ?? '',
-          type: initialMessage.data['type']?.toString() ?? 'PUSH',
-          data: initialMessage.data,
+          title: title,
+          body: body,
+          type: data['type']?.toString() ?? 'order_status_update',
+          icon: _getIconForStatus(status),
+          color: _getColorForStatus(status),
+          data: data,
         );
-        onNotificationTap.add('OPEN_NOTIFICATIONS');
+
+        onNotificationTap.add(targetOrderId ?? 'OPEN_NOTIFICATIONS');
       }
     } catch (e) {
       debugPrint('Firebase Messaging initialization error: $e');
@@ -210,25 +347,9 @@ class NotificationService {
     Map<String, dynamic>? data,
     BuildContext? context,
   }) {
-    // 1. Deduplicate by orderId if present
-    final orderId = data?['orderId'] ?? data?['_id'] ?? data?['id'];
-    if (orderId != null && orderId.toString().isNotEmpty) {
-      final isDuplicate = notifications.any((n) {
-        final nOrderId = n['data']?['orderId'] ?? n['data']?['_id'] ?? n['data']?['id'];
-        if (nOrderId != null && nOrderId.toString() == orderId.toString() && (n['type'] == 'ORDER_PLACED' || n['type'] == type)) {
-          return true;
-        }
-        if (n['type'] == 'ORDER_PLACED' && (n['body'].toString().contains(orderId.toString()) || n['title'] == title)) {
-          return true;
-        }
-        return false;
-      });
-      if (isDuplicate) return;
-    }
-
-    // 2. Avoid duplicate notifications with the exact same title & body created recently
+    // Avoid duplicate notifications with the exact same title & body created recently
     final existingIndex = notifications.indexWhere(
-      (n) => n['title'] == title && (n['body'] == body || n['type'] == type),
+      (n) => n['title'] == title && n['body'] == body,
     );
     if (existingIndex != -1 && existingIndex < 2) {
       return;

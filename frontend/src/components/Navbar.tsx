@@ -168,18 +168,16 @@ export function Navbar() {
               </Link>
             )}
 
-            {/* Mobile View: Hamburger Menu Button (Only shown when user IS logged in) */}
-            {isLoggedIn && (
-              <button
-                type="button"
-                aria-label="Toggle Navigation Menu"
-                onClick={() => setOpen((o) => !o)}
-                className="flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
-                title="Toggle Menu"
-              >
-                {open ? <ChevronDown className="size-5" /> : <Menu className="size-5" />}
-              </button>
-            )}
+            {/* Mobile View: Hamburger Menu Button (Always shown on mobile responsive) */}
+            <button
+              type="button"
+              aria-label="Toggle Navigation Menu"
+              onClick={() => setOpen((o) => !o)}
+              className="flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+              title="Toggle Menu"
+            >
+              {open ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
           </div>
         </nav>
       </header>
@@ -212,7 +210,7 @@ export function Navbar() {
             className="flex size-8 items-center justify-center rounded-full border border-gold/40 bg-gold/10 text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer"
             title="Close Menu"
           >
-            <ChevronDown className="size-4" />
+            <X className="size-4" />
           </button>
         </div>
 

@@ -5,6 +5,7 @@ import '../models/item_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
+import '../services/address_service.dart';
 import '../widgets/vexa_empty_state.dart';
 import 'login_screen.dart';
 import 'product_detail_screen.dart';
@@ -44,7 +45,20 @@ Widget _cartProductImage(
   BoxFit fit = BoxFit.cover,
 }) {
   if (src.startsWith('assets/')) {
-    return Image.asset(src, height: height, width: width, fit: fit);
+    return Image.asset(
+      src,
+      height: height,
+      width: width,
+      fit: fit,
+      errorBuilder: (context, error, stackTrace) => Container(
+        height: height,
+        width: width,
+        color: _surfaceBg,
+        child: const Center(
+          child: Icon(Icons.image_outlined, color: _subtext, size: 24),
+        ),
+      ),
+    );
   }
   return Image.network(
     src,
@@ -169,312 +183,859 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
-    final nameController = TextEditingController(text: loggedInUser.name.isNotEmpty ? loggedInUser.name : 'John Doe');
-    final addressController = TextEditingController(text: '123 Luxury Avenue, Fashion District');
-    final phoneController = TextEditingController(text: '+91 98765 43210');
-    final pincodeController = TextEditingController(text: '400001');
+    List<AddressModel> savedAddresses = (await AddressService.getAddresses()).toList();
+    AddressModel? selectedAddress = await AddressService.getDefaultAddress();
+
+    final nameController = TextEditingController(text: selectedAddress?.name ?? loggedInUser.name);
+    final addressController = TextEditingController(text: selectedAddress?.street ?? '');
+    final phoneController = TextEditingController(text: selectedAddress?.phone ?? '+91 98765 43210');
+    final pincodeController = TextEditingController(text: selectedAddress?.pincode ?? '');
+    String selectedTag = selectedAddress?.type ?? 'Home';
+    bool saveAsDefaultCheckbox = selectedAddress?.isDefault ?? true;
+
+    bool hasSavedAddress = selectedAddress != null && selectedAddress.street.trim().isNotEmpty;
+    bool isEditingAddress = !hasSavedAddress; // If already saved, DO NOT ask every time!
+    bool isSelectingOtherAddress = false;
+    String? addressFormError;
 
     String selectedPayment = 'Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)';
-
-    String selectedSavedAddress = 'home'; // 'home' | 'work' | 'custom'
     String selectedDeliverySpeed = 'express'; // 'express' | 'standard'
     String selectedInstruction = 'Leave at Door';
 
     if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: _bgColor,
-      elevation: 20,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return SizedBox(
-            height: MediaQuery.of(context).size.height * 0.92,
-            child: Column(
-              children: [
-                // ── 1. STICKY TOP HEADER WITH PROGRESS STEPS ─────────────────────────
-                Container(
-                  padding: const EdgeInsets.only(top: 16, bottom: 14, left: 20, right: 16),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                    boxShadow: [
-                      BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, 2)),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Drag indicator handle bar
-                      Center(
-                        child: Container(
-                          width: 42,
-                          height: 4.5,
-                          decoration: BoxDecoration(
-                            color: _border,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (checkoutContext) => StatefulBuilder(
+          builder: (checkoutContext, setModalState) {
+            return Scaffold(
+              backgroundColor: _bgColor,
+              appBar: AppBar(
+                backgroundColor: Colors.white,
+                elevation: 0,
+                scrolledUnderElevation: 1,
+                surfaceTintColor: Colors.transparent,
+                shadowColor: const Color(0x15000000),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+                  onPressed: () => Navigator.pop(checkoutContext),
+                ),
+                titleSpacing: 0,
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: _gold.withAlpha(25),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: const Icon(Icons.local_shipping_outlined, color: _goldDark, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Row(
+                          Text(
+                            'CHECKOUT & DELIVERY',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.cinzel(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              color: _textDark,
+                            ),
+                          ),
+                          Text(
+                            'Fast Doorstep Shipping & Secure Checkout',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              color: _subtext,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              body: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                        // ── SECTION A: SHIPPING ADDRESS ──────────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: _gold.withAlpha(25),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.local_shipping_outlined, color: _goldDark, size: 20),
+                                Text(
+                                  '1. Delivery Address',
+                                  style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5, fontWeight: FontWeight.bold),
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'CHECKOUT & DELIVERY',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.cinzel(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.0,
-                                          color: _textDark,
+                                if (hasSavedAddress && (selectedAddress?.isDefault ?? false)) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _successGreen.withAlpha(20),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: _successGreen.withAlpha(80)),
+                                    ),
+                                    child: Text(
+                                      'DEFAULT',
+                                      style: GoogleFonts.outfit(color: _successGreen, fontSize: 9.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (hasSavedAddress && !isEditingAddress)
+                              Row(
+                                children: [
+                                  if (savedAddresses.length > 1)
+                                    GestureDetector(
+                                      onTap: () => setModalState(() {
+                                        isSelectingOtherAddress = !isSelectingOtherAddress;
+                                      }),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: isSelectingOtherAddress ? _gold.withAlpha(20) : _surfaceBg,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: isSelectingOtherAddress ? _goldDark : _border),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.swap_horiz_rounded, size: 14, color: isSelectingOtherAddress ? _goldDark : _textDark),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              isSelectingOtherAddress ? 'Close' : 'Change',
+                                              style: GoogleFonts.outfit(color: isSelectingOtherAddress ? _goldDark : _textDark, fontSize: 11, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      Text(
-                                        'Fast Doorstep Shipping & Secure Checkout',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 11,
-                                          color: _subtext,
+                                    ),
+                                  const SizedBox(width: 6),
+                                  GestureDetector(
+                                    onTap: () => setModalState(() {
+                                      isEditingAddress = true;
+                                      isSelectingOtherAddress = false;
+                                      nameController.text = selectedAddress?.name ?? '';
+                                      addressController.text = selectedAddress?.street ?? '';
+                                      phoneController.text = selectedAddress?.phone ?? '';
+                                      pincodeController.text = selectedAddress?.pincode ?? '';
+                                      selectedTag = selectedAddress?.type ?? 'Home';
+                                      saveAsDefaultCheckbox = selectedAddress?.isDefault ?? true;
+                                    }),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _gold.withAlpha(20),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: _goldDark.withAlpha(120)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.edit_outlined, size: 12, color: _goldDark),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Edit',
+                                            style: GoogleFonts.outfit(color: _goldDark, fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // ── 1. SELECT DIFFERENT ADDRESS LIST ──────────────────────────
+                        if (isSelectingOtherAddress)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: _goldDark.withAlpha(100), width: 1.2),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 10, offset: const Offset(0, 2)),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'SAVED DELIVERY ADDRESSES',
+                                      style: GoogleFonts.cinzel(fontSize: 11.5, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => setModalState(() => isSelectingOtherAddress = false),
+                                      child: Text(
+                                        'Close',
+                                        style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                ...savedAddresses.map((addr) {
+                                  final isSelected = addr.id == selectedAddress?.id;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setModalState(() {
+                                        selectedAddress = addr;
+                                        nameController.text = addr.name;
+                                        addressController.text = addr.street;
+                                        phoneController.text = addr.phone;
+                                        pincodeController.text = addr.pincode;
+                                        selectedTag = addr.type;
+                                        saveAsDefaultCheckbox = addr.isDefault;
+                                        isSelectingOtherAddress = false;
+                                      });
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 10),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? _gold.withAlpha(15) : _surfaceBg,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected ? _goldDark : _border,
+                                          width: isSelected ? 1.5 : 1.0,
                                         ),
                                       ),
-                                    ],
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                                            color: isSelected ? _goldDark : _subtext,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      addr.name,
+                                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: _textDark),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                      decoration: BoxDecoration(
+                                                        color: _goldDark.withAlpha(20),
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        addr.type.toUpperCase(),
+                                                        style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _goldDark),
+                                                      ),
+                                                    ),
+                                                    if (addr.isDefault) ...[
+                                                      const SizedBox(width: 6),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                        decoration: BoxDecoration(
+                                                          color: _successGreen.withAlpha(20),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          'DEFAULT',
+                                                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _successGreen),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  addr.fullAddressText,
+                                                  style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  'Mobile: ${addr.phone}',
+                                                  style: GoogleFonts.outfit(fontSize: 11, color: _textDark, fontWeight: FontWeight.w600),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: _goldDark.withAlpha(150)),
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        isSelectingOtherAddress = false;
+                                        isEditingAddress = true;
+                                        nameController.text = loggedInUser.name;
+                                        phoneController.text = '+91 98765 43210';
+                                        addressController.clear();
+                                        pincodeController.clear();
+                                        selectedTag = 'Home';
+                                        saveAsDefaultCheckbox = true;
+                                        selectedAddress = null;
+                                      });
+                                    },
+                                    icon: const Icon(Icons.add_location_alt_outlined, color: _goldDark, size: 16),
+                                    label: Text(
+                                      '+ Add Another Address',
+                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _goldDark),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0C2340),
-                                  borderRadius: BorderRadius.circular(6),
+
+                        // ── 2. ACTIVE SELECTED DELIVERY ADDRESS CARD ──────────────────
+                        if (hasSavedAddress && !isEditingAddress && !isSelectingOtherAddress)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: _goldDark, width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(8),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
-                                child: Row(
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    const Icon(Icons.lock_rounded, color: Color(0xFFFFD700), size: 11),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '256-Bit SSL',
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.white,
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: _gold.withAlpha(25),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        selectedTag == 'Work' ? Icons.business_rounded : Icons.home_rounded,
+                                        color: _goldDark,
+                                        size: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        nameController.text.trim(),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: _textDark,
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: _successGreen.withAlpha(20),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: _successGreen.withAlpha(60)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.check_circle_rounded, color: _successGreen, size: 11),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'DELIVER HERE',
+                                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: _successGreen),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(width: 6),
-                              IconButton(
-                                icon: const Icon(Icons.close_rounded, color: _textDark, size: 22),
-                                onPressed: () => Navigator.pop(context),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── 2. SCROLLABLE FORM BODY ─────────────────────────────────────────
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-
-                        // ── SECTION A: SAVED ADDRESS QUICK SELECT ────────────────────
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '1. Select Shipping Address',
-                              style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              'Saved Locations',
-                              style: GoogleFonts.outfit(color: _goldDark, fontSize: 11.5, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-
-                        Row(
-                          children: [
-                            (id: 'home', label: '🏠 Home (Default)', name: 'John Doe', addr: '123 Luxury Avenue, Fashion District', phone: '+91 98765 43210', pin: '400001'),
-                            (id: 'work', label: '🏢 Work', name: 'John Doe (Office)', addr: 'Corporate Tower B, Financial Center', phone: '+91 98765 11223', pin: '400051'),
-                          ].map((savedAddr) {
-                            final isSelected = selectedSavedAddress == savedAddr.id;
-                            return Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setModalState(() {
-                                    selectedSavedAddress = savedAddr.id;
-                                    nameController.text = savedAddr.name;
-                                    addressController.text = savedAddr.addr;
-                                    phoneController.text = savedAddr.phone;
-                                    pincodeController.text = savedAddr.pin;
-                                  });
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 8),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? _gold.withAlpha(20) : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isSelected ? _goldDark : _border,
-                                      width: isSelected ? 1.5 : 1.0,
+                                const SizedBox(height: 8),
+                                Text(
+                                  addressController.text.trim(),
+                                  style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext, height: 1.3),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.phone_outlined, size: 13, color: _subtext),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      phoneController.text.trim(),
+                                      style: GoogleFonts.outfit(fontSize: 11.5, color: _textDark, fontWeight: FontWeight.w600),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    const Icon(Icons.pin_drop_outlined, size: 13, color: _subtext),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'PIN: ${pincodeController.text.trim()}',
+                                      style: GoogleFonts.outfit(fontSize: 11.5, color: _textDark, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Action Button: "+ Add Address"
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: _goldDark.withAlpha(120)),
+                                      padding: const EdgeInsets.symmetric(vertical: 8.5),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      backgroundColor: _gold.withAlpha(12),
+                                    ),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        isEditingAddress = true;
+                                        isSelectingOtherAddress = false;
+                                        nameController.text = loggedInUser.name;
+                                        phoneController.text = '+91 98765 43210';
+                                        addressController.clear();
+                                        pincodeController.clear();
+                                        selectedTag = 'Home';
+                                        saveAsDefaultCheckbox = true;
+                                        selectedAddress = null;
+                                      });
+                                    },
+                                    icon: const Icon(Icons.add_location_alt_outlined, color: _goldDark, size: 14),
+                                    label: Text(
+                                      '+ Add Address',
+                                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _goldDark),
                                     ),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            savedAddr.label,
-                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _textDark),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // ── 3. TOGGLE "+ ADD DELIVERY ADDRESS" (WHEN NO ADDRESS SAVED) ──
+                        if (!hasSavedAddress && !isEditingAddress)
+                          GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                addressFormError = null;
+                                isEditingAddress = true;
+                              });
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: _border, width: 1.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha(6),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: _gold.withAlpha(25),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.add_location_alt_rounded, color: _goldDark, size: 18),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '+ Add Delivery Address',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: _textDark,
                                           ),
-                                          if (isSelected)
-                                            const Icon(Icons.check_circle_rounded, color: _goldDark, size: 14),
+                                        ),
+                                        Text(
+                                          'Tap to fill your shipping details (saved as default)',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            color: _subtext,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.keyboard_arrow_down_rounded, color: _goldDark, size: 22),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        // ── 4. ADDRESS EDIT & ADD FORM ────────────────────────────────
+                        if (isEditingAddress) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: _goldDark.withAlpha(100), width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(8),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.edit_location_alt_outlined, color: _goldDark, size: 18),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          selectedAddress != null ? 'Edit Delivery Address' : 'Add New Delivery Address',
+                                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _goldDark),
+                                        ),
+                                      ],
+                                    ),
+                                    if (hasSavedAddress)
+                                      GestureDetector(
+                                        onTap: () => setModalState(() {
+                                          addressFormError = null;
+                                          isEditingAddress = false;
+                                        }),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.withAlpha(20),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            'Cancel',
+                                            style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext, fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Address Type Selection (Home, Work, Other)
+                                Text('Address Label', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: ['Home', 'Work', 'Other'].map((t) {
+                                    final isSelected = selectedTag == t;
+                                    return GestureDetector(
+                                      onTap: () => setModalState(() => selectedTag = t),
+                                      child: Container(
+                                        margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? _gold.withAlpha(25) : _surfaceBg,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: isSelected ? _goldDark : _border,
+                                            width: isSelected ? 1.5 : 1.0,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              t == 'Home'
+                                                  ? Icons.home_rounded
+                                                  : (t == 'Work' ? Icons.business_rounded : Icons.location_on_rounded),
+                                              size: 13,
+                                              color: isSelected ? _goldDark : _subtext,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              t,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: isSelected ? _goldDark : _textDark,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                const SizedBox(height: 12),
+
+                                Text('Full Name', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: nameController,
+                                  style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5),
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter recipient full name',
+                                    prefixIcon: const Icon(Icons.person_outline_rounded, color: _goldDark, size: 20),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    filled: true,
+                                    fillColor: _surfaceBg,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                Text('Delivery Address', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: addressController,
+                                  style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5),
+                                  maxLines: 2,
+                                  decoration: InputDecoration(
+                                    hintText: 'House/Flat No., Street, Landmark, Area',
+                                    prefixIcon: const Padding(
+                                      padding: EdgeInsets.only(bottom: 24),
+                                      child: Icon(Icons.location_on_outlined, color: _goldDark, size: 20),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    filled: true,
+                                    fillColor: _surfaceBg,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Phone Number', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 6),
+                                          TextField(
+                                            controller: phoneController,
+                                            keyboardType: TextInputType.phone,
+                                            style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5),
+                                            decoration: InputDecoration(
+                                              hintText: '10-digit number',
+                                              prefixIcon: const Icon(Icons.phone_outlined, color: _goldDark, size: 20),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                              filled: true,
+                                              fillColor: _surfaceBg,
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                      const SizedBox(height: 4),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    SizedBox(
+                                      width: 125,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('PIN Code', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 6),
+                                          TextField(
+                                            controller: pincodeController,
+                                            keyboardType: TextInputType.number,
+                                            style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5),
+                                            decoration: InputDecoration(
+                                              hintText: '6-digit PIN',
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                              filled: true,
+                                              fillColor: _surfaceBg,
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Checkbox: Make this my default address
+                                GestureDetector(
+                                  onTap: () => setModalState(() => saveAsDefaultCheckbox = !saveAsDefaultCheckbox),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: Checkbox(
+                                          value: saveAsDefaultCheckbox,
+                                          activeColor: _goldDark,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                          onChanged: (val) => setModalState(() => saveAsDefaultCheckbox = val ?? true),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        savedAddr.addr,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext),
+                                        'Save as default delivery address',
+                                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
 
-                        const SizedBox(height: 14),
-
-                        // Input fields
-                        Text('Full Name', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: nameController,
-                          style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'e.g. John Doe',
-                            prefixIcon: const Icon(Icons.person_outline_rounded, color: _goldDark, size: 20),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        Text('Delivery Address', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: addressController,
-                          style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'Street name, Apartment, Suite',
-                            prefixIcon: const Icon(Icons.location_on_outlined, color: _goldDark, size: 20),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Phone Number', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 6),
-                                  TextField(
-                                    controller: phoneController,
-                                    style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                                    decoration: InputDecoration(
-                                      hintText: '+91 98765 43210',
-                                      prefixIcon: const Icon(Icons.phone_outlined, color: _goldDark, size: 20),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                if (addressFormError != null) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: _errorRed.withAlpha(20),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: _errorRed.withAlpha(80)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.error_outline_rounded, size: 16, color: _errorRed),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            addressFormError!,
+                                            style: GoogleFonts.outfit(color: _errorRed, fontSize: 11.5, fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            SizedBox(
-                              width: 120,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('PIN Code', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 6),
-                                  TextField(
-                                    controller: pincodeController,
-                                    style: GoogleFonts.outfit(color: _textDark, fontSize: 14),
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      hintText: '400001',
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                const SizedBox(height: 14),
+
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _goldDark,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: () async {
+                                      final name = nameController.text.trim();
+                                      final addr = addressController.text.trim();
+                                      final phone = phoneController.text.trim();
+                                      final pin = pincodeController.text.trim();
+
+                                      if (name.isEmpty) {
+                                        setModalState(() => addressFormError = 'Please enter your full name');
+                                        return;
+                                      }
+                                      if (addr.isEmpty) {
+                                        setModalState(() => addressFormError = 'Please enter delivery address');
+                                        return;
+                                      }
+                                      if (phone.isEmpty) {
+                                        setModalState(() => addressFormError = 'Please enter phone number');
+                                        return;
+                                      }
+                                      if (pin.isEmpty) {
+                                        setModalState(() => addressFormError = 'Please enter PIN code');
+                                        return;
+                                      }
+
+                                      FocusScope.of(context).unfocus();
+
+                                      final newModel = AddressModel(
+                                        id: selectedAddress?.id ?? 'addr_${DateTime.now().millisecondsSinceEpoch}',
+                                        type: selectedTag,
+                                        name: name,
+                                        phone: phone,
+                                        street: addr,
+                                        pincode: pin,
+                                        isDefault: saveAsDefaultCheckbox,
+                                      );
+
+                                      await AddressService.saveAddress(newModel, setAsDefault: saveAsDefaultCheckbox);
+                                      final reloaded = (await AddressService.getAddresses()).toList();
+
+                                      setModalState(() {
+                                        savedAddresses = reloaded;
+                                        selectedAddress = newModel;
+                                        addressFormError = null;
+                                        hasSavedAddress = true;
+                                        isEditingAddress = false;
+                                        isSelectingOtherAddress = false;
+                                      });
+                                    },
+                                    child: Center(
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Save Address & Deliver Here',
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white,
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
 
                         const SizedBox(height: 20),
 
@@ -722,14 +1283,11 @@ class _CartScreenState extends State<CartScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
-                ),
-
-                // ── 3. STICKY BOTTOM ACTION BAR ──────────────────────────────────────
-                Container(
+                bottomNavigationBar: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   decoration: const BoxDecoration(
                     color: Colors.white,
@@ -751,6 +1309,13 @@ class _CartScreenState extends State<CartScreen> {
                         onPressed: _isSubmittingOrder
                             ? null
                             : () {
+                                if (!hasSavedAddress || addressController.text.trim().isEmpty || nameController.text.trim().isEmpty) {
+                                  setModalState(() {
+                                    isEditingAddress = true;
+                                    addressFormError = 'Please enter and save your delivery address to proceed.';
+                                  });
+                                  return;
+                                }
                                 if (selectedPayment.contains('Razorpay')) {
                                   // Launch Realtime Razorpay Gateway Flow
                                   _showRazorpayGatewayModal(
@@ -771,6 +1336,18 @@ class _CartScreenState extends State<CartScreen> {
                                       )).toList();
 
                                       final currentUser = await AuthService.getUser();
+                                      AddressService.saveAddress(
+                                        AddressModel(
+                                          id: selectedAddress?.id ?? 'addr_${DateTime.now().millisecondsSinceEpoch}',
+                                          type: selectedTag,
+                                          name: nameController.text.trim(),
+                                          phone: phoneController.text.trim(),
+                                          street: addressController.text.trim(),
+                                          pincode: pincodeController.text.trim(),
+                                          isDefault: saveAsDefaultCheckbox,
+                                        ),
+                                        setAsDefault: saveAsDefaultCheckbox,
+                                      );
                                       final placedOrder = await OrderService.createOrder(
                                         customerName: nameController.text.isNotEmpty ? nameController.text : (currentUser?.name ?? 'Valued Customer'),
                                         shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
@@ -791,7 +1368,7 @@ class _CartScreenState extends State<CartScreen> {
                                       });
                                       if (widget.onCartUpdated != null) widget.onCartUpdated!();
 
-                                      Navigator.pop(context);
+                                      Navigator.pop(checkoutContext);
                                       _showOrderSuccessDialog(placedOrder);
                                     },
                                   );
@@ -812,6 +1389,19 @@ class _CartScreenState extends State<CartScreen> {
                                       image: c.item.image,
                                     )).toList();
 
+                                    AddressService.saveAddress(
+                                      AddressModel(
+                                        id: selectedAddress?.id ?? 'addr_${DateTime.now().millisecondsSinceEpoch}',
+                                        type: selectedTag,
+                                        name: nameController.text.trim(),
+                                        phone: phoneController.text.trim(),
+                                        street: addressController.text.trim(),
+                                        pincode: pincodeController.text.trim(),
+                                        isDefault: saveAsDefaultCheckbox,
+                                      ),
+                                      setAsDefault: saveAsDefaultCheckbox,
+                                    );
+
                                     final placedOrder = await OrderService.createOrder(
                                       customerName: nameController.text,
                                       shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
@@ -831,7 +1421,7 @@ class _CartScreenState extends State<CartScreen> {
                                     });
                                     if (widget.onCartUpdated != null) widget.onCartUpdated!();
 
-                                    Navigator.pop(context);
+                                    Navigator.pop(checkoutContext);
                                     _showOrderSuccessDialog(placedOrder);
                                   });
                                 }
@@ -863,13 +1453,12 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+              );
+            },
+          ),
+        ),
+      );
+    }
 
   // ── RAZORPAY LIVE PAYMENT GATEWAY FULL-SCREEN VIEW (EXACT WEB & BANK FLOW REPLICA) ──
   void _showRazorpayGatewayModal({

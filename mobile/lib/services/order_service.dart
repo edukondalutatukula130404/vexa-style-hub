@@ -79,20 +79,26 @@ class OrderModel {
   });
 
   Color get statusColor {
-    switch (status.toLowerCase()) {
-      case 'delivered':
-        return const Color(0xFF10B981);
-      case 'shipped':
-      case 'out for delivery':
-        return const Color(0xFFD4AF37);
-      case 'processing':
-      case 'confirmed':
-        return const Color(0xFF3B82F6);
-      case 'cancelled':
-        return const Color(0xFFEF4444);
-      default:
-        return const Color(0xFFD4AF37);
+    final s = status.toLowerCase();
+    if (s.contains('deliver') && !s.contains('out')) {
+      return const Color(0xFF10B981);
     }
+    if (s.contains('out for delivery') || s.contains('courier')) {
+      return const Color(0xFFF59E0B);
+    }
+    if (s.contains('ship') || s.contains('transit')) {
+      return const Color(0xFF2563EB);
+    }
+    if (s.contains('process') || s.contains('pack')) {
+      return const Color(0xFF3B82F6);
+    }
+    if (s.contains('confirm') || s.contains('place') || s.contains('pend')) {
+      return const Color(0xFFD4AF37);
+    }
+    if (s.contains('cancel')) {
+      return const Color(0xFFEF4444);
+    }
+    return const Color(0xFFD4AF37);
   }
 
   String get formattedDate {

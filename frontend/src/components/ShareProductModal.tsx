@@ -51,12 +51,13 @@ export const ShareProductModal: React.FC<ShareProductModalProps> = ({
 
   if (!isOpen || !product) return null;
 
-  const productUrl = `https://vexa.style/p/${product.id || "vx-00"}`;
-  const shareText = `Check out ${product.name} (₹${product.price}) on VEXA Style Hub!`;
+  const cleanId = product.id?.trim() || "vx-01";
+  const productUrl = `https://clothing.speshway.site/product/${cleanId}`;
+  const shareText = `Take a look at this ${product.name} on VEXA\n${productUrl}`;
 
   const encodedUrl = encodeURIComponent(productUrl);
   const encodedText = encodeURIComponent(shareText);
-  const encodedCombined = encodeURIComponent(`${shareText}\n${productUrl}`);
+  const encodedCombined = encodeURIComponent(shareText);
 
   const handleNativeShare = async () => {
     onClose();

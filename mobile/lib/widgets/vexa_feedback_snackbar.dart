@@ -111,24 +111,38 @@ class VexaFeedback {
             ),
             if (actionLabel != null && onActionTap != null) ...[
               const SizedBox(width: 8),
-              TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  onActionTap();
+              Builder(
+                builder: (btnContext) {
+                  return TextButton(
+                    onPressed: () {
+                      try {
+                        ScaffoldMessenger.maybeOf(btnContext)?.hideCurrentSnackBar();
+                      } catch (_) {
+                        try {
+                          ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+                        } catch (_) {}
+                      }
+                      try {
+                        onActionTap();
+                      } catch (e) {
+                        debugPrint('❌ Error on snackbar action: $e');
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      backgroundColor: const Color(0xFFB8860B),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: Text(
+                      actionLabel,
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
                 },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  backgroundColor: const Color(0xFFB8860B),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: Text(
-                  actionLabel,
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
               ),
             ],
           ],

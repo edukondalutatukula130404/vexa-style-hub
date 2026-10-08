@@ -1238,7 +1238,6 @@ export function UserDashboard() {
 
   const navItems = [
     { id: "profile", label: "My Profile", icon: UserIcon },
-    { id: "wallet", label: "VEXA Wallet", icon: Wallet },
     { id: "orders", label: "My Orders", icon: Package },
     { id: "booking", label: "Book Custom Tee", icon: Sparkles },
     { id: "cart", label: "My Cart", icon: ShoppingBag },

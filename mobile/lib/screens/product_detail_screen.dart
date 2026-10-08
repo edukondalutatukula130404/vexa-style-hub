@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/item_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/share_product_modal.dart';
 import '../widgets/vexa_feedback_snackbar.dart';
+import 'cart_screen.dart';
 import 'login_screen.dart';
 
 class _ReviewItem {
@@ -206,8 +208,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  void _openShareModalSheet() {
-    ShareProductModal.show(context, widget.item);
+  void _shareProduct() async {
+    final cleanId = widget.item.id.trim().isEmpty ? 'vx-01' : widget.item.id.trim();
+    final productUrl = 'https://clothing.speshway.site/product/$cleanId';
+    final shareText = 'Take a look at this ${widget.item.name} on VEXA\n$productUrl';
+    try {
+      await Share.share(shareText, subject: widget.item.name);
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: shareText));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Product link copied to clipboard!', style: GoogleFonts.outfit(color: Colors.white)),
+            backgroundColor: const Color(0xFF0F172A),
+          ),
+        );
+      }
+    }
   }
 
   void _openImagePopup(BuildContext context, String currentImg, int initialIndex) {
@@ -242,7 +259,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
-                  onPressed: () => _openShareModalSheet(),
+                  onPressed: _shareProduct,
                 ),
               ],
             ),
@@ -840,9 +857,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                // Share Button (Opens social share apps modal)
+                                // Share Button (Direct Native System Share)
                                 GestureDetector(
-                                  onTap: _openShareModalSheet,
+                                  onTap: _shareProduct,
                                   child: Container(
                                     width: 40,
                                     height: 40,
@@ -968,6 +985,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           const SizedBox(height: 4),
                           Text(
                             widget.item.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
@@ -1877,7 +1896,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 VexaFeedback.showAddToCartSuccess(
                                   context,
                                   productName: widget.item.name,
-                                  onViewCart: widget.onOpenCart,
+                                  onViewCart: () {
+                                    if (widget.onOpenCart != null) {
+                                      widget.onOpenCart!();
+                                    } else {
+                                      Navigator.of(context, rootNavigator: true).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const CartScreen(cartItems: []),
+                                        ),
+                                      );
+                                    }
+                                  },
                                 );
                               },
                               child: Text(

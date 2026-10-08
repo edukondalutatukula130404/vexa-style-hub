@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+﻿import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import {
   Star,
@@ -27,7 +27,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { addToCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
-import { ShareProductModal } from "@/components/ShareProductModal";
+import { toast } from "sonner";
 
 import black from "@/assets/tee-black.jpg";
 import white from "@/assets/tee-white.jpg";
@@ -131,16 +131,9 @@ export function ProductDetailPage() {
   // Find product by id
   const product = useMemo(() => {
     if (!products || products.length === 0) return null;
-    if (!id) return products[0];
-
-    const cleanId = id.toLowerCase().trim();
-    const cleanIdAlphaNum = cleanId.replace(/[^a-z0-9]/g, "");
-
     return (
       products.find((p) => p.id === id) ||
-      products.find((p) => p.id && p.id.toLowerCase() === cleanId) ||
-      products.find((p) => p.id && p.id.toLowerCase().replace(/[^a-z0-9]/g, "") === cleanIdAlphaNum) ||
-      products.find((p) => p.name && p.name.toLowerCase().includes(cleanId)) ||
+      products.find((p) => p.id && id && p.id.toLowerCase() === id.toLowerCase()) ||
       products[0]
     );
   }, [products, id]);
@@ -155,7 +148,6 @@ export function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState<"specs" | "care" | "shipping">("specs");
   const [addedToast, setAddedToast] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
 
   // Review state
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -213,6 +205,15 @@ export function ProductDetailPage() {
   // Scroll to top on ID change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [id]);
+
+  // Scroll to top on ID change
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as any });
+    if (typeof document !== "undefined") {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
   }, [id]);
 
   // Dynamic Review Filter & Sort state
@@ -465,6 +466,8 @@ export function ProductDetailPage() {
         >
           <ChevronLeft className="size-4" /> Back to All Products
         </Link>
+
+
       </div>
     );
   }
@@ -481,6 +484,29 @@ export function ProductDetailPage() {
     addToCart(getProductWithColor(), selectedSize, quantity);
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 3000);
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const shareData = {
+      title: product?.name || "VEXA Style Hub",
+      text: `Take a look at this ${product?.name || "item"} on VEXA!`,
+      url: url,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Product link copied to clipboard!");
+    } catch {
+      toast("Link: " + url);
+    }
   };
 
   const handleBuyNow = () => {
@@ -521,25 +547,7 @@ export function ProductDetailPage() {
       )}
 
 
-      {/* Back to Products & Share Navigation Bar */}
-      <div className="mb-6 flex items-center justify-between">
-        <Link
-          to="/products"
-          className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold backdrop-blur transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
-        >
-          <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
-          <span>Back</span>
-        </Link>
 
-        <button
-          type="button"
-          onClick={() => setShowShareModal(true)}
-          className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold backdrop-blur transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm cursor-pointer"
-        >
-          <Share2 className="size-4" />
-          <span>Share</span>
-        </button>
-      </div>
 
       {/* Main Product Grid */}
       <div className="grid gap-12 lg:grid-cols-12 items-start">
@@ -551,9 +559,6 @@ export function ProductDetailPage() {
                 key={selectedImage}
                 src={selectedImage}
                 alt={`${product.name} in ${selectedColor.name}`}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = heroLuxuryImg;
-                }}
                 className="h-[480px] sm:h-[580px] w-full object-cover object-top transition-all duration-700 group-hover:scale-105 animate-in fade-in duration-300"
               />
               <span className="absolute left-5 top-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-md z-10">
@@ -562,9 +567,7 @@ export function ProductDetailPage() {
               <span className="btn-gold absolute right-5 top-5 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider z-10">
                 {discountOff}% OFF
               </span>
-              <span className="absolute bottom-5 left-5 rounded-full border border-gold/60 bg-[#f4efe6] px-4 py-1.5 text-[10px] font-extrabold text-[#1c1917] shadow-md z-10">
-                240 GSM Heavyweight Cotton
-              </span>
+
             </div>
           </Reveal>
 
@@ -604,9 +607,19 @@ export function ProductDetailPage() {
         <div className="lg:col-span-5 space-y-7">
           <Reveal>
             <div className="space-y-3">
-              <span className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold">
-                VEXA Signature Series
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold">
+                  VEXA Signature Series
+                </span>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-card/80 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gold backdrop-blur transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-xs cursor-pointer active:scale-95"
+                >
+                  <Share2 className="size-3.5" />
+                  <span>Share</span>
+                </button>
+              </div>
               <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">
                 {product.name}
               </h1>
@@ -1263,13 +1276,6 @@ export function ProductDetailPage() {
           </div>
         </div>
       )}
-
-      {/* SHARE PRODUCT MODAL */}
-      <ShareProductModal
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        product={product}
-      />
     </section>
   );
 }

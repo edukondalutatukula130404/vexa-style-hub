@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../config/api_config.dart';
 import '../models/item_model.dart';
 
 class ShareProductModal extends StatelessWidget {
@@ -31,20 +30,12 @@ class ShareProductModal extends StatelessWidget {
   }
 
   String get _productUrl {
-    final cleanId = item.id.toLowerCase().replaceAll(RegExp(r'[^a-z0-9-]'), '');
-    final id = cleanId.isEmpty ? 'vx-01' : cleanId;
-
-    // Use active valid server domain so links resolve online without DNS errors
-    final base = ApiConfig.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
-    final validDomain = base.contains('http') && !base.contains('10.0.2.2')
-        ? base
-        : ApiConfig.productionUrl.replaceAll(RegExp(r'/api/?$'), '');
-
-    return '$validDomain/?id=$id';
+    final cleanId = item.id.trim().isEmpty ? 'vx-01' : item.id.trim();
+    return 'https://clothing.speshway.site/product/$cleanId';
   }
 
   String get _shareText {
-    return '🛍️ *${item.name}*\nSpecial Price: ₹${item.price.toStringAsFixed(0)}\n\n🔗 Open product link in VEXA app:\n$_productUrl';
+    return 'Take a look at this ${item.name} on VEXA\n$_productUrl';
   }
 
   Future<void> _handleSystemShare(BuildContext context) async {
@@ -477,7 +468,7 @@ class ShareProductModal extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Check out ${item.name} on VEXA Style Hub - $_productUrl',
+                      'Take a look at this ${item.name} on VEXA - $_productUrl',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(

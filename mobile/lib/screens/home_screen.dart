@@ -67,7 +67,7 @@ const _promoBanners = [
     body: 'Sculpted from 240 GSM bio-washed heavy cotton with double-stitched collar reinforcement.',
     cta: 'EXPLORE COLLECTION',
     img: 'assets/images/promo_banner_1.png',
-    imgAlignment: Alignment.topCenter,
+    imgAlignment: Alignment(0.0, -0.32),
   ),
   (
     tag: 'BESPOKE CUSTOMISATION',
@@ -76,7 +76,7 @@ const _promoBanners = [
     body: 'Personalize colorways, custom embroidery & bulk orders directly from your user dashboard.',
     cta: 'BOOK CUSTOM TEE',
     img: 'assets/images/promo_banner_2.png',
-    imgAlignment: Alignment.center,
+    imgAlignment: Alignment(0.0, -0.05),
   ),
   (
     tag: 'VEXA SIGNATURE ESSENTIALS',
@@ -85,7 +85,7 @@ const _promoBanners = [
     body: 'Engineered for lasting quality, zero color bleeding, and pre-shrunk combed long-staple luxury cotton.',
     cta: 'SHOP CATALOG',
     img: 'assets/images/hero_luxury_tshirt.png',
-    imgAlignment: Alignment.center,
+    imgAlignment: Alignment(0.0, -0.2),
   ),
 ];
 
@@ -2211,7 +2211,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Featured Highlights',
+          Text('FEATURED HIGHLIGHTS',
               style: GoogleFonts.outfit(fontSize: 10, color: _gold, fontWeight: FontWeight.w700, letterSpacing: 3)),
           const SizedBox(height: 4),
           RichText(
@@ -2233,12 +2233,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               },
               itemBuilder: (context, index) {
                 final b = _promoBanners[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: _PromoBannerCard(
-                    banner: b,
-                    onTap: () => _handleBannerTap(b.cta),
-                  ),
+                return _PromoBannerCard(
+                  banner: b,
+                  onTap: () => _handleBannerTap(b.cta),
                 );
               },
             ),
@@ -3517,78 +3514,142 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _openHomeOrderDetailSheet(BuildContext context, OrderModel order) {
+  void _openHomeOrderDetailSheet(BuildContext context, OrderModel initialOrder) {
+    OrderModel order = initialOrder;
+    bool isRefreshing = false;
+
     Navigator.push(
       context,
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (ctx) {
-          final isCancelled = order.status.toLowerCase() == 'cancelled';
-          final isDelivered = order.status.toLowerCase().contains('deliver');
+          return StatefulBuilder(
+            builder: (sheetCtx, setSheetState) {
+              Future<void> handleRefresh() async {
+                if (isRefreshing) return;
+                setSheetState(() => isRefreshing = true);
+                try {
+                  final user = await AuthService.getUser();
+                  final orders = await OrderService.getOrders(email: user?.email);
+                  final cleanCurrent = order.id.replaceAll('#', '').toLowerCase().trim();
 
-          return Scaffold(
-            backgroundColor: _bgColor,
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0.8,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
-                onPressed: () => Navigator.pop(ctx),
-              ),
-              titleSpacing: 0,
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: _gold.withAlpha(25),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _gold.withAlpha(60)),
-                    ),
-                    child: const Icon(Icons.inventory_2_rounded, color: _goldDark, size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
+                  for (final o in orders) {
+                    final oClean = o.id.replaceAll('#', '').toLowerCase().trim();
+                    final isMatch = oClean == cleanCurrent ||
+                        (cleanCurrent.length >= 4 && oClean.endsWith(cleanCurrent)) ||
+                        (oClean.length >= 4 && cleanCurrent.endsWith(oClean)) ||
+                        (cleanCurrent.length >= 4 && oClean.contains(cleanCurrent)) ||
+                        (oClean.length >= 4 && cleanCurrent.contains(oClean));
+
+                    if (isMatch) {
+                      if (sheetCtx.mounted) {
+                        setSheetState(() {
+                          order = o;
+                        });
+                      }
+                      break;
+                    }
+                  }
+                  _refreshOrders();
+                  if (sheetCtx.mounted) {
+                    ScaffoldMessenger.of(sheetCtx).clearSnackBars();
+                    ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                      SnackBar(
+                        content: Row(
                           children: [
-                            Flexible(
-                              child: Text(
-                                'ORDER ${order.id}',
-                                style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Order details refreshed!',
+                              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Row(
+                        backgroundColor: const Color(0xFF10B981),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('Refresh error: $e');
+                } finally {
+                  if (sheetCtx.mounted) {
+                    setSheetState(() => isRefreshing = false);
+                  }
+                }
+              }
+
+              final isCancelled = order.status.toLowerCase() == 'cancelled';
+              final isDelivered = order.status.toLowerCase().contains('deliver');
+
+              return Scaffold(
+                backgroundColor: _bgColor,
+                appBar: AppBar(
+                  backgroundColor: Colors.white,
+                  elevation: 0.8,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                  titleSpacing: 0,
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: _gold.withAlpha(25),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _gold.withAlpha(60)),
+                        ),
+                        child: const Icon(Icons.inventory_2_rounded, color: _goldDark, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.access_time_rounded, size: 11, color: _subtext),
-                            const SizedBox(width: 4),
-                            Text('Placed on ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 10, color: _subtext)),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'ORDER ${order.id}',
+                                    style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time_rounded, size: 11, color: _subtext),
+                                const SizedBox(width: 4),
+                                Text('Placed on ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 10, color: _subtext)),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              actions: [
-                if (order.isPaid)
-                  IconButton(
-                    icon: const Icon(Icons.download_rounded, color: _goldDark, size: 22),
-                    tooltip: 'Download Invoice',
-                    onPressed: () => _showInvoiceModal(ctx, order, autoStartDownload: true),
-                  ),
-              ],
-            ),
-            body: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
+                  actions: [
+                    if (order.isPaid)
+                      IconButton(
+                        icon: const Icon(Icons.download_rounded, color: _goldDark, size: 22),
+                        tooltip: 'Download Invoice',
+                        onPressed: () => _showInvoiceModal(ctx, order, autoStartDownload: true),
+                      ),
+                  ],
+                ),
+                body: RefreshIndicator(
+                  color: _goldDark,
+                  onRefresh: handleRefresh,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                    padding: const EdgeInsets.all(20),
+                    children: [
                 // 1. CANCELLATION BANNER (If Cancelled)
                 if (isCancelled) ...[
                   Container(
@@ -4027,11 +4088,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 const SizedBox(height: 10),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
-  }
+  },
+),
+);
+}
 
   void _showCancelOrderDialog(OrderModel order) {
     String selectedReason = 'Changed my mind / Placed by mistake';

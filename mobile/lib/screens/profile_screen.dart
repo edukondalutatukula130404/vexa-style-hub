@@ -12,6 +12,7 @@ import 'order_details_screen.dart';
 import 'customer_support_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
 import '../services/invoice_pdf_service.dart';
+import '../services/address_service.dart';
 
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
@@ -97,10 +98,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUser() async {
     final user = await AuthService.getUser();
+    final addrs = await AddressService.getAddresses();
     if (mounted) {
       setState(() {
         _currentUser = user;
         _isLoadingUser = false;
+        _userAddresses.clear();
+        _userAddresses.addAll(addrs.map((a) => a.toJson()));
       });
     }
   }
@@ -4142,6 +4146,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _userAddresses.add(updatedAddress);
                 }
               });
+              AddressService.saveAddress(
+                AddressModel.fromJson(updatedAddress),
+                setAsDefault: updatedAddress['isDefault'] == true,
+              );
               if (mounted) setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -4166,6 +4174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               setAddressState(() {
                 _userAddresses.removeWhere((a) => a['id'] == id);
               });
+              AddressService.deleteAddress(id);
               if (mounted) setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -4183,6 +4192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   a['isDefault'] = (a['id'] == id);
                 }
               });
+              AddressService.setDefaultAddress(id);
               if (mounted) setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

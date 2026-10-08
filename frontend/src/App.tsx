@@ -43,7 +43,14 @@ function ScrollToTop() {
   const { pathname, search } = useLocation();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as any });
+    if (typeof document !== "undefined") {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
   }, [pathname, search]);
 
   return null;
@@ -146,6 +153,8 @@ export default function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/product" element={<ProductDetailPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
+          <Route path="/p/:id" element={<ProductDetailPage />} />
+          <Route path="/s/:id" element={<ProductDetailPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/cart" element={<CartRedirect />} />

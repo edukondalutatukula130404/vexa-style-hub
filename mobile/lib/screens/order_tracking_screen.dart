@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/order_service.dart';
 import '../services/websocket_service.dart';
+import '../services/auth_service.dart';
 import 'customer_support_screen.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
@@ -17,11 +18,22 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   late OrderModel _currentOrder;
   StreamSubscription? _wsSub;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _currentOrder = widget.order;
+
+    _fetchLatestOrder();
+
+    OrderService.ordersChangeNotifier.addListener(_onOrdersNotifierChanged);
+
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) {
+        _fetchLatestOrder();
+      }
+    });
 
     _wsSub = VexaWebSocketService().stream.listen((event) {
       if (mounted) {
@@ -33,13 +45,27 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             final cleanCurrent = _currentOrder.id.replaceAll('#', '').toLowerCase().trim();
             final cleanEvent = orderId.replaceAll('#', '').toLowerCase().trim();
 
-            if (cleanCurrent == cleanEvent || cleanCurrent.endsWith(cleanEvent) || cleanEvent.endsWith(cleanCurrent)) {
+            final isMatch = cleanCurrent == cleanEvent ||
+                (cleanEvent.isNotEmpty && cleanCurrent.endsWith(cleanEvent)) ||
+                (cleanCurrent.isNotEmpty && cleanEvent.endsWith(cleanCurrent)) ||
+                (cleanEvent.length >= 4 && cleanCurrent.contains(cleanEvent)) ||
+                (cleanCurrent.length >= 4 && cleanEvent.contains(cleanCurrent));
+
+            if (isMatch) {
               final newStatus = (data['status'] ?? '').toString();
               final cancelReason = data['cancelReason']?.toString();
-              setState(() {
-                _currentOrder.status = newStatus;
-                if (cancelReason != null) _currentOrder.cancelReason = cancelReason;
-              });
+              if (newStatus.isNotEmpty) {
+                setState(() {
+                  _currentOrder.status = newStatus;
+                  if (cancelReason != null) _currentOrder.cancelReason = cancelReason;
+                });
+                OrderService.updateOrderStatusLocally(
+                  _currentOrder.id,
+                  newStatus,
+                  cancelReason: cancelReason,
+                  createNotification: false,
+                );
+              }
             }
           }
         }
@@ -47,33 +73,58 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     });
   }
 
+  void _onOrdersNotifierChanged() {
+    _fetchLatestOrder();
+  }
+
+  Future<void> _fetchLatestOrder() async {
+    try {
+      final user = await AuthService.getUser();
+      final orders = await OrderService.getOrders(email: user?.email);
+      final cleanCurrent = _currentOrder.id.replaceAll('#', '').toLowerCase().trim();
+
+      for (final o in orders) {
+        final oClean = o.id.replaceAll('#', '').toLowerCase().trim();
+        final isMatch = oClean == cleanCurrent ||
+            (cleanCurrent.length >= 4 && oClean.endsWith(cleanCurrent)) ||
+            (oClean.length >= 4 && cleanCurrent.endsWith(oClean)) ||
+            (cleanCurrent.length >= 4 && oClean.contains(cleanCurrent)) ||
+            (oClean.length >= 4 && cleanCurrent.contains(oClean));
+
+        if (isMatch) {
+          if (mounted && (_currentOrder.status != o.status || _currentOrder.cancelReason != o.cancelReason)) {
+            setState(() {
+              _currentOrder.status = o.status;
+              if (o.cancelReason != null) _currentOrder.cancelReason = o.cancelReason;
+            });
+          }
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
+    _pollTimer?.cancel();
+    OrderService.ordersChangeNotifier.removeListener(_onOrdersNotifierChanged);
     _wsSub?.cancel();
     super.dispose();
   }
 
   int get _currentStepIndex {
-    final status = _currentOrder.status.toLowerCase();
+    final status = _currentOrder.status.toLowerCase().trim();
     if (status.contains('cancel')) return -1;
-    if (status.contains('deliver')) return 4;
+    if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
+      return 4;
+    }
     if (status.contains('out for delivery') || status.contains('courier')) return 3;
     if (status.contains('ship') || status.contains('transit')) return 2;
-    if (status.contains('qc')) return 1;
+    if (status.contains('qc') || status.contains('quality') || status.contains('inspection')) return 1;
+    if (status.contains('process') || status.contains('pack')) return 0;
+    if (status.contains('confirm') || status.contains('place') || status.contains('pend')) return 0;
 
-    // Real-time time progression based on order creation
-    final elapsedSeconds = DateTime.now().difference(_currentOrder.createdAt).inSeconds;
-    if (elapsedSeconds < 25) {
-      return 0; // Warehouse
-    } else if (elapsedSeconds < 55) {
-      return 1; // QC Hub
-    } else if (elapsedSeconds < 110) {
-      return 2; // Express Van
-    } else if (elapsedSeconds < 180) {
-      return 3; // Out for Delivery
-    } else {
-      return 4; // Delivered
-    }
+    return 0;
   }
 
   String _formatDateShort(DateTime dt) {

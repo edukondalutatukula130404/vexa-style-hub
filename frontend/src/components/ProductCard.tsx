@@ -71,8 +71,8 @@ export function ProductCard({ product }: { product: Product }) {
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
 
-          {/* Category Pill Badge (Bottom-Left on Image, matching mobile app) */}
-          <span className="absolute left-2.5 bottom-2.5 z-10 rounded-md border border-white/20 bg-black/75 px-2.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-white font-extrabold shadow-sm backdrop-blur-xs">
+          {/* Category Pill Badge (Upper-Left on Image) */}
+          <span className="absolute left-2.5 top-2.5 z-10 rounded-md border border-white/20 bg-black/75 px-2.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-white font-extrabold shadow-sm backdrop-blur-xs">
             {product.category}
           </span>
 

@@ -337,10 +337,6 @@ export function Home() {
 
             {/* Desktop Left Side Content Container (Hidden on Mobile to keep image clean) */}
             <div className="hidden md:flex relative z-10 flex-col justify-center w-full md:w-1/2 lg:w-[55%] p-6 sm:p-10 lg:p-14 pl-14 sm:pl-20 lg:pl-24 pr-6 sm:pr-8 space-y-3.5 sm:space-y-4.5">
-              <span className="inline-block w-fit rounded-full border border-[#B8860B]/60 bg-[#f4efe6] px-3.5 py-1 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.25em] text-[#1c1917] shadow-sm">
-                {activePromoBanners[bannerIndex].tag}
-              </span>
-
               <h3 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold uppercase leading-[1.12] text-foreground tracking-tight max-w-xl">
                 {activePromoBanners[bannerIndex].title}
               </h3>
@@ -363,22 +359,22 @@ export function Home() {
             <button
               type="button"
               onClick={() => setBannerIndex((prev) => (prev - 1 + activePromoBanners.length) % activePromoBanners.length)}
-              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 flex size-9 sm:size-11 items-center justify-center rounded-full border border-[#B8860B]/50 bg-background/90 text-[#B8860B] shadow-lg backdrop-blur-md transition-all hover:bg-[#B8860B] hover:text-primary-foreground hover:scale-110 active:scale-95 cursor-pointer"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 flex items-center justify-center text-white/90 hover:text-[#B8860B] hover:scale-125 active:scale-95 transition-all cursor-pointer drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] bg-transparent border-none p-1.5"
               aria-label="Previous Showcase Banner"
               title="Previous Banner"
             >
-              <ChevronLeft className="size-5 sm:size-6" />
+              <ChevronLeft className="size-8 sm:size-9 stroke-[2.5]" />
             </button>
 
             {/* Right Navigation Arrow Button */}
             <button
               type="button"
               onClick={() => setBannerIndex((prev) => (prev + 1) % activePromoBanners.length)}
-              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 flex size-9 sm:size-11 items-center justify-center rounded-full border border-[#B8860B]/50 bg-background/90 text-[#B8860B] shadow-lg backdrop-blur-md transition-all hover:bg-[#B8860B] hover:text-primary-foreground hover:scale-110 active:scale-95 cursor-pointer"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 flex items-center justify-center text-white/90 hover:text-[#B8860B] hover:scale-125 active:scale-95 transition-all cursor-pointer drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] bg-transparent border-none p-1.5"
               aria-label="Next Showcase Banner"
               title="Next Banner"
             >
-              <ChevronRight className="size-5 sm:size-6" />
+              <ChevronRight className="size-8 sm:size-9 stroke-[2.5]" />
             </button>
           </div>
         </div>

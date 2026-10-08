@@ -185,16 +185,17 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (mongoose.Types.ObjectId.isValid(targetId)) {
       order = await Order.findById(targetId);
     }
+    if (!order && mongoose.Types.ObjectId.isValid(cleanCode)) {
+      order = await Order.findById(cleanCode);
+    }
 
     if (!order) {
       order = await Order.findOne({
         $or: [
-          { _id: targetId },
           { id: targetId },
-          { _id: cleanCode },
           { id: cleanCode },
-          { id: { $regex: cleanCode, $options: 'i' } },
-          { _id: { $regex: cleanCode, $options: 'i' } }
+          { id: `#${cleanCode}` },
+          { id: { $regex: new RegExp(cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } }
         ]
       });
     }

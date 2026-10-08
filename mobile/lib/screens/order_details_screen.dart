@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/order_service.dart';
 import '../services/websocket_service.dart';
+import '../services/auth_service.dart';
 import 'order_tracking_screen.dart';
 import 'customer_support_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
@@ -34,21 +35,62 @@ class OrderDetailsScreen extends StatefulWidget {
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   late OrderModel _currentOrder;
   StreamSubscription? _wsSub;
-  Timer? _realtimeTicker;
+  Timer? _pollTimer;
+  bool _isRefreshing = false;
+
+  Future<void> _handleManualRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    try {
+      await _fetchLatestOrder();
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Order details refreshed!',
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Manual refresh error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _currentOrder = widget.order;
 
-    // Real-time tracking ticker updates progress in real-time every 2 seconds
-    _realtimeTicker = Timer.periodic(const Duration(seconds: 2), (_) {
+    // Fetch latest status immediately
+    _fetchLatestOrder();
+
+    // Listen to local OrderService changes
+    OrderService.ordersChangeNotifier.addListener(_onOrdersNotifierChanged);
+
+    // Periodic poll every 3 seconds to guarantee real-time sync with admin changes
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) {
-        setState(() {});
+        _fetchLatestOrder();
       }
     });
 
-    // Subscribe to live WebSocket updates
+    // Subscribe to live WebSocket updates from backend
     _wsSub = VexaWebSocketService().stream.listen((event) {
       if (mounted) {
         final type = event['type'];
@@ -59,14 +101,28 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             final cleanCurrent = _currentOrder.id.replaceAll('#', '').toLowerCase().trim();
             final cleanEvent = orderId.replaceAll('#', '').toLowerCase().trim();
 
-            if (cleanCurrent == cleanEvent || cleanCurrent.endsWith(cleanEvent) || cleanEvent.endsWith(cleanCurrent)) {
+            final isMatch = cleanCurrent == cleanEvent ||
+                (cleanEvent.isNotEmpty && cleanCurrent.endsWith(cleanEvent)) ||
+                (cleanCurrent.isNotEmpty && cleanEvent.endsWith(cleanCurrent)) ||
+                (cleanEvent.length >= 4 && cleanCurrent.contains(cleanEvent)) ||
+                (cleanCurrent.length >= 4 && cleanEvent.contains(cleanCurrent));
+
+            if (isMatch) {
               final newStatus = (data['status'] ?? '').toString();
               final cancelReason = data['cancelReason']?.toString();
-              setState(() {
-                _currentOrder.status = newStatus;
-                if (cancelReason != null) _currentOrder.cancelReason = cancelReason;
-              });
-              if (widget.onRefreshParent != null) widget.onRefreshParent!();
+              if (newStatus.isNotEmpty) {
+                setState(() {
+                  _currentOrder.status = newStatus;
+                  if (cancelReason != null) _currentOrder.cancelReason = cancelReason;
+                });
+                OrderService.updateOrderStatusLocally(
+                  _currentOrder.id,
+                  newStatus,
+                  cancelReason: cancelReason,
+                  createNotification: false,
+                );
+                if (widget.onRefreshParent != null) widget.onRefreshParent!();
+              }
             }
           }
         }
@@ -75,8 +131,50 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant OrderDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.order.status != _currentOrder.status || widget.order.id != _currentOrder.id) {
+      setState(() {
+        _currentOrder = widget.order;
+      });
+    }
+  }
+
+  void _onOrdersNotifierChanged() {
+    _fetchLatestOrder();
+  }
+
+  Future<void> _fetchLatestOrder() async {
+    try {
+      final user = await AuthService.getUser();
+      final orders = await OrderService.getOrders(email: user?.email);
+      final cleanCurrent = _currentOrder.id.replaceAll('#', '').toLowerCase().trim();
+
+      for (final o in orders) {
+        final oClean = o.id.replaceAll('#', '').toLowerCase().trim();
+        final isMatch = oClean == cleanCurrent ||
+            (cleanCurrent.length >= 4 && oClean.endsWith(cleanCurrent)) ||
+            (oClean.length >= 4 && cleanCurrent.endsWith(oClean)) ||
+            (cleanCurrent.length >= 4 && oClean.contains(cleanCurrent)) ||
+            (oClean.length >= 4 && cleanCurrent.contains(oClean));
+
+        if (isMatch) {
+          if (mounted) {
+            setState(() {
+              _currentOrder = o;
+            });
+            if (widget.onRefreshParent != null) widget.onRefreshParent!();
+          }
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
-    _realtimeTicker?.cancel();
+    _pollTimer?.cancel();
+    OrderService.ordersChangeNotifier.removeListener(_onOrdersNotifierChanged);
     _wsSub?.cancel();
     super.dispose();
   }
@@ -471,45 +569,79 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   int get _currentStepIndex {
-    final status = _currentOrder.status.toLowerCase();
+    final status = _currentOrder.status.toLowerCase().trim();
     if (status.contains('cancel')) return -1;
-    if (status.contains('deliver')) return 4;
+    if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
+      return 4;
+    }
     if (status.contains('out for delivery') || status.contains('courier')) return 3;
     if (status.contains('ship') || status.contains('transit')) return 2;
-    if (status.contains('qc')) return 1;
+    if (status.contains('qc') || status.contains('quality') || status.contains('inspection')) return 1;
+    if (status.contains('process') || status.contains('pack')) return 0;
+    if (status.contains('confirm') || status.contains('place') || status.contains('pend')) return 0;
 
-    // Real-time time progression based on order creation
-    final elapsedSeconds = DateTime.now().difference(_currentOrder.createdAt).inSeconds;
-    if (elapsedSeconds < 25) {
-      return 0; // Warehouse
-    } else if (elapsedSeconds < 55) {
-      return 1; // QC Hub
-    } else if (elapsedSeconds < 110) {
-      return 2; // Express Van
-    } else if (elapsedSeconds < 180) {
-      return 3; // Out for Delivery
-    } else {
-      return 4; // Delivered
-    }
+    return 0; // Accurately matches initial warehouse/processing status
   }
 
-  String get _expectedDeliveryText {
-    final status = _currentOrder.status.toLowerCase();
-    if (status.contains('cancel')) return 'Order Cancelled';
-    if (status.contains('deliver')) return 'Delivered on ${_currentOrder.formattedDate}';
+  String get _deliveryStatusTitle {
+    final status = _currentOrder.status.toLowerCase().trim();
+    if (status.contains('cancel')) return 'CANCELLED';
+    if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
+      return 'DELIVERED';
+    }
+    if (status.contains('out for delivery') || status.contains('courier')) {
+      return 'OUT FOR DELIVERY';
+    }
+    if (status.contains('ship') || status.contains('transit')) {
+      return 'SHIPPED';
+    }
+    if (status.contains('qc') || status.contains('quality')) {
+      return 'QC INSPECTION';
+    }
+    if (status.contains('process') || status.contains('pack')) {
+      return 'PROCESSING';
+    }
+    if (status.contains('confirm')) {
+      return 'ORDER CONFIRMED';
+    }
+    if (status.contains('place') || status.contains('pend')) {
+      return 'ORDER PLACED';
+    }
+    return _currentOrder.status.toUpperCase();
+  }
 
-    final stepIdx = _currentStepIndex;
-    if (stepIdx == 0) return 'Warehouse Dispatch Pending';
-    if (stepIdx == 1) return 'QC Inspection in Progress';
-    if (stepIdx == 2) return 'In Transit via Express Courier';
-    if (stepIdx == 3) return 'Arriving Today by 6:00 PM';
-    if (stepIdx == 4) return 'Delivered on ${_currentOrder.formattedDate}';
+  String get _deliverySubtitle {
+    final status = _currentOrder.status.toLowerCase().trim();
+    if (status.contains('cancel')) return 'Shipment has been cancelled';
+    if (status == 'delivered' || (status.contains('deliver') && !status.contains('out for delivery'))) {
+      return 'Delivered on ${_currentOrder.formattedDate}';
+    }
+    if (status.contains('out for delivery') || status.contains('courier')) {
+      return 'Arriving Today by 6:00 PM';
+    }
+    if (status.contains('ship') || status.contains('transit')) {
+      return 'In Transit via Express Courier • Arriving in 2–3 Days';
+    }
+    if (status.contains('qc') || status.contains('quality')) {
+      return 'QC Inspection in Progress at Central Hub';
+    }
+    if (status.contains('process') || status.contains('pack')) {
+      return 'Preparing and Packing Garment at Warehouse Studio';
+    }
+    if (status.contains('confirm')) {
+      return 'Order Confirmed • Preparing for Dispatch';
+    }
+    if (status.contains('place') || status.contains('pend')) {
+      return 'Order Placed • Awaiting Warehouse Dispatch';
+    }
+
     return 'Expected in 2–3 Business Days';
   }
 
   Widget _buildRealtimeMapCard() {
     final isCancelled = _currentOrder.status.toLowerCase().contains('cancel');
     final stepIdx = _currentStepIndex;
+    final status = _currentOrder.status.toLowerCase().trim();
 
     double progressWidthFactor = 0.0;
     if (!isCancelled) {
@@ -526,34 +658,44 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       }
     }
 
-    String statusDisplay = _currentOrder.status.toUpperCase();
-    if (!isCancelled) {
-      if (stepIdx == 0) {
-        statusDisplay = 'PROCESSING';
-      } else if (stepIdx == 1) {
-        statusDisplay = 'QC CHECK ACTIVE';
-      } else if (stepIdx == 2) {
-        statusDisplay = 'IN TRANSIT';
-      } else if (stepIdx == 3) {
-        statusDisplay = 'OUT FOR DELIVERY';
-      } else if (stepIdx == 4) {
-        statusDisplay = 'DELIVERED';
-      }
-    }
+    final statusDisplay = _deliveryStatusTitle;
 
     String gpsText = 'Live GPS Sync Active • Waybill #BD-98402';
+    IconData gpsIcon = Icons.my_location_rounded;
+    Color gpsColor = const Color(0xFF10B981);
+
     if (isCancelled) {
-      gpsText = 'Shipment Cancelled';
-    } else if (stepIdx == 0) {
-      gpsText = 'Warehouse Dispatch Active • Packing Garment';
-    } else if (stepIdx == 1) {
+      gpsText = 'Order Cancelled';
+      gpsIcon = Icons.cancel_outlined;
+      gpsColor = _errorRed;
+    } else if (status.contains('deliver') && !status.contains('out')) {
+      gpsText = 'Package Delivered to Doorstep';
+      gpsIcon = Icons.check_circle_outline_rounded;
+      gpsColor = const Color(0xFF10B981);
+    } else if (status.contains('out for delivery') || status.contains('courier')) {
+      gpsText = 'Out for Delivery • Courier Reaching Today';
+      gpsIcon = Icons.delivery_dining_rounded;
+      gpsColor = const Color(0xFFF59E0B);
+    } else if (status.contains('ship') || status.contains('transit')) {
+      gpsText = 'Shipped • In Transit via Express Courier (Waybill #BD-98402)';
+      gpsIcon = Icons.local_shipping_outlined;
+      gpsColor = const Color(0xFF2563EB);
+    } else if (status.contains('qc')) {
       gpsText = 'Quality Check Active at QC Hub • Waybill #BD-98402';
-    } else if (stepIdx == 2) {
-      gpsText = 'Live GPS Sync Active • Waybill #BD-98402';
-    } else if (stepIdx == 3) {
-      gpsText = 'Out for Delivery • Courier Arriving Soon';
-    } else if (stepIdx == 4) {
-      gpsText = 'Package Delivered';
+      gpsIcon = Icons.inventory_2_outlined;
+      gpsColor = _goldDark;
+    } else if (status.contains('process') || status.contains('pack')) {
+      gpsText = 'Processing • Packing Garment at Warehouse Studio';
+      gpsIcon = Icons.storefront_outlined;
+      gpsColor = const Color(0xFF3B82F6);
+    } else if (status.contains('confirm')) {
+      gpsText = 'Order Confirmed • Warehouse Allocation in Progress';
+      gpsIcon = Icons.task_alt_rounded;
+      gpsColor = const Color(0xFF3B82F6);
+    } else {
+      gpsText = 'Order Placed • Awaiting Warehouse Processing';
+      gpsIcon = Icons.shopping_bag_outlined;
+      gpsColor = _goldDark;
     }
 
     return Container(
@@ -577,6 +719,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           // Header Row inside Card
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
@@ -593,11 +736,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      _expectedDeliveryText,
+                      _deliveryStatusTitle,
                       style: GoogleFonts.cinzel(
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: _textDark,
+                        letterSpacing: 1.0,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _deliverySubtitle,
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: _subtext,
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -672,10 +827,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0, isActiveNode: stepIdx == 0),
-                    _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1, isActiveNode: stepIdx == 1),
-                    _buildMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2, isActiveNode: stepIdx == 2 || stepIdx == 3),
-                    _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4, isActiveNode: stepIdx == 4),
+                    _buildMapNodeIcon(Icons.storefront_rounded, 'Warehouse', stepIdx >= 0 && !isCancelled, isActiveNode: stepIdx == 0 && !isCancelled),
+                    _buildMapNodeIcon(Icons.inventory_2_rounded, 'QC Hub', stepIdx >= 1 && !isCancelled, isActiveNode: stepIdx == 1 && !isCancelled),
+                    _buildMapNodeIcon(Icons.local_shipping_rounded, 'Express Van', stepIdx >= 2 && !isCancelled, isActiveNode: (stepIdx == 2 || stepIdx == 3) && !isCancelled),
+                    _buildMapNodeIcon(Icons.home_rounded, 'Your Home', stepIdx == 4 && !isCancelled, isActiveNode: stepIdx == 4 && !isCancelled),
                   ],
                 ),
               ],
@@ -684,22 +839,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
           const SizedBox(height: 20),
 
-          // Live GPS Sync Badge
+          // Live Courier & GPS Movement Badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withAlpha(15),
+              color: gpsColor.withAlpha(15),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF10B981).withAlpha(50)),
+              border: Border.all(color: gpsColor.withAlpha(50)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.my_location_rounded, color: Color(0xFF10B981), size: 12),
+                Icon(gpsIcon, color: gpsColor, size: 13),
                 const SizedBox(width: 6),
-                Text(
-                  gpsText,
-                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
+                Flexible(
+                  child: Text(
+                    gpsText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: gpsColor),
+                  ),
                 ),
               ],
             ),
@@ -762,21 +921,27 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: _gold.withAlpha(25),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _gold.withAlpha(60)),
+              ),
+              child: const Icon(Icons.inventory_2_rounded, color: _goldDark, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'ORDER ${_currentOrder.id}',
-                          style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'ORDER ${_currentOrder.id}',
+                    style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Row(
@@ -788,6 +953,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
         actions: [
           if (_currentOrder.isPaid)
             IconButton(
@@ -807,9 +975,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-        children: [
+      body: RefreshIndicator(
+        color: _goldDark,
+        onRefresh: _handleManualRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+          children: [
           // 1. CANCELLATION BANNER (If Cancelled)
           if (isCancelled) ...[
             Container(
@@ -1139,6 +1311,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           const SizedBox(height: 10),
         ],
       ),
+    ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -1232,7 +1405,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: widget.order)),
+                          MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: _currentOrder)),
                         );
                       },
                       icon: const Icon(Icons.location_on_outlined, color: Colors.white, size: 18),

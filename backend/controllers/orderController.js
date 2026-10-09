@@ -172,9 +172,11 @@ exports.getUserOrders = async (req, res, next) => {
 // @access  Public/Admin
 exports.updateOrderStatus = async (req, res, next) => {
   try {
-    const { status: newStatus, cancelReason } = req.body;
-    const targetId = req.params.id ? String(req.params.id).trim() : '';
-    const cleanCode = targetId.replace(/^#/, '').trim();
+    const { status: newStatus, cancelReason, customerName, userName, userEmail, orderId } = req.body;
+    const targetId = (req.params.id && String(req.params.id).trim() !== 'status')
+      ? String(req.params.id).trim()
+      : String(orderId || req.body.id || req.body._id || '').trim();
+    const cleanCode = targetId.replace(/^#+/, '').trim();
 
     if (!newStatus) {
       return res.status(400).json({ success: false, message: 'Please provide status' });
@@ -189,18 +191,57 @@ exports.updateOrderStatus = async (req, res, next) => {
       order = await Order.findById(cleanCode);
     }
 
-    if (!order) {
+    if (!order && (targetId || cleanCode)) {
       order = await Order.findOne({
         $or: [
           { id: targetId },
-          { id: cleanCode },
           { id: `#${cleanCode}` },
+          { id: cleanCode },
           { id: { $regex: new RegExp(cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } }
         ]
       });
     }
 
     if (!order) {
+      // In-memory or demo orders (e.g. #VX-1806): still notify admin & broadcast
+      if (newStatus.toUpperCase() === 'CANCELLED') {
+        const orderShortCode = cleanCode.slice(-8).toUpperCase() || 'ORDER';
+        const displayCustomer = customerName || userName || userEmail || 'Customer';
+        const cancelTitle = `Order was cancelled #${orderShortCode}`;
+        const cancelMsg = `Order #${orderShortCode} was cancelled by ${displayCustomer}.${cancelReason ? ` Reason: ${cancelReason}` : ''}`;
+
+        broadcast('ORDER_CANCELLED', {
+          orderId: targetId || `#${orderShortCode}`,
+          _id: targetId || `#${orderShortCode}`,
+          id: targetId || `#${orderShortCode}`,
+          customerName: displayCustomer,
+          userEmail: userEmail || '',
+          totalAmount: req.body.refundAmount || 0,
+          cancelReason: cancelReason || 'Cancelled by customer',
+          status: 'Cancelled',
+        });
+        broadcast('ORDERS_UPDATED', { id: targetId, status: 'Cancelled' });
+
+        try {
+          await Notification.create({
+            userId: 'admin',
+            userEmail: 'admin@vexa.com',
+            orderId: targetId || `#${orderShortCode}`,
+            type: 'order_cancelled',
+            title: cancelTitle,
+            message: cancelMsg,
+            status: 'Cancelled',
+            read: false
+          });
+        } catch (_) {}
+
+        return res.status(200).json({
+          success: true,
+          message: 'Order cancelled successfully and admin notified',
+          data: { id: targetId, status: 'Cancelled', cancelReason }
+        });
+      }
+
       return res.status(404).json({
         success: false,
         message: 'Order not found'
@@ -230,6 +271,19 @@ exports.updateOrderStatus = async (req, res, next) => {
     // Broadcast Real-time WebSocket event for open dashboards/apps
     broadcast('ORDER_STATUS_UPDATED', order);
     broadcast('ORDERS_UPDATED', order);
+    if (newStatus.toUpperCase() === 'CANCELLED') {
+      broadcast('ORDER_CANCELLED', {
+        orderId: order.id || String(order._id),
+        _id: order._id,
+        id: order.id,
+        customerName: order.userName || order.customerName || order.userEmail || 'Customer',
+        userEmail: order.userEmail,
+        totalAmount: order.totalAmount,
+        cancelReason: cancelReason || order.cancelReason || 'Cancelled by customer',
+        status: 'Cancelled',
+        order,
+      });
+    }
 
     // 3. Retrieve user associated with that order and get FCM token(s)
     let notificationSent = false;
@@ -295,6 +349,64 @@ exports.updateOrderStatus = async (req, res, next) => {
           status: newStatus,
           read: false
         });
+      }
+    }
+
+    // 6. When an order is cancelled, notify all Admins directly (DB + FCM + WS)
+    if (newStatus.toUpperCase() === 'CANCELLED') {
+      try {
+        const customerDisplayName = order.userName || order.customerName || order.userEmail || 'Customer';
+        const cancelTitle = `Order was cancelled #${orderShortCode}`;
+        const cancelMsg = `Order #${orderShortCode} was cancelled by ${customerDisplayName}.${order.cancelReason ? ` Reason: ${order.cancelReason}` : ''}`;
+
+        const adminUsers = await User.find({
+          $or: [{ role: 'admin' }, { email: { $regex: /admin/i } }]
+        });
+
+        for (const admin of adminUsers) {
+          const adminTokens = Array.isArray(admin.fcmTokens) && admin.fcmTokens.length > 0
+            ? admin.fcmTokens
+            : (admin.fcmToken ? [admin.fcmToken] : []);
+
+          if (adminTokens.length > 0) {
+            await sendFcmNotification({
+              tokens: adminTokens,
+              title: cancelTitle,
+              body: cancelMsg,
+              data: {
+                type: 'order_cancelled',
+                orderId: order.id || String(order._id),
+                status: 'Cancelled',
+                customerName: customerDisplayName,
+              }
+            });
+          }
+
+          await Notification.create({
+            userId: String(admin._id),
+            userEmail: admin.email,
+            orderId: order.id || String(order._id),
+            type: 'order_cancelled',
+            title: cancelTitle,
+            message: cancelMsg,
+            status: 'Cancelled',
+            read: false
+          });
+        }
+
+        // Also add fallback admin notification record
+        await Notification.create({
+          userId: 'admin',
+          userEmail: 'admin@vexa.com',
+          orderId: order.id || String(order._id),
+          type: 'order_cancelled',
+          title: cancelTitle,
+          message: cancelMsg,
+          status: 'Cancelled',
+          read: false
+        });
+      } catch (adminErr) {
+        console.warn('Admin cancel notification error:', adminErr.message);
       }
     }
 

@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import '../config/api_config.dart';
+import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import '../services/notification_service.dart';
 import '../services/websocket_service.dart';
@@ -171,14 +175,43 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
           builder: (ctx, setChatState) {
             void sendMessage(String text) {
               if (text.trim().isEmpty) return;
+              final cleanText = text.trim();
               setChatState(() {
                 chatMessages.add({
                   'sender': 'user',
-                  'text': text.trim(),
+                  'text': cleanText,
                   'time': 'Just now',
                 });
               });
               chatInputController.clear();
+
+              // Send live customer support message to Admin in real-time (WS + HTTP)
+              final supportPayload = {
+                'userName': widget.order?.customerName ?? 'Customer',
+                'customerName': widget.order?.customerName ?? 'Customer',
+                'orderId': widget.order?.id ?? '',
+                'category': 'VIP Concierge Chat',
+                'text': cleanText,
+                'message': cleanText,
+                'timestamp': DateTime.now().toIso8601String(),
+              };
+
+              VexaWebSocketService().send('SUPPORT_MESSAGE', supportPayload);
+
+              () async {
+                try {
+                  final user = await AuthService.getUser();
+                  final postData = Map<String, dynamic>.from(supportPayload);
+                  if (user?.email != null) postData['userEmail'] = user!.email;
+                  await http.post(
+                    Uri.parse('${ApiConfig.baseUrl}/notifications/support'),
+                    headers: {'Content-Type': 'application/json'},
+                    body: jsonEncode(postData),
+                  ).timeout(const Duration(seconds: 4));
+                } catch (e) {
+                  debugPrint('Support message HTTP forward notice: $e');
+                }
+              }();
 
               Future.delayed(const Duration(milliseconds: 900), () {
                 if (!ctx.mounted) return;
@@ -400,14 +433,36 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
         context: context,
       );
 
-      VexaWebSocketService().send('SUPPORT_TICKET_CREATED', {
+      final ticketPayload = {
         'ticketId': ticketId,
         'category': _selectedCategory,
         'query': queryText,
+        'text': queryText,
+        'message': queryText,
         'phone': phoneText,
         'orderId': widget.order?.id ?? '',
+        'userName': widget.order?.customerName ?? 'Customer',
+        'customerName': widget.order?.customerName ?? 'Customer',
         'createdAt': DateTime.now().toIso8601String(),
-      });
+      };
+
+      VexaWebSocketService().send('SUPPORT_TICKET_CREATED', ticketPayload);
+      VexaWebSocketService().send('SUPPORT_MESSAGE', ticketPayload);
+
+      () async {
+        try {
+          final user = await AuthService.getUser();
+          final postData = Map<String, dynamic>.from(ticketPayload);
+          if (user?.email != null) postData['userEmail'] = user!.email;
+          await http.post(
+            Uri.parse('${ApiConfig.baseUrl}/notifications/support'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(postData),
+          ).timeout(const Duration(seconds: 4));
+        } catch (e) {
+          debugPrint('Support ticket HTTP forward notice: $e');
+        }
+      }();
 
       showDialog(
         context: context,
@@ -758,7 +813,6 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
                   margin: const EdgeInsets.only(bottom: 10),
                   child: Material(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                       side: BorderSide(color: isExpanded ? _gold : _border),

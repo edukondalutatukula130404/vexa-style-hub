@@ -71,29 +71,54 @@ export const triggerWebTestPushNotification = (
   title = "⚡ VEXA Push Notification",
   body = "Push notifications are working perfectly on your web browser!"
 ) => {
-  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (typeof window === "undefined") return;
+
+  // Synthesize notification chime audio
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    }
+  } catch (_) {}
+
+  if (!("Notification" in window)) return;
+
+  const notifOptions: NotificationOptions = {
+    body,
+    icon: "/vexa_logo.png",
+    badge: "/vexa_logo.png",
+    tag: `vexa-notif-${Date.now()}`,
+    requireInteraction: true,
+    silent: false,
+  };
 
   const fireNotification = () => {
     try {
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.getRegistration().then((reg) => {
           if (reg && reg.showNotification) {
-            reg.showNotification(title, {
-              body,
-              icon: "/vexa_logo.png",
-              badge: "/vexa_logo.png",
-              tag: `vexa-notif-${Date.now()}`,
-            }).catch(() => {
-              new Notification(title, { body, icon: "/vexa_logo.png" });
+            reg.showNotification(title, notifOptions).catch(() => {
+              try { new Notification(title, notifOptions); } catch (_) {}
             });
           } else {
-            new Notification(title, { body, icon: "/vexa_logo.png" });
+            try { new Notification(title, notifOptions); } catch (_) {}
           }
         }).catch(() => {
-          new Notification(title, { body, icon: "/vexa_logo.png" });
+          try { new Notification(title, notifOptions); } catch (_) {}
         });
       } else {
-        new Notification(title, { body, icon: "/vexa_logo.png" });
+        try { new Notification(title, notifOptions); } catch (_) {}
       }
     } catch (e) {
       console.warn("Native browser notification warning:", e);
@@ -103,10 +128,12 @@ export const triggerWebTestPushNotification = (
   if (Notification.permission === "granted") {
     fireNotification();
   } else if (Notification.permission !== "denied") {
-    Notification.requestPermission().then((permission) => {
-      if (permission === "granted") {
-        fireNotification();
-      }
-    });
+    try {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          fireNotification();
+        }
+      });
+    } catch (_) {}
   }
 };

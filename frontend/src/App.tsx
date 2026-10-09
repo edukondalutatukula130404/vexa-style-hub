@@ -92,6 +92,23 @@ function Layout() {
         const body = `Order ${orderId} placed successfully.`;
         toast.success(title, { description: body });
         triggerWebTestPushNotification(title, body);
+      } else if (type === "ORDER_CANCELLED") {
+        const rawId = data?.orderId || data?.id || data?._id || "ORDER";
+        const cleanCode = String(rawId).replace(/^#+/, "").trim();
+        const shortCode = cleanCode.length > 8 ? cleanCode.slice(-8).toUpperCase() : cleanCode.toUpperCase();
+        const customerName = data?.customerName || data?.userName || data?.userEmail || "Customer";
+        const reason = data?.cancelReason ? ` - Reason: ${data.cancelReason}` : "";
+        const title = `❌ Order was cancelled #${shortCode}`;
+        const body = `Order #${shortCode} was cancelled by ${customerName}${reason}`;
+        toast.error(title, { description: body, duration: 8000 });
+        triggerWebTestPushNotification(title, body);
+      } else if (type === "SUPPORT_MESSAGE" || type === "SUPPORT_TICKET_CREATED") {
+        const sender = data?.userName || data?.customerName || data?.userEmail || "Customer";
+        const msgText = data?.text || data?.message || data?.query || "New customer support query";
+        const title = `💬 Customer Support Message: ${sender}`;
+        const body = `${msgText}`;
+        toast.info(title, { description: body, duration: 8000 });
+        triggerWebTestPushNotification(title, body);
       }
     });
 

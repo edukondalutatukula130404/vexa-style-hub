@@ -5,6 +5,7 @@ import '../services/order_service.dart';
 import '../widgets/vexa_empty_state.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
+import 'home_screen.dart';
 
 const Color _gold = Color(0xFFB8860B);
 const Color _goldDark = Color(0xFF8B6508);
@@ -692,7 +693,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   onCartUpdated: () => setState(() {}),
                   onNavigateToProducts: () => Navigator.pop(context),
                   onNavigateToOrders: () {
-                    Navigator.pop(context);
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const HomeScreen(initialTabIndex: 1)),
+                      (route) => false,
+                    );
                     OrderService.notifyOrdersChanged();
                   },
                 ),

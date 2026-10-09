@@ -9,6 +9,7 @@ import '../services/address_service.dart';
 import '../widgets/vexa_empty_state.dart';
 import 'login_screen.dart';
 import 'product_detail_screen.dart';
+import 'home_screen.dart';
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
 const Color _gold = Color(0xFFB8860B);
@@ -188,6 +189,8 @@ class _CartScreenState extends State<CartScreen> {
 
     final nameController = TextEditingController(text: selectedAddress?.name ?? loggedInUser.name);
     final addressController = TextEditingController(text: selectedAddress?.street ?? '');
+    final cityController = TextEditingController(text: selectedAddress?.city ?? 'Hyderabad');
+    final stateController = TextEditingController(text: selectedAddress?.state ?? 'Telangana');
     final phoneController = TextEditingController(text: selectedAddress?.phone ?? '+91 98765 43210');
     final pincodeController = TextEditingController(text: selectedAddress?.pincode ?? '');
     String selectedTag = selectedAddress?.type ?? 'Home';
@@ -199,8 +202,6 @@ class _CartScreenState extends State<CartScreen> {
     String? addressFormError;
 
     String selectedPayment = 'Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)';
-    String selectedDeliverySpeed = 'express'; // 'express' | 'standard'
-    String selectedInstruction = 'Leave at Door';
 
     if (!mounted) return;
     Navigator.push(
@@ -299,13 +300,13 @@ class _CartScreenState extends State<CartScreen> {
                             if (hasSavedAddress && !isEditingAddress)
                               Row(
                                 children: [
-                                  if (savedAddresses.length > 1)
+                                  if (savedAddresses.isNotEmpty)
                                     GestureDetector(
                                       onTap: () => setModalState(() {
                                         isSelectingOtherAddress = !isSelectingOtherAddress;
                                       }),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: isSelectingOtherAddress ? _gold.withAlpha(20) : _surfaceBg,
                                           borderRadius: BorderRadius.circular(8),
@@ -331,13 +332,16 @@ class _CartScreenState extends State<CartScreen> {
                                       isSelectingOtherAddress = false;
                                       nameController.text = selectedAddress?.name ?? '';
                                       addressController.text = selectedAddress?.street ?? '';
+                                      cityController.text = selectedAddress?.city ?? 'Hyderabad';
+                                      stateController.text = selectedAddress?.state ?? 'Telangana';
                                       phoneController.text = selectedAddress?.phone ?? '';
                                       pincodeController.text = selectedAddress?.pincode ?? '';
                                       selectedTag = selectedAddress?.type ?? 'Home';
                                       saveAsDefaultCheckbox = selectedAddress?.isDefault ?? true;
+                                      addressFormError = null;
                                     }),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: _gold.withAlpha(20),
                                         borderRadius: BorderRadius.circular(8),
@@ -356,8 +360,8 @@ class _CartScreenState extends State<CartScreen> {
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                  ],
+                                ),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -403,6 +407,8 @@ class _CartScreenState extends State<CartScreen> {
                                         selectedAddress = addr;
                                         nameController.text = addr.name;
                                         addressController.text = addr.street;
+                                        cityController.text = addr.city;
+                                        stateController.text = addr.state;
                                         phoneController.text = addr.phone;
                                         pincodeController.text = addr.pincode;
                                         selectedTag = addr.type;
@@ -436,36 +442,97 @@ class _CartScreenState extends State<CartScreen> {
                                               children: [
                                                 Row(
                                                   children: [
-                                                    Text(
-                                                      addr.name,
-                                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: _textDark),
+                                                    Expanded(
+                                                      child: Row(
+                                                        children: [
+                                                          Flexible(
+                                                            child: Text(
+                                                              addr.name,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: _textDark),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 6),
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                            decoration: BoxDecoration(
+                                                              color: _goldDark.withAlpha(20),
+                                                              borderRadius: BorderRadius.circular(4),
+                                                            ),
+                                                            child: Text(
+                                                              addr.type.toUpperCase(),
+                                                              style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _goldDark),
+                                                            ),
+                                                          ),
+                                                          if (addr.isDefault) ...[
+                                                            const SizedBox(width: 6),
+                                                            Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                              decoration: BoxDecoration(
+                                                                color: _successGreen.withAlpha(20),
+                                                                borderRadius: BorderRadius.circular(4),
+                                                              ),
+                                                              child: Text(
+                                                                'DEFAULT',
+                                                                style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _successGreen),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ],
+                                                      ),
                                                     ),
-                                                    const SizedBox(width: 6),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                                      decoration: BoxDecoration(
-                                                        color: _goldDark.withAlpha(20),
-                                                        borderRadius: BorderRadius.circular(4),
-                                                      ),
-                                                      child: Text(
-                                                        addr.type.toUpperCase(),
-                                                        style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _goldDark),
+                                                    GestureDetector(
+                                                      onTap: () {
+                                                        setModalState(() {
+                                                          selectedAddress = addr;
+                                                          nameController.text = addr.name;
+                                                          addressController.text = addr.street;
+                                                          cityController.text = addr.city;
+                                                          stateController.text = addr.state;
+                                                          phoneController.text = addr.phone;
+                                                          pincodeController.text = addr.pincode;
+                                                          selectedTag = addr.type;
+                                                          saveAsDefaultCheckbox = addr.isDefault;
+                                                          isEditingAddress = true;
+                                                          isSelectingOtherAddress = false;
+                                                        });
+                                                      },
+                                                      child: const Padding(
+                                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                                        child: Icon(Icons.edit_outlined, size: 16, color: _goldDark),
                                                       ),
                                                     ),
-                                                    if (addr.isDefault) ...[
-                                                      const SizedBox(width: 6),
-                                                      Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                                        decoration: BoxDecoration(
-                                                          color: _successGreen.withAlpha(20),
-                                                          borderRadius: BorderRadius.circular(4),
-                                                        ),
-                                                        child: Text(
-                                                          'DEFAULT',
-                                                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _successGreen),
+                                                    if (savedAddresses.length > 1)
+                                                      GestureDetector(
+                                                        onTap: () async {
+                                                          await AddressService.deleteAddress(addr.id);
+                                                          final reloaded = (await AddressService.getAddresses()).toList();
+                                                          final newSelected = (selectedAddress?.id == addr.id)
+                                                              ? (reloaded.isNotEmpty ? reloaded.first : null)
+                                                              : selectedAddress;
+                                                          setModalState(() {
+                                                            savedAddresses = reloaded;
+                                                            selectedAddress = newSelected;
+                                                            if (newSelected != null) {
+                                                              nameController.text = newSelected.name;
+                                                              addressController.text = newSelected.street;
+                                                              cityController.text = newSelected.city;
+                                                              stateController.text = newSelected.state;
+                                                              phoneController.text = newSelected.phone;
+                                                              pincodeController.text = newSelected.pincode;
+                                                              selectedTag = newSelected.type;
+                                                              saveAsDefaultCheckbox = newSelected.isDefault;
+                                                            } else {
+                                                              hasSavedAddress = false;
+                                                              isEditingAddress = true;
+                                                            }
+                                                          });
+                                                        },
+                                                        child: const Padding(
+                                                          padding: EdgeInsets.symmetric(horizontal: 4),
+                                                          child: Icon(Icons.delete_outline_rounded, size: 16, color: _errorRed),
                                                         ),
                                                       ),
-                                                    ],
                                                   ],
                                                 ),
                                                 const SizedBox(height: 3),
@@ -500,12 +567,15 @@ class _CartScreenState extends State<CartScreen> {
                                         isSelectingOtherAddress = false;
                                         isEditingAddress = true;
                                         nameController.text = loggedInUser.name;
-                                        phoneController.text = '+91 98765 43210';
+                                        phoneController.text = selectedAddress?.phone ?? '+91 98765 43210';
                                         addressController.clear();
+                                        cityController.text = 'Hyderabad';
+                                        stateController.text = 'Telangana';
                                         pincodeController.clear();
                                         selectedTag = 'Home';
                                         saveAsDefaultCheckbox = true;
                                         selectedAddress = null;
+                                        addressFormError = null;
                                       });
                                     },
                                     icon: const Icon(Icons.add_location_alt_outlined, color: _goldDark, size: 16),
@@ -607,37 +677,6 @@ class _CartScreenState extends State<CartScreen> {
                                       style: GoogleFonts.outfit(fontSize: 11.5, color: _textDark, fontWeight: FontWeight.w600),
                                     ),
                                   ],
-                                ),
-                                const SizedBox(height: 12),
-                                // Action Button: "+ Add Address"
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(color: _goldDark.withAlpha(120)),
-                                      padding: const EdgeInsets.symmetric(vertical: 8.5),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      backgroundColor: _gold.withAlpha(12),
-                                    ),
-                                    onPressed: () {
-                                      setModalState(() {
-                                        isEditingAddress = true;
-                                        isSelectingOtherAddress = false;
-                                        nameController.text = loggedInUser.name;
-                                        phoneController.text = '+91 98765 43210';
-                                        addressController.clear();
-                                        pincodeController.clear();
-                                        selectedTag = 'Home';
-                                        saveAsDefaultCheckbox = true;
-                                        selectedAddress = null;
-                                      });
-                                    },
-                                    icon: const Icon(Icons.add_location_alt_outlined, color: _goldDark, size: 14),
-                                    label: Text(
-                                      '+ Add Address',
-                                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _goldDark),
-                                    ),
-                                  ),
                                 ),
                               ],
                             ),
@@ -743,6 +782,19 @@ class _CartScreenState extends State<CartScreen> {
                                         onTap: () => setModalState(() {
                                           addressFormError = null;
                                           isEditingAddress = false;
+                                          if (selectedAddress == null && savedAddresses.isNotEmpty) {
+                                            selectedAddress = savedAddresses.first;
+                                          }
+                                          if (selectedAddress != null) {
+                                            nameController.text = selectedAddress!.name;
+                                            addressController.text = selectedAddress!.street;
+                                            cityController.text = selectedAddress!.city;
+                                            stateController.text = selectedAddress!.state;
+                                            phoneController.text = selectedAddress!.phone;
+                                            pincodeController.text = selectedAddress!.pincode;
+                                            selectedTag = selectedAddress!.type;
+                                            saveAsDefaultCheckbox = selectedAddress!.isDefault;
+                                          }
                                         }),
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -843,6 +895,59 @@ class _CartScreenState extends State<CartScreen> {
                                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
                                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
                                   ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('City', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 6),
+                                          TextField(
+                                            controller: cityController,
+                                            style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5),
+                                            decoration: InputDecoration(
+                                              hintText: 'City (e.g. Hyderabad)',
+                                              prefixIcon: const Icon(Icons.location_city_outlined, color: _goldDark, size: 18),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                              filled: true,
+                                              fillColor: _surfaceBg,
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('State', style: GoogleFonts.outfit(color: _textDark, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 6),
+                                          TextField(
+                                            controller: stateController,
+                                            style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5),
+                                            decoration: InputDecoration(
+                                              hintText: 'State (e.g. Telangana)',
+                                              prefixIcon: const Icon(Icons.map_outlined, color: _goldDark, size: 18),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                              filled: true,
+                                              fillColor: _surfaceBg,
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 12),
 
@@ -966,6 +1071,8 @@ class _CartScreenState extends State<CartScreen> {
                                     onPressed: () async {
                                       final name = nameController.text.trim();
                                       final addr = addressController.text.trim();
+                                      final city = cityController.text.trim();
+                                      final state = stateController.text.trim();
                                       final phone = phoneController.text.trim();
                                       final pin = pincodeController.text.trim();
 
@@ -994,6 +1101,8 @@ class _CartScreenState extends State<CartScreen> {
                                         name: name,
                                         phone: phone,
                                         street: addr,
+                                        city: city.isNotEmpty ? city : 'Hyderabad',
+                                        state: state.isNotEmpty ? state : 'Telangana',
                                         pincode: pin,
                                         isDefault: saveAsDefaultCheckbox,
                                       );
@@ -1004,11 +1113,40 @@ class _CartScreenState extends State<CartScreen> {
                                       setModalState(() {
                                         savedAddresses = reloaded;
                                         selectedAddress = newModel;
+                                        nameController.text = newModel.name;
+                                        addressController.text = newModel.street;
+                                        cityController.text = newModel.city;
+                                        stateController.text = newModel.state;
+                                        phoneController.text = newModel.phone;
+                                        pincodeController.text = newModel.pincode;
+                                        selectedTag = newModel.type;
+                                        saveAsDefaultCheckbox = newModel.isDefault;
                                         addressFormError = null;
                                         hasSavedAddress = true;
                                         isEditingAddress = false;
                                         isSelectingOtherAddress = false;
                                       });
+
+                                      if (checkoutContext.mounted) {
+                                        ScaffoldMessenger.of(checkoutContext).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: _goldDark,
+                                            behavior: SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            content: Row(
+                                              children: [
+                                                const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Address saved successfully!',
+                                                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
                                     },
                                     child: Center(
                                       child: Row(
@@ -1039,73 +1177,9 @@ class _CartScreenState extends State<CartScreen> {
 
                         const SizedBox(height: 20),
 
-                        // ── SECTION B: DELIVERY SPEED & INSTRUCTIONS ─────────────────
+                        // ── SECTION B: PAYMENT METHOD SELECTION ─────────────────────
                         Text(
-                          '2. Delivery Speed & Preference',
-                          style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 10),
-
-                        Row(
-                          children: [
-                            (id: 'express', title: '⚡ Express Priority', subtitle: 'Tomorrow, 5 PM', fee: 'FREE'),
-                            (id: 'standard', title: '🚚 Standard Ground', subtitle: 'In 3-4 Business Days', fee: 'FREE'),
-                          ].map((speed) {
-                            final isSel = selectedDeliverySpeed == speed.id;
-                            return Expanded(
-                              child: GestureDetector(
-                                onTap: () => setModalState(() => selectedDeliverySpeed = speed.id),
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 8),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isSel ? _gold.withAlpha(20) : Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: isSel ? _goldDark : _border, width: isSel ? 1.5 : 1.0),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(speed.title, style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _textDark)),
-                                          Icon(isSel ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, size: 16, color: isSel ? _goldDark : _subtext),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(speed.subtitle, style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext)),
-                                      const SizedBox(height: 4),
-                                      Text(speed.fee, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _successGreen)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          children: ['🚪 Leave at Door', '📞 Call First', '🔔 Don\'t Ring Bell'].map((inst) {
-                            final isSel = selectedInstruction == inst;
-                            return ChoiceChip(
-                              label: Text(inst, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: isSel ? Colors.white : _textDark)),
-                              selected: isSel,
-                              selectedColor: _goldDark,
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: isSel ? _goldDark : _border),
-                              onSelected: (_) => setModalState(() => selectedInstruction = inst),
-                            );
-                          }).toList(),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // ── SECTION C: PAYMENT METHOD SELECTION ─────────────────────
-                        Text(
-                          '3. Select Payment Method',
+                          '2. Select Payment Method',
                           style: GoogleFonts.outfit(color: _textDark, fontSize: 13.5, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 10),
@@ -1343,14 +1417,16 @@ class _CartScreenState extends State<CartScreen> {
                                           name: nameController.text.trim(),
                                           phone: phoneController.text.trim(),
                                           street: addressController.text.trim(),
+                                          city: cityController.text.trim().isNotEmpty ? cityController.text.trim() : 'Hyderabad',
+                                          state: stateController.text.trim().isNotEmpty ? stateController.text.trim() : 'Telangana',
                                           pincode: pincodeController.text.trim(),
                                           isDefault: saveAsDefaultCheckbox,
                                         ),
                                         setAsDefault: saveAsDefaultCheckbox,
                                       );
-                                      final placedOrder = await OrderService.createOrder(
+                                      await OrderService.createOrder(
                                         customerName: nameController.text.isNotEmpty ? nameController.text : (currentUser?.name ?? 'Valued Customer'),
-                                        shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
+                                        shippingAddress: '${addressController.text.trim()}${cityController.text.trim().isNotEmpty ? ', ${cityController.text.trim()}' : ''}${stateController.text.trim().isNotEmpty ? ', ${stateController.text.trim()}' : ''}, PIN: ${pincodeController.text.trim()}',
                                         phone: phoneController.text,
                                         paymentMethod: methodLabel,
                                         totalAmount: _finalTotal,
@@ -1369,7 +1445,7 @@ class _CartScreenState extends State<CartScreen> {
                                       if (widget.onCartUpdated != null) widget.onCartUpdated!();
 
                                       Navigator.pop(checkoutContext);
-                                      _showOrderSuccessDialog(placedOrder);
+                                      _redirectToOrdersScreen();
                                     },
                                   );
                                 } else {
@@ -1396,15 +1472,17 @@ class _CartScreenState extends State<CartScreen> {
                                         name: nameController.text.trim(),
                                         phone: phoneController.text.trim(),
                                         street: addressController.text.trim(),
+                                        city: cityController.text.trim().isNotEmpty ? cityController.text.trim() : 'Hyderabad',
+                                        state: stateController.text.trim().isNotEmpty ? stateController.text.trim() : 'Telangana',
                                         pincode: pincodeController.text.trim(),
                                         isDefault: saveAsDefaultCheckbox,
                                       ),
                                       setAsDefault: saveAsDefaultCheckbox,
                                     );
 
-                                    final placedOrder = await OrderService.createOrder(
+                                    await OrderService.createOrder(
                                       customerName: nameController.text,
-                                      shippingAddress: '${addressController.text}, Pincode: ${pincodeController.text}',
+                                      shippingAddress: '${addressController.text.trim()}${cityController.text.trim().isNotEmpty ? ', ${cityController.text.trim()}' : ''}${stateController.text.trim().isNotEmpty ? ', ${stateController.text.trim()}' : ''}, PIN: ${pincodeController.text.trim()}',
                                       phone: phoneController.text,
                                       paymentMethod: selectedPayment,
                                       totalAmount: _finalTotal,
@@ -1422,7 +1500,7 @@ class _CartScreenState extends State<CartScreen> {
                                     if (widget.onCartUpdated != null) widget.onCartUpdated!();
 
                                     Navigator.pop(checkoutContext);
-                                    _showOrderSuccessDialog(placedOrder);
+                                    _redirectToOrdersScreen();
                                   });
                                 }
                               },
@@ -2434,111 +2512,22 @@ class _CartScreenState extends State<CartScreen> {
 
 
 
-  void _showOrderSuccessDialog(OrderModel order) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        backgroundColor: _cardBg,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: _gold.withAlpha(25),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _gold, width: 2),
-                ),
-                child: const Icon(Icons.check_circle_rounded, size: 44, color: _goldDark),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'ORDER CONFIRMED',
-                style: GoogleFonts.cinzel(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  color: _textDark,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _gold.withAlpha(30),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _gold.withAlpha(80)),
-                ),
-                child: Text(
-                  'Order Number: ${order.id}',
-                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _goldDark),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Thank you ${order.customerName}! Your order for ₹${order.totalAmount.toStringAsFixed(0)} (${order.paymentMethod}) has been registered and is being prepared for dispatch.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.4),
-              ),
-              const SizedBox(height: 20),
-              // View My Orders Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _goldDark,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    if (widget.onNavigateToOrders != null) {
-                      widget.onNavigateToOrders!();
-                    } else {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      }
-                      OrderService.notifyOrdersChanged();
-                    }
-                  },
-                  icon: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 18),
-                  label: Text(
-                    'VIEW MY ORDERS',
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              // Continue Shopping Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: _border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    if (widget.onNavigateToProducts != null) {
-                      widget.onNavigateToProducts!();
-                    }
-                  },
-                  child: Text(
-                    'CONTINUE SHOPPING',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1, color: _textDark),
-                  ),
-                ),
-              ),
-            ],
-          ),
+  void _redirectToOrdersScreen() {
+    OrderService.notifyOrdersChanged();
+
+    if (widget.onNavigateToOrders != null) {
+      widget.onNavigateToOrders!();
+      return;
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const HomeScreen(initialTabIndex: 1),
         ),
-      ),
-    );
+        (route) => false,
+      );
+    }
   }
 
   @override

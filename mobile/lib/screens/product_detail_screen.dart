@@ -31,6 +31,12 @@ class _ReviewItem {
   }) : isHelpful = false;
 }
 
+class _ColorVariant {
+  final String name;
+  final String image;
+  const _ColorVariant({required this.name, required this.image});
+}
+
 class ProductDetailScreen extends StatefulWidget {
   final ItemModel item;
   final Function(ItemModel item, String selectedColor, String selectedSize, int quantity)? onAddToCart;
@@ -81,7 +87,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     _pageController = PageController();
     _transformationController = TransformationController();
-    _selectedColor = widget.item.colors.isNotEmpty ? widget.item.colors.first : widget.item.color;
+    _selectedColor = widget.item.color.isNotEmpty
+        ? widget.item.color
+        : (widget.item.colors.isNotEmpty ? widget.item.colors.first : 'Emerald Green');
     _currentDisplayImage = widget.item.image;
     _isFavorite = widget.favoriteIds?.contains(widget.item.id) ?? false;
 
@@ -151,6 +159,83 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ..scale(scale);
     }
   }
+
+  List<_ColorVariant> get _availableColorVariants {
+    final List<_ColorVariant> variants = [
+      const _ColorVariant(name: 'Emerald Green', image: 'assets/images/tee-emerald.png'),
+      const _ColorVariant(name: 'Jet Black', image: 'assets/images/tee-black.jpg'),
+      const _ColorVariant(name: 'Vintage Rust', image: 'assets/images/tee-rust.png'),
+      const _ColorVariant(name: 'Ivory White', image: 'assets/images/tee-white.jpg'),
+      const _ColorVariant(name: 'Military Olive', image: 'assets/images/tee-olive.jpg'),
+      const _ColorVariant(name: 'Pastel Lavender', image: 'assets/images/tee-lavender.png'),
+      const _ColorVariant(name: 'Midnight Navy', image: 'assets/images/tee-navy.jpg'),
+      const _ColorVariant(name: 'Desert Sand', image: 'assets/images/tee-beige.jpg'),
+      const _ColorVariant(name: 'Charcoal Grey', image: 'assets/images/tee-charcoal.jpg'),
+      const _ColorVariant(name: 'Luxury Cream & Gold', image: 'assets/images/hero_luxury_tshirt.png'),
+    ];
+
+    final currentName = widget.item.color.isNotEmpty ? widget.item.color : '';
+    final currentImg = widget.item.image;
+
+    final matchIndex = variants.indexWhere((v) =>
+        (currentName.isNotEmpty && v.name.toLowerCase() == currentName.toLowerCase()) ||
+        v.image == currentImg);
+
+    if (matchIndex != -1) {
+      final matched = variants.removeAt(matchIndex);
+      variants.insert(0, matched);
+    } else if (currentImg.isNotEmpty) {
+      variants.insert(0, _ColorVariant(name: currentName.isNotEmpty ? currentName : 'Original', image: currentImg));
+    }
+
+    return variants;
+  }
+
+  void _showSizeChartModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: combustionSizeBox(ctx),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Size Chart (in Inches)', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Table(
+              border: TableBorder.all(color: const Color(0xFFE2E8F0)),
+              children: [
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
+                  children: ['Size', 'Chest', 'Length', 'Shoulder'].map((h) => Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(h, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  )).toList(),
+                ),
+                TableRow(children: ['S', '38"', '27.5"', '17.5"'].map((v) => Padding(padding: const EdgeInsets.all(8), child: Text(v))).toList()),
+                TableRow(children: ['M', '40"', '28.5"', '18.5"'].map((v) => Padding(padding: const EdgeInsets.all(8), child: Text(v))).toList()),
+                TableRow(children: ['L', '42"', '29.5"', '19.5"'].map((v) => Padding(padding: const EdgeInsets.all(8), child: Text(v))).toList()),
+                TableRow(children: ['XL', '44"', '30.5"', '20.5"'].map((v) => Padding(padding: const EdgeInsets.all(8), child: Text(v))).toList()),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static MainAxisSize combustionSizeBox(BuildContext _) => MainAxisSize.min;
 
   List<Map<String, dynamic>> get _gallerySlides {
     final mainImg = _currentDisplayImage;
@@ -350,7 +435,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
 
 
-  Widget _buildProductImage(String src, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
+  Widget _buildProductImage(
+    String src, {
+    double? width,
+    double? height,
+    BoxFit fit = BoxFit.cover,
+  }) {
     if (src.startsWith('assets/')) {
       return Image.asset(
         src,
@@ -1036,18 +1126,117 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           const SizedBox(height: 20),
 
                           // ════════════════════════════════════════════════════
-                          // 4. SIZE SELECTION & STOCK STATUS
+                          // 4. COLOR SELECTION (IMAGE THUMBNAIL VARIANTS)
+                          // ════════════════════════════════════════════════════
+                          RichText(
+                            text: TextSpan(
+                              style: GoogleFonts.outfit(fontSize: 14.5),
+                              children: [
+                                TextSpan(
+                                  text: 'Selected Color: ',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.textColor,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: _selectedColor,
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w500,
+                                    color: AppTheme.subtextColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          SizedBox(
+                            height: 74,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _availableColorVariants.length,
+                              separatorBuilder: (_, _) => const SizedBox(width: 10),
+                              itemBuilder: (context, index) {
+                                final variant = _availableColorVariants[index];
+                                final isSelected = _selectedColor == variant.name;
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedColor = variant.name;
+                                      _currentDisplayImage = variant.image;
+                                    });
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: 56,
+                                    height: 74,
+                                    padding: const EdgeInsets.all(2.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? (AppTheme.textColor)
+                                            : const Color(0xFFE2E8F0),
+                                        width: isSelected ? 2.2 : 1.0,
+                                      ),
+                                      boxShadow: isSelected
+                                          ? [
+                                              BoxShadow(
+                                                color: Colors.black.withAlpha(25),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(7),
+                                      child: _buildProductImage(
+                                        variant.image,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ════════════════════════════════════════════════════
+                          // 5. SIZE SELECTION & STOCK STATUS
                           // ════════════════════════════════════════════════════
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Select Size:',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textColor,
-                                ),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Select Size',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  GestureDetector(
+                                    onTap: () => _showSizeChartModal(context),
+                                    child: Text(
+                                      'Size Chart',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF2563EB),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               Text(
                                 _outOfStockSizes.contains(_selectedSize)
@@ -1889,6 +2078,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 final sizedItem = widget.item.copyWith(
                                   price: _currentPrice,
                                   oldPrice: _currentOldPrice,
+                                  color: _selectedColor,
+                                  image: _currentDisplayImage,
                                 );
                                 if (widget.onAddToCart != null) {
                                   widget.onAddToCart!(sizedItem, _selectedColor, _selectedSize, _quantity);
@@ -1959,6 +2150,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 final sizedItem = widget.item.copyWith(
                                   price: _currentPrice,
                                   oldPrice: _currentOldPrice,
+                                  color: _selectedColor,
+                                  image: _currentDisplayImage,
                                 );
                                 if (widget.onBuyNow != null) {
                                   widget.onBuyNow!(sizedItem, _selectedColor, _selectedSize, _quantity);

@@ -6,6 +6,7 @@ import '../services/websocket_service.dart';
 import '../services/auth_service.dart';
 import 'order_tracking_screen.dart';
 import 'customer_support_screen.dart';
+import 'home_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
 import '../services/invoice_pdf_service.dart';
 
@@ -21,11 +22,13 @@ const Color _errorRed = Color(0xFFEF4444);
 class OrderDetailsScreen extends StatefulWidget {
   final OrderModel order;
   final VoidCallback? onRefreshParent;
+  final VoidCallback? onBack;
 
   const OrderDetailsScreen({
     super.key,
     required this.order,
     this.onRefreshParent,
+    this.onBack,
   });
 
   @override
@@ -37,6 +40,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   StreamSubscription? _wsSub;
   Timer? _pollTimer;
   bool _isRefreshing = false;
+
+  void _handleBack() {
+    if (widget.onBack != null) {
+      widget.onBack!();
+      return;
+    }
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
 
   Future<void> _handleManualRefresh() async {
     if (_isRefreshing) return;
@@ -321,15 +334,62 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withAlpha(20),
+                                      color: order.status.toLowerCase().contains('cancel')
+                                          ? const Color(0xFFEF4444).withAlpha(20)
+                                          : const Color(0xFF10B981).withAlpha(20),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
+                                      border: Border.all(
+                                        color: order.status.toLowerCase().contains('cancel')
+                                            ? const Color(0xFFEF4444).withAlpha(80)
+                                            : const Color(0xFF10B981).withAlpha(80),
+                                      ),
                                     ),
-                                    child: Text('PAID', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: const Color(0xFF10B981), letterSpacing: 1)),
+                                    child: Text(
+                                      order.status.toLowerCase().contains('cancel')
+                                          ? 'CANCELLED'
+                                          : (order.isPaid ? 'PAID' : 'CONFIRMED'),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: order.status.toLowerCase().contains('cancel')
+                                            ? const Color(0xFFEF4444)
+                                            : const Color(0xFF10B981),
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
                               const Divider(height: 24),
+                              if (order.status.toLowerCase().contains('cancel')) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEF4444).withAlpha(20),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFEF4444).withAlpha(80)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'ORDER CANCELLED — INVOICE VOIDED',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: const Color(0xFFEF4444),
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
 
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,8 +492,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('GRAND TOTAL (INCL. GST)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark)),
-                                        Text('₹${totalAmt.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: _goldDark)),
+                                        Text(order.status.toLowerCase().contains('cancel') ? 'STATUS (REFUNDED)' : 'GRAND TOTAL (INCL. GST)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: order.status.toLowerCase().contains('cancel') ? const Color(0xFFEF4444) : _textDark)),
+                                        Text(order.status.toLowerCase().contains('cancel') ? 'CANCELLED' : '₹${totalAmt.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: order.status.toLowerCase().contains('cancel') ? 13 : 15, fontWeight: FontWeight.w900, color: order.status.toLowerCase().contains('cancel') ? const Color(0xFFEF4444) : _goldDark)),
                                       ],
                                     ),
                                   ],
@@ -522,6 +582,36 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   void _confirmCancelOrder() {
+    if (!_currentOrder.canCancel) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Color(0xFFEF4444), size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Cancellation Not Possible',
+                style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark),
+              ),
+            ],
+          ),
+          content: Text(
+            'No option to cancel the order as it has already been shipped.',
+            style: GoogleFonts.outfit(fontSize: 13, color: _subtext, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text('OK', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: _goldDark)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -545,7 +635,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               Navigator.pop(dialogCtx);
               final messenger = ScaffoldMessenger.of(context);
               final success = await OrderService.cancelOrder(_currentOrder.id, 'Cancelled by customer via app', context: context, targetOrder: _currentOrder);
-              if (success) {
+              if (success && mounted) {
                 setState(() {
                   _currentOrder.status = 'Cancelled';
                   _currentOrder.cancelReason = 'Cancelled by customer via app';
@@ -558,6 +648,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     backgroundColor: _errorRed,
                     behavior: SnackBarBehavior.floating,
                   ),
+                );
+                // Redirect immediately to Cancelled Orders screen
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const HomeScreen(initialTabIndex: 1, initialOrderFilter: 'Cancelled'),
+                  ),
+                  (route) => false,
                 );
               }
             },
@@ -909,18 +1006,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final isCancelled = _currentOrder.status.toLowerCase() == 'cancelled';
-    final isDelivered = _currentOrder.status.toLowerCase() == 'delivered';
 
-    return Scaffold(
-      backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        centerTitle: false,
-        elevation: 0.8,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: _bgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          centerTitle: false,
+          elevation: 0.8,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+            onPressed: _handleBack,
+          ),
         title: Row(
           children: [
             Container(
@@ -963,16 +1065,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               tooltip: 'Download Invoice',
               onPressed: () => _showInvoiceModal(context, _currentOrder, autoStartDownload: true),
             ),
-          IconButton(
-            icon: const Icon(Icons.alt_route_rounded, color: _goldDark, size: 20),
-            tooltip: 'Track Package',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: _currentOrder)),
-              );
-            },
-          ),
         ],
       ),
       body: RefreshIndicator(
@@ -1375,7 +1467,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
               Row(
                 children: [
-                  if (!isCancelled && !isDelivered) ...[
+                  if (!isCancelled) ...[
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
@@ -1443,6 +1535,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

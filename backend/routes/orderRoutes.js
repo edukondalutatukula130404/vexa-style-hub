@@ -11,6 +11,7 @@ const {
 router.post('/', createOrder);
 router.get('/', getAllOrders);
 router.get('/myorders', getUserOrders);
+router.put('/status', updateOrderStatus);
 router.put('/:id/status', updateOrderStatus);
 router.delete('/:id', deleteOrder);
 

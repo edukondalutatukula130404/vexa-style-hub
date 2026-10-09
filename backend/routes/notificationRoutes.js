@@ -4,10 +4,12 @@ const {
   getUserNotifications,
   markNotificationRead,
   markAllNotificationsRead,
-  clearUserNotifications
+  clearUserNotifications,
+  sendSupportMessage
 } = require('../controllers/notificationController');
 
 router.get('/', getUserNotifications);
+router.post('/support', sendSupportMessage);
 router.put('/read-all', markAllNotificationsRead);
 router.put('/:id/read', markNotificationRead);
 router.delete('/', clearUserNotifications);

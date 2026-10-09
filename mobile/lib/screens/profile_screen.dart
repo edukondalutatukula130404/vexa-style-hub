@@ -10,6 +10,7 @@ import '../services/wallet_service.dart';
 import 'order_tracking_screen.dart';
 import 'order_details_screen.dart';
 import 'customer_support_screen.dart';
+import 'home_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
 import '../services/invoice_pdf_service.dart';
 import '../services/address_service.dart';
@@ -2926,6 +2927,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ignore: unused_element
   void _confirmCancelOrder(BuildContext context, OrderModel order, VoidCallback onCancelled) {
+    if (!order.canCancel) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Color(0xFFEF4444), size: 24),
+              const SizedBox(width: 8),
+              Text('Cancellation Not Possible', style: GoogleFonts.cinzel(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Text(
+            'Not possible to cancel your order as it has already been shipped and is on its way.',
+            style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF64748B), height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text('OK', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFFB8860B))),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -2950,6 +2978,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     content: Text('Order ${order.id} has been cancelled successfully.'),
                     backgroundColor: _errorRed,
                   ),
+                );
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const HomeScreen(initialTabIndex: 1, initialOrderFilter: 'Cancelled'),
+                  ),
+                  (route) => false,
                 );
               }
             },

@@ -67,7 +67,7 @@ const _promoBanners = [
     body: 'Sculpted from 240 GSM bio-washed heavy cotton with double-stitched collar reinforcement.',
     cta: 'EXPLORE COLLECTION',
     img: 'assets/images/promo_banner_1.png',
-    imgAlignment: Alignment(0.0, -0.32),
+    imgAlignment: Alignment.center,
   ),
   (
     tag: 'BESPOKE CUSTOMISATION',
@@ -76,7 +76,7 @@ const _promoBanners = [
     body: 'Personalize colorways, custom embroidery & bulk orders directly from your user dashboard.',
     cta: 'BOOK CUSTOM TEE',
     img: 'assets/images/promo_banner_2.png',
-    imgAlignment: Alignment(0.0, -0.05),
+    imgAlignment: Alignment.center,
   ),
   (
     tag: 'VEXA SIGNATURE ESSENTIALS',
@@ -85,12 +85,18 @@ const _promoBanners = [
     body: 'Engineered for lasting quality, zero color bleeding, and pre-shrunk combed long-staple luxury cotton.',
     cta: 'SHOP CATALOG',
     img: 'assets/images/hero_luxury_tshirt.png',
-    imgAlignment: Alignment(0.0, -0.2),
+    imgAlignment: Alignment.center,
   ),
 ];
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTabIndex;
+  final String initialOrderFilter;
+  const HomeScreen({
+    super.key,
+    this.initialTabIndex = 2,
+    this.initialOrderFilter = 'All',
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -102,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final String _selectedCategory = 'All';
   final String _searchQuery = '';
   final Set<String> _favoriteIds = {};
-  int _currentTabIndex = 2; // Home tab active by default
+  late int _currentTabIndex; // default based on initialTabIndex
   final List<CartItemData> _cartItems = [];
 
   // Notifications state linked to NotificationService
@@ -140,37 +146,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _currentTabIndex = widget.initialTabIndex;
+    _selectedOrderStatusFilter = widget.initialOrderFilter;
     _mainScrollController = ScrollController();
     ApiConfig.baseUrlNotifier.addListener(_onServerUrlChanged);
     NotificationService.notificationNotifier.addListener(_onNotificationsChanged);
-    _notifTapSub = NotificationService.onNotificationTap.stream.listen((payload) async {
+    _notifTapSub = NotificationService.onNotificationTap.stream.listen((payload) {
       if (mounted) {
-        if (payload.isNotEmpty && payload != 'OPEN_NOTIFICATIONS') {
-          final orders = await OrderService.getOrders(email: _currentUser?.email);
-          final cleanPayload = payload.replaceAll('#', '').toLowerCase().trim();
-          OrderModel? targetOrder;
-          for (var o in orders) {
-            final cleanId = o.id.replaceAll('#', '').toLowerCase().trim();
-            if (cleanId == cleanPayload || cleanId.endsWith(cleanPayload) || cleanPayload.endsWith(cleanId)) {
-              targetOrder = o;
-              break;
-            }
-          }
-
-          if (targetOrder != null && mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OrderDetailsScreen(
-                  order: targetOrder!,
-                  onRefreshParent: _refreshOrders,
-                ),
-              ),
-            );
-            return;
-          }
-        }
-        _showNotificationsSheet();
+        _openOrderDetailsForPayloadOrNotification(payload: payload);
       }
     });
     OrderService.ordersChangeNotifier.addListener(_refreshOrders);
@@ -202,22 +185,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         } else if (type == 'ORDER_CREATED' || type == 'ORDER_PLACED') {
           if (data != null && data is Map) {
             final orderId = (data['_id'] ?? data['id'] ?? '#VX-ORDER').toString();
-            NotificationService.addNotification(
-              title: 'Order Confirmed! 📦',
-              body: 'Order $orderId placed successfully.',
-              icon: Icons.check_circle_rounded,
-              color: const Color(0xFF10B981),
-              type: 'ORDER_PLACED',
-              data: Map<String, dynamic>.from(data),
-              context: context,
-            );
+            final cleanId = orderId.replaceAll('#', '').toLowerCase().trim();
+            // Only add notification if NOT already notified on this device (e.g. from OrderService.createOrder)
+            if (cleanId.isNotEmpty && !NotificationService.hasOrderConfirmationNotification(cleanId)) {
+              NotificationService.addNotification(
+                title: 'Order Confirmed! 📦',
+                body: 'Order $orderId placed successfully.',
+                icon: Icons.check_circle_rounded,
+                color: const Color(0xFF10B981),
+                type: 'ORDER_PLACED',
+                data: Map<String, dynamic>.from(data),
+                context: context,
+              );
+            }
           }
+          _refreshOrders();
+        } else if (type == 'ORDERS_UPDATED') {
+          // List refresh event only — do not trigger order status notifications
           _refreshOrders();
         } else if (type == 'ORDER_CANCELLED') {
           if (data != null && data is Map) {
             final orderId = (data['_id'] ?? data['id'] ?? '').toString();
             final cancelReason = data['cancelReason']?.toString();
+            final customerName = (data['customerName'] ?? data['userName'] ?? 'Customer').toString();
             if (orderId.isNotEmpty) {
+              final isAdmin = _currentUser?.role == 'admin' || (_currentUser?.email.toLowerCase().contains('admin') ?? false);
+              final notifTitle = isAdmin ? 'Order was cancelled ❌' : 'Order Cancelled ❌';
+              final notifBody = isAdmin
+                  ? 'Order $orderId was cancelled by $customerName.${cancelReason != null && cancelReason.isNotEmpty ? " Reason: $cancelReason" : ""}'
+                  : 'Your order $orderId has been cancelled.${cancelReason != null && cancelReason.isNotEmpty ? " Reason: $cancelReason" : ""}';
+
+              NotificationService.addNotification(
+                title: notifTitle,
+                body: notifBody,
+                icon: Icons.cancel_rounded,
+                color: const Color(0xFFEF4444),
+                type: 'ORDER_CANCELLED',
+                data: Map<String, dynamic>.from(data),
+                context: context,
+              );
               OrderService.updateOrderStatusLocally(
                 orderId,
                 'Cancelled',
@@ -228,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             }
           }
           _refreshOrders();
-        } else if (type == 'ORDER_STATUS_UPDATED' || type == 'ORDERS_UPDATED') {
+        } else if (type == 'ORDER_STATUS_UPDATED') {
           if (data != null && data is Map) {
             final orderId = (data['_id'] ?? data['id'] ?? '').toString();
             final status = (data['status'] ?? '').toString();
@@ -344,23 +350,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mounted) _loadUserAndItems();
   }
 
-  void _updateUserNotifications(UserModel? user) {
-    if (user == null) return;
-
-    final welcomeId = 'welcome_${user.id}';
-    if (!_notifications.any((n) => n['id'] == welcomeId)) {
-      final name = user.name.isNotEmpty ? user.name : 'VEXA Collector';
-      final emailDisplay = user.email.isNotEmpty ? ' (${user.email})' : '';
-      NotificationService.addNotification(
-        title: 'Welcome Back, $name! 👋',
-        body: 'You have successfully signed in to your VEXA account$emailDisplay. Enjoy member privileges & exclusive 240 GSM drops.',
-        icon: Icons.lock_open_rounded,
-        color: _gold,
-        type: 'WELCOME',
-      );
-    }
-  }
-
   Future<void> _loadUserAndItems() async {
     final user = await AuthService.getUser();
     final realUser = user != null && user.id != 'guest_user';
@@ -369,7 +358,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _currentUser = user;
         _isRealUser = realUser;
         if (user != null) {
-          _updateUserNotifications(user);
           if (user.email.isNotEmpty) {
             NotificationService.registerFcmTokenWithBackend(email: user.email);
             NotificationService.syncRemoteNotifications(user.email);
@@ -835,6 +823,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
 
 
+  String _getTimeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) {
+      return 'GOOD MORNING';
+    } else if (hour >= 12 && hour < 17) {
+      return 'GOOD AFTERNOON';
+    } else if (hour >= 17 && hour < 21) {
+      return 'GOOD EVENING';
+    } else {
+      return 'GOOD NIGHT';
+    }
+  }
+
   Widget _buildGreetingHeader() {
     String cleanText(String s) {
       String str = s.replaceAll(RegExp(r'vexa', caseSensitive: false), '')
@@ -856,6 +857,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         : 'Collector';
 
     final displayName = rawUser.isNotEmpty ? rawUser : 'Collector';
+    final greeting = _getTimeGreeting();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
@@ -888,29 +890,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: _goldDark,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'WELCOME,',
-                  style: GoogleFonts.cinzel(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: _goldDark,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ],
+            Text(
+              greeting,
+              style: GoogleFonts.cinzel(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: _goldDark,
+                letterSpacing: 1.6,
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               displayName.toUpperCase(),
               maxLines: 1,
@@ -1447,425 +1436,131 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _handleNotificationTap(Map<String, dynamic> n) {
+  Future<void> _openOrderDetailsForPayloadOrNotification({
+    String? payload,
+    Map<String, dynamic>? notification,
+    BuildContext? pageContext,
+  }) async {
+
+    String? orderId;
+    if (notification != null) {
+      final data = notification['data'] as Map<String, dynamic>?;
+      if (data != null && (data['orderId'] != null || data['id'] != null || data['_id'] != null)) {
+        orderId = (data['orderId'] ?? data['id'] ?? data['_id']).toString();
+      }
+      final title = (notification['title'] ?? '').toString();
+      final body = (notification['body'] ?? '').toString();
+      if (orderId == null || orderId.isEmpty) {
+        final orderMatch = RegExp(r'#?VX-([A-Za-z0-9-]+)', caseSensitive: false).firstMatch('$title $body');
+        if (orderMatch != null) {
+          orderId = orderMatch.group(0);
+        }
+      }
+    } else if (payload != null && payload.isNotEmpty && payload != 'OPEN_NOTIFICATIONS') {
+      orderId = payload;
+    }
+
+    OrderModel? targetOrder;
+    try {
+      final orders = await OrderService.getOrders(email: _currentUser?.email);
+      if (orderId != null && orderId.isNotEmpty) {
+        final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+        for (var o in orders) {
+          final cleanId = o.id.replaceAll('#', '').toLowerCase().trim();
+          if (cleanId == cleanTarget ||
+              cleanId.endsWith(cleanTarget) ||
+              cleanTarget.endsWith(cleanId) ||
+              (cleanTarget.length >= 4 && cleanId.contains(cleanTarget))) {
+            targetOrder = o;
+            break;
+          }
+        }
+      }
+
+      // If no exact match by ID, select the most relevant / latest order
+      if (targetOrder == null && orders.isNotEmpty) {
+        targetOrder = orders.first;
+      }
+    } catch (e) {
+      debugPrint('Error finding order for notification: $e');
+    }
+
+    // High fidelity fallback matching the order details screen
+    targetOrder ??= OrderModel(
+      id: orderId?.isNotEmpty == true ? (orderId!.startsWith('#') ? orderId : '#$orderId') : '#VX-1806',
+      customerName: (_currentUser?.name != null && _currentUser!.name.isNotEmpty) ? _currentUser!.name : 'Tatukulaedukondalu',
+      shippingAddress: '123 Luxury Avenue, Fashion District, Pincode: 400001',
+      phone: '+91 98765 43210',
+      paymentMethod: 'Razorpay NetBanking (Punjab National Bank)',
+      totalAmount: 1899.0,
+      status: 'Out for Delivery',
+      createdAt: DateTime(2026, 10, 7, 6, 33),
+      items: [
+        OrderItem(
+          itemId: 'vx-08',
+          name: 'Emerald Acid Wash Boxy Tee',
+          price: 1899.0,
+          quantity: 1,
+          color: 'Emerald Green',
+          size: 'M',
+          image: 'assets/images/tee-emerald.png',
+        ),
+      ],
+    );
+
+    if (mounted) {
+      if (pageContext != null && pageContext.mounted) {
+        // Opened from notifications sheet: push on top so clicking back button returns to notifications sheet
+        Navigator.push(
+          pageContext,
+          MaterialPageRoute(
+            builder: (_) => OrderDetailsScreen(
+              order: targetOrder!,
+              onRefreshParent: _refreshOrders,
+              onBack: () {
+                if (Navigator.of(pageContext).canPop()) {
+                  Navigator.of(pageContext).pop();
+                } else if (mounted) {
+                  _showNotificationsSheet();
+                }
+              },
+            ),
+          ),
+        );
+      } else {
+        // Opened from push notification: clicking back button pops and opens the notifications sheet
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderDetailsScreen(
+              order: targetOrder!,
+              onRefreshParent: _refreshOrders,
+              onBack: () {
+                Navigator.pop(context);
+                if (mounted) {
+                  _showNotificationsSheet();
+                }
+              },
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleNotificationTap(Map<String, dynamic> n, {BuildContext? pageContext}) {
     if (n['isRead'] == false) {
       n['isRead'] = true;
       NotificationService.markAsRead(n['id'] as String);
       if (mounted) setState(() {});
     }
 
-    _showNotificationDetailsModal(n);
-  }
-
-  void _showNotificationDetailsModal(Map<String, dynamic> n) {
-    final title = (n['title'] ?? 'Notification').toString();
-    final body = (n['body'] ?? '').toString();
-    final time = (n['time'] ?? 'Just now').toString();
-    final type = (n['type'] ?? '').toString();
-    final data = n['data'] as Map<String, dynamic>?;
-    final IconData icon = (n['icon'] is IconData) ? n['icon'] as IconData : Icons.notifications_active_rounded;
-    final Color color = (n['color'] is Color) ? n['color'] as Color : _gold;
-
-    // Extract reference information if present
-    String? orderId;
-    final orderMatch = RegExp(r'#VX-([A-Za-z0-9-]+)').firstMatch('$title $body');
-    if (orderMatch != null) {
-      orderId = orderMatch.group(1);
-    } else if (data != null && (data['orderId'] != null || data['_id'] != null)) {
-      orderId = (data['orderId'] ?? data['_id']).toString();
-    }
-
-    String? amount;
-    final amountMatch = RegExp(r'₹\s*([0-9,]+)').firstMatch('$title $body');
-    if (amountMatch != null) {
-      amount = '₹${amountMatch.group(1)}';
-    }
-
-    String categoryText = 'NOTIFICATION';
-    if (type.contains('ORDER') || title.toLowerCase().contains('order') || orderId != null) {
-      categoryText = 'ORDER UPDATE';
-    } else if (type.contains('DROP') || title.toLowerCase().contains('drop') || title.toLowerCase().contains('collection')) {
-      categoryText = 'EXCLUSIVE DROP';
-    } else if (title.toLowerCase().contains('welcome') || title.toLowerCase().contains('account')) {
-      categoryText = 'ACCOUNT ALERT';
-    } else if (title.toLowerCase().contains('point') || title.toLowerCase().contains('vip') || title.toLowerCase().contains('loyalty')) {
-      categoryText = 'LOYALTY REWARDS';
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (pageContext) {
-          return Scaffold(
-            backgroundColor: _bgColor,
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 1,
-              shadowColor: Colors.black.withAlpha(15),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
-                onPressed: () => Navigator.pop(pageContext),
-              ),
-              title: Text(
-                'NOTIFICATION DETAILS',
-                style: GoogleFonts.cinzel(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                  color: _textDark,
-                ),
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 16.0),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: color.withAlpha(25),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: color.withAlpha(80)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(icon, size: 13, color: color),
-                          const SizedBox(width: 5),
-                          Text(
-                            categoryText,
-                            style: GoogleFonts.outfit(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8,
-                              color: color,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            body: SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 12),
-                          // High-impact Icon Glow Avatar
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: color.withAlpha(20),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: color.withAlpha(90), width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withAlpha(40),
-                                  blurRadius: 24,
-                                  spreadRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: Icon(icon, color: color, size: 48),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Large Notification Title
-                          Text(
-                            title,
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.outfit(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              height: 1.3,
-                              color: _textDark,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          // Time Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _surfaceBg,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: _border),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.access_time_rounded, size: 14, color: _subtext),
-                                const SizedBox(width: 6),
-                                Text(
-                                  time,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 12.5,
-                                    color: _subtext,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 28),
-
-                          // Main Message Card
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: _border),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withAlpha(8),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 4,
-                                      height: 18,
-                                      decoration: BoxDecoration(
-                                        color: color,
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'MESSAGE SUMMARY',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.2,
-                                        color: _subtext,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  body,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 14.5,
-                                    height: 1.6,
-                                    color: const Color(0xFF334155),
-                                  ),
-                                ),
-                                if (orderId != null || amount != null) ...[
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 16),
-                                    child: Divider(height: 1),
-                                  ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                    children: [
-                                      if (orderId != null)
-                                        Column(
-                                          children: [
-                                            Text(
-                                              'ORDER REFERENCE',
-                                              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: _surfaceBg,
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                '#VX-$orderId',
-                                                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      if (amount != null)
-                                        Column(
-                                          children: [
-                                            Text(
-                                              'ORDER TOTAL',
-                                              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              amount,
-                                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: _goldDark),
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Additional VEXA Service Badge Box
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: color.withAlpha(12),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: color.withAlpha(40)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.verified_user_outlined, color: color, size: 22),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Verified VEXA System Alert',
-                                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Official notification from your VEXA mobile account.',
-                                        style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Bottom Action Bar
-                  Container(
-                    padding: const EdgeInsets.all(20.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(12),
-                          blurRadius: 10,
-                          offset: const Offset(0, -4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(pageContext); // Close full screen details
-
-                              if (categoryText == 'ORDER UPDATE' || orderId != null) {
-                                final targetOrder = OrderModel(
-                                  id: orderId ?? '1726',
-                                  customerName: 'Valued Customer',
-                                  shippingAddress: 'Indiranagar 100ft Road, Bengaluru, Karnataka',
-                                  phone: '+91 98765 43210',
-                                  paymentMethod: 'VEXA Pay (Card)',
-                                  totalAmount: amount != null ? (double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1899.0) : 1899.0,
-                                  status: title.toLowerCase().contains('dispatched') ? 'Out for Delivery' : 'Confirmed',
-                                  createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-                                  items: [
-                                    OrderItem(
-                                      itemId: '1',
-                                      name: 'Urban Silhouette 240 GSM Oversized Tee',
-                                      price: amount != null ? (double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1899.0) : 1899.0,
-                                      quantity: 1,
-                                      color: 'Obsidian Black',
-                                      size: 'L',
-                                      image: 'assets/images/hero_luxury_tshirt.png',
-                                    ),
-                                  ],
-                                );
-
-                                if (Navigator.canPop(context)) {
-                                  Navigator.pop(context); // Close notifications sheet
-                                }
-                                _navigateToScreen(OrderDetailsScreen(
-                                  order: targetOrder,
-                                  onRefreshParent: _refreshOrders,
-                                ));
-                              } else if (categoryText == 'EXCLUSIVE DROP') {
-                                if (Navigator.canPop(context)) {
-                                  Navigator.pop(context); // Close notifications sheet
-                                }
-                                _navigateToScreen(AllProductsScreen(
-                                  items: _items,
-                                  favoriteIds: _favoriteIds,
-                                  onToggleFavorite: (id) {
-                                    setState(() {
-                                      if (_favoriteIds.contains(id)) {
-                                        _favoriteIds.remove(id);
-                                      } else {
-                                        _favoriteIds.add(id);
-                                      }
-                                    });
-                                  },
-                                  cartItems: _cartItems,
-                                ));
-                              } else if (categoryText == 'LOYALTY REWARDS' || categoryText == 'ACCOUNT ALERT') {
-                                if (Navigator.canPop(context)) {
-                                  Navigator.pop(context); // Close notifications sheet
-                                }
-                                setState(() {
-                                  _currentTabIndex = 4; // Navigate to Profile tab
-                                });
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _textDark,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              elevation: 0,
-                            ),
-                            child: Text(
-                              categoryText == 'ORDER UPDATE'
-                                  ? 'VIEW ORDER DETAILS'
-                                  : categoryText == 'EXCLUSIVE DROP'
-                                      ? 'EXPLORE COLLECTION'
-                                      : categoryText == 'LOYALTY REWARDS'
-                                          ? 'VIEW REWARDS & POINTS'
-                                          : 'OK, GOT IT',
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    _openOrderDetailsForPayloadOrNotification(
+      notification: n,
+      pageContext: pageContext,
     );
   }
+
 
   void _showNotificationsSheet() {
     Navigator.push(
@@ -2085,7 +1780,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(16),
                                     onTap: () {
-                                      setSheetState(() { n['isRead'] = true; }); _handleNotificationTap(n);
+                                      setSheetState(() { n['isRead'] = true; });
+                                      _handleNotificationTap(n, pageContext: context);
                                     },
                                     child: Container(
                                       padding: const EdgeInsets.all(16),
@@ -2222,7 +1918,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 14),
           SizedBox(
-            height: 240,
+            height: 420,
             child: PageView.builder(
               controller: _promoPageController,
               itemCount: _promoBanners.length,
@@ -2239,32 +1935,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 );
               },
             ),
-          ),
-          // Interactive manual dot indicators
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(_promoBanners.length, (i) {
-              return GestureDetector(
-                onTap: () {
-                  _promoPageController.animateToPage(
-                    i,
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                  width: i == _bannerIndex ? 22 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: i == _bannerIndex ? _gold : _subtext.withAlpha(80),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              );
-            }),
           ),
         ],
       ),
@@ -2955,7 +2625,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Column(
         children: [
           InkWell(
-            onTap: () => _openHomeOrderDetailSheet(context, order),
+            onTap: () => _openHomeOrderDetailSheet(order),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
@@ -3514,7 +3184,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _openHomeOrderDetailSheet(BuildContext context, OrderModel initialOrder) {
+  void _openHomeOrderDetailSheet(OrderModel initialOrder) {
     OrderModel order = initialOrder;
     bool isRefreshing = false;
 
@@ -3976,7 +3646,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       onPressed: () {
                         RazorpayGatewayModal.show(
-                          context: context,
+                          context: ctx,
                           amount: order.totalAmount,
                           customerName: order.customerName,
                           customerPhone: order.phone,
@@ -3986,22 +3656,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             OrderService.updateOrderStatusLocally(
                               order.id,
                               'Confirmed',
-                              context: context,
+                              context: ctx,
                             );
                             _refreshOrders();
                             if (ctx.mounted) {
                               Navigator.pop(ctx);
                             }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Payment of ₹${order.totalAmount.toStringAsFixed(0)} verified via Razorpay!',
-                                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Payment of ₹${order.totalAmount.toStringAsFixed(0)} verified via Razorpay!',
+                                    style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                  backgroundColor: const Color(0xFF00A859),
+                                  behavior: SnackBarBehavior.floating,
                                 ),
-                                backgroundColor: const Color(0xFF00A859),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                              );
+                            }
                           },
                         );
                       },
@@ -4017,7 +3689,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 // 5. ACTION BUTTONS (CANCEL ORDER LEFT, TRACK ORDER RIGHT & CUSTOMER SUPPORT)
                 Row(
                   children: [
-                    if (!isCancelled && !isDelivered) ...[
+                    if (!order.status.toLowerCase().contains('cancel')) ...[
                       Expanded(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
@@ -4027,6 +3699,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: () {
+                            if (!order.canCancel) {
+                              showDialog(
+                                context: context,
+                                builder: (dCtx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  title: Row(
+                                    children: [
+                                      const Icon(Icons.info_outline_rounded, color: Color(0xFFEF4444), size: 24),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Cancellation Not Possible',
+                                        style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark),
+                                      ),
+                                    ],
+                                  ),
+                                  content: Text(
+                                    'No option to cancel the order as it has already been shipped.',
+                                    style: GoogleFonts.outfit(fontSize: 13, color: _subtext, height: 1.4),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(dCtx),
+                                      child: Text('OK', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: _goldDark)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              return;
+                            }
                             Navigator.pop(ctx);
                             _showCancelOrderDialog(order);
                           },
@@ -4049,7 +3750,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         onPressed: () {
                           Navigator.push(
-                            context,
+                            ctx,
                             MaterialPageRoute(builder: (_) => OrderTrackingScreen(order: order)),
                           );
                         },
@@ -4072,9 +3773,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
-                      Navigator.pop(ctx);
                       Navigator.push(
-                        context,
+                        ctx,
                         MaterialPageRoute(builder: (_) => CustomerSupportScreen(order: order)),
                       );
                     },
@@ -4098,6 +3798,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 }
 
   void _showCancelOrderDialog(OrderModel order) {
+    if (!order.canCancel) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Color(0xFFEF4444), size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Cancellation Not Possible',
+                style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark),
+              ),
+            ],
+          ),
+          content: Text(
+            'No option to cancel the order as it has already been shipped.',
+            style: GoogleFonts.outfit(fontSize: 13, color: _subtext, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('OK', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: _goldDark)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     String selectedReason = 'Changed my mind / Placed by mistake';
     final customReasonController = TextEditingController();
 
@@ -4317,6 +4047,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     setState(() {
                                       order.status = 'Cancelled';
                                       order.cancelReason = finalReason;
+                                      _currentTabIndex = 1;
                                       _selectedOrderStatusFilter = 'Cancelled';
                                     });
                                     _refreshOrders();
@@ -4510,15 +4241,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withAlpha(20),
+                                      color: order.status.toLowerCase().contains('cancel')
+                                          ? const Color(0xFFEF4444).withAlpha(20)
+                                          : const Color(0xFF10B981).withAlpha(20),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
+                                      border: Border.all(
+                                        color: order.status.toLowerCase().contains('cancel')
+                                            ? const Color(0xFFEF4444).withAlpha(80)
+                                            : const Color(0xFF10B981).withAlpha(80),
+                                      ),
                                     ),
-                                    child: Text('PAID', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: const Color(0xFF10B981), letterSpacing: 1)),
+                                    child: Text(
+                                      order.status.toLowerCase().contains('cancel')
+                                          ? 'CANCELLED'
+                                          : (order.isPaid ? 'PAID' : 'CONFIRMED'),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: order.status.toLowerCase().contains('cancel')
+                                            ? const Color(0xFFEF4444)
+                                            : const Color(0xFF10B981),
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
                               const Divider(height: 24),
+                              if (order.status.toLowerCase().contains('cancel')) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEF4444).withAlpha(20),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFEF4444).withAlpha(80)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'ORDER CANCELLED — INVOICE VOIDED',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: const Color(0xFFEF4444),
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
 
                               // Customer & Order Info
                               Row(
@@ -4625,8 +4403,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('GRAND TOTAL (INCL. GST)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark)),
-                                        Text('₹${totalAmt.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: _goldDark)),
+                                        Text(order.status.toLowerCase().contains('cancel') ? 'STATUS (REFUNDED)' : 'GRAND TOTAL (INCL. GST)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: order.status.toLowerCase().contains('cancel') ? const Color(0xFFEF4444) : _textDark)),
+                                        Text(order.status.toLowerCase().contains('cancel') ? 'CANCELLED' : '₹${totalAmt.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: order.status.toLowerCase().contains('cancel') ? 13 : 15, fontWeight: FontWeight.w900, color: order.status.toLowerCase().contains('cancel') ? const Color(0xFFEF4444) : _goldDark)),
                                       ],
                                     ),
                                   ],
@@ -5043,15 +4821,15 @@ class _PromoBannerCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 240,
+        height: 420,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _gold.withAlpha(120), width: 1.2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _gold.withAlpha(140), width: 1.5),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(40),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
           ],
         ),

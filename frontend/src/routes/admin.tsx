@@ -202,6 +202,7 @@ export function Admin() {
 
   // Track known order IDs so polling can detect brand-new orders and fire toast/notification
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const knownCancelledOrderIdsRef = useRef<Set<string>>(new Set());
   const isFirstFetchRef = useRef(true);
 
 
@@ -362,12 +363,45 @@ export function Admin() {
 
     const handleWsMessage = (e: any) => {
       const payload = e?.detail;
-      if (payload && payload.type === "ORDER_CREATED") {
+      if (!payload) return;
+      if (payload.type === "ORDER_CREATED") {
         if (payload.data) {
           handleNewOrderNotif({ detail: payload.data });
         }
+      } else if (payload.type === "ORDER_CANCELLED") {
+        const data = payload.data;
+        const rawId = data?.orderId || data?.id || data?._id || "ORDER";
+        const cleanCode = String(rawId).replace(/^#+/, "").trim();
+        const shortCode = cleanCode.slice(-8).toUpperCase();
+        const customerName = data?.customerName || data?.userName || data?.userEmail || "Customer";
+        const reason = data?.cancelReason ? ` - Reason: ${data.cancelReason}` : "";
+        playNotifChime();
+        toast.error(`Order was cancelled #${shortCode}`, {
+          description: `Order #${shortCode} was cancelled by ${customerName}${reason}`,
+          duration: 8000,
+        });
+        triggerWebTestPushNotification(
+          `Order was cancelled #${shortCode}`,
+          `Order #${shortCode} was cancelled by ${customerName}${reason}`
+        );
+        fetchOrders();
+      } else if (payload.type === "SUPPORT_MESSAGE" || payload.type === "SUPPORT_TICKET_CREATED") {
+        const data = payload.data;
+        const sender = data?.userName || data?.customerName || data?.userEmail || "Customer";
+        const msgText = data?.text || data?.message || data?.query || "New customer support query";
+        playNotifChime();
+        toast.info(`💬 Customer Support Message: ${sender}`, {
+          description: `${msgText}`,
+          duration: 8000,
+        });
+        triggerWebTestPushNotification(
+          `💬 Customer Support Message: ${sender}`,
+          `${msgText}`
+        );
       }
     };
+
+    requestWebNotificationPermission().catch(() => {});
 
     window.addEventListener("vexa_orders_updated", handleOrdersUpdatedEvent);
     window.addEventListener("vexa_ws_message", handleWsMessage);
@@ -1247,6 +1281,48 @@ export function Admin() {
             );
             playNotifChime();
           }
+
+          // Check if order was cancelled by customer
+          const isCancelled = String(ord.status || "").toLowerCase().includes("cancel");
+          const wasCancelledKnown =
+            (mongoId && knownCancelledOrderIdsRef.current.has(mongoId)) ||
+            (customId && knownCancelledOrderIdsRef.current.has(customId)) ||
+            knownCancelledOrderIdsRef.current.has(cleanCode);
+
+          if (isCancelled && !wasCancelledKnown) {
+            if (mongoId) knownCancelledOrderIdsRef.current.add(mongoId);
+            if (customId) knownCancelledOrderIdsRef.current.add(customId);
+            knownCancelledOrderIdsRef.current.add(cleanCode);
+
+            const notifCancelId = `notif-cancel-${cleanCode}`;
+            const customerName = ord.userName || ord.userEmail || "Customer";
+            const reason = ord.cancelReason ? ` - Reason: ${ord.cancelReason}` : "";
+
+            setNotifications((prev) => {
+              if (prev.some((n) => n.id === notifCancelId)) return prev;
+              const cancelNotif: NotificationItem = {
+                id: notifCancelId,
+                title: `Order was cancelled #${shortCode}`,
+                message: `Order #${shortCode} was cancelled by ${customerName}${reason}`,
+                time: "Just now",
+                timestamp: Date.now(),
+                read: false,
+                type: "order",
+                targetTab: "orders",
+              };
+              return [cancelNotif, ...prev];
+            });
+
+            toast.error(`Order was cancelled #${shortCode}`, {
+              description: `${customerName} cancelled order #${shortCode}${reason}`,
+              duration: 7000,
+            });
+            triggerWebTestPushNotification(
+              `Order was cancelled #${shortCode}`,
+              `${customerName} cancelled order #${shortCode}${reason}`
+            );
+            playNotifChime();
+          }
         });
       } else {
         // First fetch: just populate known IDs silently, don't notify
@@ -1258,6 +1334,12 @@ export function Admin() {
           if (customId) knownOrderIdsRef.current.add(customId);
           const cleanCode = (customId || mongoId).replace(/^#+/, "").trim();
           if (cleanCode) knownOrderIdsRef.current.add(cleanCode);
+
+          if (String(ord.status || "").toLowerCase().includes("cancel")) {
+            if (mongoId) knownCancelledOrderIdsRef.current.add(mongoId);
+            if (customId) knownCancelledOrderIdsRef.current.add(customId);
+            if (cleanCode) knownCancelledOrderIdsRef.current.add(cleanCode);
+          }
         });
       }
       // ─────────────────────────────────────────────────────────────────────────
@@ -1294,8 +1376,78 @@ export function Admin() {
     const handleOrdersUpdated = () => { fetchOrders(); };
     const handleWsMsg = (e: any) => {
       const t = e?.detail?.type;
+      const data = e?.detail?.data;
       if (t === "ORDER_CREATED" || t === "ORDERS_UPDATED" || t === "ORDER_STATUS_UPDATED") {
         fetchOrders();
+      }
+
+      if (t === "ORDER_CANCELLED") {
+        fetchOrders();
+        const rawId = data?.orderId || data?.id || data?._id || "ORDER";
+        const cleanCode = String(rawId).replace(/^#+/, "").trim();
+        const shortCode = cleanCode.slice(-8).toUpperCase();
+        const customerName = data?.customerName || data?.userName || data?.userEmail || "Customer";
+        const reason = data?.cancelReason ? ` - Reason: ${data.cancelReason}` : "";
+        const notifId = `notif-cancel-${cleanCode}-${Date.now()}`;
+
+        if (cleanCode) knownCancelledOrderIdsRef.current.add(cleanCode);
+
+        toast.error(`Order was cancelled #${shortCode}`, {
+          description: `Order #${shortCode} was cancelled by ${customerName}${reason}`,
+          duration: 7000,
+        });
+        triggerWebTestPushNotification(
+          `Order was cancelled #${shortCode}`,
+          `Order #${shortCode} was cancelled by ${customerName}${reason}`
+        );
+        playNotifChime();
+
+        setNotifications((prev) => {
+          if (prev.some((n) => n.id === notifId)) return prev;
+          const newNotif: NotificationItem = {
+            id: notifId,
+            title: `Order was cancelled #${shortCode}`,
+            message: `Order #${shortCode} was cancelled by ${customerName}${reason}`,
+            time: "Just now",
+            timestamp: Date.now(),
+            read: false,
+            type: "order",
+            targetTab: "orders",
+          };
+          return [newNotif, ...prev];
+        });
+      }
+
+      if (t === "SUPPORT_MESSAGE" || t === "SUPPORT_TICKET_CREATED") {
+        const sender = data?.userName || data?.customerName || data?.userEmail || "Customer";
+        const msgText = data?.text || data?.message || data?.query || "New customer support query";
+        const category = data?.category ? ` [${data.category}]` : "";
+        const orderRef = data?.orderId ? ` (Ref: #${String(data.orderId).replace(/^#+/, "").slice(-8).toUpperCase()})` : "";
+        const notifId = `notif-support-${Date.now()}`;
+
+        toast.info(`💬 Customer Support Message${category}`, {
+          description: `${sender}: "${msgText.slice(0, 90)}${msgText.length > 90 ? "..." : ""}"${orderRef}`,
+          duration: 7000,
+        });
+        triggerWebTestPushNotification(
+          `💬 Customer Support Message: ${sender}`,
+          `${msgText}${orderRef}`
+        );
+        playNotifChime();
+
+        setNotifications((prev) => [
+          {
+            id: notifId,
+            title: `💬 Support: ${sender}${category}`,
+            message: `"${msgText}"${orderRef}`,
+            time: "Just now",
+            timestamp: Date.now(),
+            read: false,
+            type: "system",
+            targetTab: "orders",
+          },
+          ...prev,
+        ]);
       }
     };
 

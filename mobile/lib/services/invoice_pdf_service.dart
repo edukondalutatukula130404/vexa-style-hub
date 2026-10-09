@@ -60,10 +60,18 @@ class InvoicePdfService {
     streamContent.writeln('(${_pdfEscape("DATE: ${order.formattedDate}")}) Tj');
 
     // Right Column
+    final isCancelled = order.status.toLowerCase().contains('cancel');
+    final pdfStatus = isCancelled ? 'CANCELLED (VOID)' : (order.isPaid ? 'PAID' : 'CONFIRMED');
     streamContent.writeln('1 0 0 1 320 725 Tm');
     streamContent.writeln('(${_pdfEscape("PAYMENT: ${order.paymentMethod}")}) Tj');
     streamContent.writeln('1 0 0 1 320 707 Tm');
-    streamContent.writeln('(${_pdfEscape("STATUS: ${order.isPaid ? 'PAID' : 'CONFIRMED'}")}) Tj');
+    if (isCancelled) {
+      streamContent.writeln('0.93 0.27 0.27 rg');
+    }
+    streamContent.writeln('(${_pdfEscape("STATUS: $pdfStatus")}) Tj');
+    if (isCancelled) {
+      streamContent.writeln('0.05 0.14 0.25 rg');
+    }
     streamContent.writeln('1 0 0 1 320 689 Tm');
     streamContent.writeln('(${_pdfEscape("CURRENCY: INR (Rs.)")}) Tj');
     streamContent.writeln('ET');
@@ -192,16 +200,22 @@ class InvoicePdfService {
 
     // Total Amount Highlight Box
     y -= 30;
-    streamContent.writeln('0.77 0.62 0.35 rg'); // Gold fill #C5A059
+    if (isCancelled) {
+      streamContent.writeln('0.93 0.27 0.27 rg'); // Red fill #EF4444
+    } else {
+      streamContent.writeln('0.77 0.62 0.35 rg'); // Gold fill #C5A059
+    }
     streamContent.writeln('290 $y 275 28 re f');
 
     streamContent.writeln('BT');
     streamContent.writeln('/F1 11 Tf');
     streamContent.writeln('1 1 1 rg');
     streamContent.writeln('1 0 0 1 305 ${y + 9} Tm');
-    streamContent.writeln('(${_pdfEscape("TOTAL AMOUNT PAID:")}) Tj');
-    streamContent.writeln('1 0 0 1 475 ${y + 9} Tm');
-    streamContent.writeln('(${_pdfEscape("Rs. ${totalAmt.toStringAsFixed(0)}")}) Tj');
+    final totalLabel = isCancelled ? "ORDER STATUS:" : "TOTAL AMOUNT PAID:";
+    final totalVal = isCancelled ? "CANCELLED (REFUNDED)" : "Rs. ${totalAmt.toStringAsFixed(0)}";
+    streamContent.writeln('(${_pdfEscape(totalLabel)}) Tj');
+    streamContent.writeln('1 0 0 1 ${isCancelled ? 415 : 475} ${y + 9} Tm');
+    streamContent.writeln('(${_pdfEscape(totalVal)}) Tj');
     streamContent.writeln('ET');
 
     // 8. Footer Box

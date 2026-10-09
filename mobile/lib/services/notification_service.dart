@@ -39,14 +39,15 @@ class NotificationService {
   /// Central notification list accessible across the app
   static final List<Map<String, dynamic>> notifications = [
     {
-      'id': '1',
-      'title': 'Limited Edition Drop Live! 🚀',
-      'body': 'Urban Silhouette 240 GSM Collection is now live. Claim yours before stocks run out.',
-      'time': '10m ago',
+      'id': 'vx-notif-1806',
+      'title': 'Order Out for Delivery 🚚',
+      'body': 'Your order #VX-1806 is out for delivery. Courier reaching today by 6:00 PM.',
+      'time': 'Just now',
       'isRead': false,
-      'icon': Icons.bolt_rounded,
+      'icon': Icons.local_shipping_outlined,
       'color': const Color(0xFFB8860B),
-      'type': 'GENERAL',
+      'type': 'order_status_update',
+      'data': {'orderId': '#VX-1806', 'status': 'Out for Delivery'},
     },
     {
       'id': '2',
@@ -60,6 +61,17 @@ class NotificationService {
       'data': {'orderId': '#VX-8834'},
     },
     {
+      'id': '1',
+      'title': 'Limited Edition Drop Live! 🚀',
+      'body': 'Urban Silhouette 240 GSM Collection is now live. Claim yours before stocks run out.',
+      'time': '3h ago',
+      'isRead': false,
+      'icon': Icons.bolt_rounded,
+      'color': const Color(0xFFB8860B),
+      'type': 'GENERAL',
+      'data': {'orderId': '#VX-1806'},
+    },
+    {
       'id': '3',
       'title': 'VIP Loyalty Access Unlocked 👑',
       'body': 'You earned 150 VEXA Points! Enjoy early preview for next week\'s dropped styles.',
@@ -68,6 +80,7 @@ class NotificationService {
       'icon': Icons.workspace_premium_outlined,
       'color': const Color(0xFFD97706),
       'type': 'GENERAL',
+      'data': {'orderId': '#VX-1806'},
     },
   ];
 
@@ -337,6 +350,27 @@ class NotificationService {
     }
   }
 
+  /// Check if an order placement/confirmation notification already exists for this order
+  static bool hasOrderConfirmationNotification(String orderId) {
+    final cleanId = orderId.replaceAll('#', '').toLowerCase().trim();
+    if (cleanId.isEmpty) return false;
+    return notifications.any((n) {
+      final nData = n['data'];
+      final rawNotifOrderId = (nData is Map ? (nData['orderId'] ?? nData['id'] ?? nData['_id']) : null)?.toString();
+      final cleanNotifId = rawNotifOrderId?.replaceAll('#', '').toLowerCase().trim();
+      if (cleanNotifId != null && cleanNotifId.isNotEmpty && cleanNotifId == cleanId) {
+        return true;
+      }
+      final nTitle = (n['title'] ?? '').toString().toLowerCase();
+      final nBody = (n['body'] ?? '').toString().toLowerCase();
+      if ((nTitle.contains('order confirmed') || nTitle.contains('order placed')) &&
+          nBody.contains(cleanId)) {
+        return true;
+      }
+      return false;
+    });
+  }
+
   /// Add a new notification to the app and trigger UI update + optional in-app banner
   static void addNotification({
     required String title,
@@ -347,11 +381,39 @@ class NotificationService {
     Map<String, dynamic>? data,
     BuildContext? context,
   }) {
-    // Avoid duplicate notifications with the exact same title & body created recently
-    final existingIndex = notifications.indexWhere(
-      (n) => n['title'] == title && n['body'] == body,
-    );
-    if (existingIndex != -1 && existingIndex < 2) {
+    // Avoid duplicate notifications
+    final String? rawOrderId = (data?['orderId'] ?? data?['id'] ?? data?['_id'])?.toString();
+    final cleanOrderId = rawOrderId?.replaceAll('#', '').toLowerCase().trim();
+
+    // 1. If this is an order confirmation/placed notification and one already exists for this orderId, suppress it
+    final isOrderPlacement = type == 'ORDER_PLACED' ||
+        title.toLowerCase().contains('order confirmed') ||
+        title.toLowerCase().contains('order placed');
+
+    if (isOrderPlacement && cleanOrderId != null && cleanOrderId.isNotEmpty) {
+      if (hasOrderConfirmationNotification(cleanOrderId)) {
+        debugPrint('🚫 [NotificationService] Suppressing duplicate order notification for $cleanOrderId');
+        return;
+      }
+    }
+
+    // 2. Avoid duplicate notifications with identical title and body, or identical title & orderId
+    final isDuplicate = notifications.take(5).any((n) {
+      if (n['title'] == title && n['body'] == body) return true;
+      if (cleanOrderId != null && cleanOrderId.isNotEmpty && n['title'] == title) {
+        final existingData = n['data'];
+        final existingId = (existingData is Map ? (existingData['orderId'] ?? existingData['id'] ?? existingData['_id']) : null)
+            ?.toString()
+            .replaceAll('#', '')
+            .toLowerCase()
+            .trim();
+        if (existingId == cleanOrderId) return true;
+      }
+      return false;
+    });
+
+    if (isDuplicate) {
+      debugPrint('🚫 [NotificationService] Suppressing duplicate notification: $title');
       return;
     }
 
@@ -372,10 +434,18 @@ class NotificationService {
 
     // Trigger system notification banner
     try {
+      String? payloadOrderId = data?['orderId']?.toString() ?? data?['id']?.toString();
+      if (payloadOrderId == null || payloadOrderId.isEmpty) {
+        final match = RegExp(r'#?VX-([A-Za-z0-9-]+)', caseSensitive: false).firstMatch('$title $body');
+        if (match != null) {
+          payloadOrderId = match.group(0);
+        }
+      }
       localNotifications.show(
         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
         title: title,
         body: body,
+        payload: payloadOrderId ?? 'OPEN_NOTIFICATIONS',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
             'high_importance_channel',
@@ -395,7 +465,14 @@ class NotificationService {
     }
 
     if (context != null && context.mounted) {
-      showInAppBanner(context, title: title, body: body, icon: icon, color: color);
+      String? payloadOrderId = data?['orderId']?.toString() ?? data?['id']?.toString();
+      if (payloadOrderId == null || payloadOrderId.isEmpty) {
+        final match = RegExp(r'#?VX-([A-Za-z0-9-]+)', caseSensitive: false).firstMatch('$title $body');
+        if (match != null) {
+          payloadOrderId = match.group(0);
+        }
+      }
+      showInAppBanner(context, title: title, body: body, icon: icon, color: color, orderId: payloadOrderId);
     }
   }
 
@@ -449,6 +526,7 @@ class NotificationService {
     required String body,
     IconData icon = Icons.notifications_active_rounded,
     Color color = const Color(0xFFB8860B),
+    String? orderId,
   }) {
     final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
     if (scaffoldMessenger == null) return;
@@ -462,46 +540,52 @@ class NotificationService {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: const Color(0xFF0F172A),
         duration: const Duration(seconds: 4),
-        content: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withAlpha(40),
-                shape: BoxShape.circle,
-                border: Border.all(color: color.withAlpha(100)),
+        content: InkWell(
+          onTap: () {
+            scaffoldMessenger.hideCurrentSnackBar();
+            onNotificationTap.add(orderId ?? 'OPEN_NOTIFICATIONS');
+          },
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withAlpha(40),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color.withAlpha(100)),
+                ),
+                child: Icon(icon, color: color, size: 22),
               ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.outfit(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    body,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(
-                      fontSize: 11.5,
-                      color: const Color(0xFFCBD5E1),
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        color: const Color(0xFFCBD5E1),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

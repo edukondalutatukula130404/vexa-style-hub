@@ -63,7 +63,8 @@ class VexaSocketClient {
             type === "ORDER_CREATED" ||
             type === "ORDER_STATUS_UPDATED" ||
             type === "ORDER_DELETED" ||
-            type === "ORDERS_UPDATED"
+            type === "ORDERS_UPDATED" ||
+            type === "ORDER_CANCELLED"
           ) {
             window.dispatchEvent(new CustomEvent("vexa_orders_updated", { detail: data }));
           }

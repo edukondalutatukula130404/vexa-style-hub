@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import 'auth_service.dart';
@@ -144,6 +145,25 @@ class OrderModel {
     return false;
   }
 
+  bool get isShippedOrBeyond {
+    final s = status.toLowerCase().trim();
+    return s == 'shipped' ||
+        s.contains('ship') ||
+        s == 'out for delivery' ||
+        s.contains('out for delivery') ||
+        s.contains('courier') ||
+        s == 'delivered' ||
+        s.contains('deliver') ||
+        s.contains('transit');
+  }
+
+  bool get canCancel {
+    final s = status.toLowerCase().trim();
+    if (s == 'cancelled' || s.contains('cancel')) return false;
+    if (isShippedOrBeyond) return false;
+    return true;
+  }
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     List<OrderItem> itemsList = [];
     if (json['items'] is List) {
@@ -279,6 +299,27 @@ class OrderService {
   }
 
   static final List<OrderModel> _inMemoryOrders = [
+    OrderModel(
+      id: '#VX-1806',
+      customerName: 'Tatukulaedukondalu',
+      shippingAddress: '123 Luxury Avenue, Fashion District, Pincode: 400001',
+      phone: '+91 98765 43210',
+      paymentMethod: 'Razorpay NetBanking (Punjab National Bank)',
+      totalAmount: 1899.0,
+      status: 'Out for Delivery',
+      createdAt: DateTime(2026, 10, 7, 6, 33),
+      items: [
+        OrderItem(
+          itemId: 'vx-08',
+          name: 'Emerald Acid Wash Boxy Tee',
+          price: 1899.0,
+          quantity: 1,
+          color: 'Emerald Green',
+          size: 'M',
+          image: 'assets/images/tee-emerald.png',
+        ),
+      ],
+    ),
     OrderModel(
       id: '#VX-9420',
       customerName: 'Aarav Sharma',
@@ -577,7 +618,6 @@ class OrderService {
     // Broadcast over WebSocket directly for instant realtime Admin Dashboard update
     try {
       VexaWebSocketService().send('ORDER_CREATED', orderPayload);
-      VexaWebSocketService().send('ORDERS_UPDATED', orderPayload);
     } catch (e) {
       debugPrint('WebSocket direct send notice: $e');
     }
@@ -608,6 +648,53 @@ class OrderService {
     OrderModel? targetOrder,
   }) async {
     final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+
+    // Find the target order if available
+    OrderModel? matchedOrder = targetOrder;
+    if (matchedOrder == null) {
+      for (var o in _inMemoryOrders) {
+        final cleanOrd = o.id.replaceAll('#', '').toLowerCase().trim();
+        if (o.id == orderId || cleanOrd == cleanTarget) {
+          matchedOrder = o;
+          break;
+        }
+      }
+    }
+
+    // Do NOT permit cancellation if order is already shipped
+    if (matchedOrder != null && !matchedOrder.canCancel) {
+      debugPrint('🚫 [OrderService] Cancellation rejected: Order ${matchedOrder.id} is already shipped (${matchedOrder.status}).');
+      if (context != null && context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Color(0xFFEF4444), size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Cancellation Not Possible',
+                  style: GoogleFonts.cinzel(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Text(
+              'No option to cancel the order as it has already been shipped.',
+              style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF64748B), height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('OK', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFFB8860B))),
+              ),
+            ],
+          ),
+        );
+      }
+      return false;
+    }
+
     _cancelledOrderReasons[cleanTarget] = reason;
     _cancelledOrderReasons[orderId] = reason;
 
@@ -674,10 +761,18 @@ class OrderService {
 
     notifyOrdersChanged();
 
+    final cleanId = orderId.replaceAll('#', '').trim();
+    final customerName = (targetOrder != null && targetOrder.customerName.isNotEmpty)
+        ? targetOrder.customerName
+        : 'Customer';
+
     final cancelPayload = {
       '_id': orderId,
       'id': orderId,
+      'orderId': orderId,
+      'cleanId': cleanId,
       'status': 'Cancelled',
+      'customerName': customerName,
       'cancelReason': reason,
       'refundAmount': refundAmount,
     };
@@ -687,12 +782,36 @@ class OrderService {
     VexaWebSocketService().send('ORDERS_UPDATED', cancelPayload);
 
     try {
-      await http.put(
-        Uri.parse('${ApiConfig.baseUrl}/orders/$orderId/status'),
+      final res = await http.put(
+        Uri.parse('${ApiConfig.baseUrl}/orders/$cleanId/status'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'status': 'Cancelled', 'cancelReason': reason, 'refundAmount': refundAmount}),
-      ).timeout(const Duration(seconds: 3));
-    } catch (_) {}
+        body: jsonEncode({
+          'orderId': orderId,
+          'id': cleanId,
+          'status': 'Cancelled',
+          'cancelReason': reason,
+          'customerName': customerName,
+          'refundAmount': refundAmount,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        await http.put(
+          Uri.parse('${ApiConfig.baseUrl}/orders/status'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'orderId': orderId,
+            'id': cleanId,
+            'status': 'Cancelled',
+            'cancelReason': reason,
+            'customerName': customerName,
+            'refundAmount': refundAmount,
+          }),
+        ).timeout(const Duration(seconds: 4));
+      }
+    } catch (e) {
+      debugPrint('Order status sync warning: $e');
+    }
 
     return true;
   }

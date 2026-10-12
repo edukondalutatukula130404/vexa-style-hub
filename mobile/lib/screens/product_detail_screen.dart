@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/item_model.dart';
+import '../services/address_service.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/order_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/vexa_feedback_snackbar.dart';
 import 'cart_screen.dart';
+import 'home_screen.dart';
 import 'login_screen.dart';
+import 'select_address_screen.dart';
 
 class _ReviewItem {
   final String id;
@@ -39,6 +42,7 @@ class _ColorVariant {
 
 class ProductDetailScreen extends StatefulWidget {
   final ItemModel item;
+  final List<CartItemData>? cartItems;
   final Function(ItemModel item, String selectedColor, String selectedSize, int quantity)? onAddToCart;
   final Function(ItemModel item, String selectedColor, String selectedSize, int quantity)? onBuyNow;
   final VoidCallback? onOpenCart;
@@ -49,6 +53,7 @@ class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
     super.key,
     required this.item,
+    this.cartItems,
     this.onAddToCart,
     this.onBuyNow,
     this.onOpenCart,
@@ -69,6 +74,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isFavorite = false;
   int _filterStar = 0; // 0 = All
   bool _showAllReviews = false;
+  int _cartCount = 0;
+  bool _hasAddedToCart = false;
+  AddressModel? _deliveryAddress;
 
   late PageController _pageController;
   late TransformationController _transformationController;
@@ -87,6 +95,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     _pageController = PageController();
     _transformationController = TransformationController();
+    _loadDeliveryAddress();
+    _cartCount = widget.cartItems?.fold<int>(0, (sum, i) => sum + i.quantity) ?? 0;
+    _hasAddedToCart = _cartCount > 0;
     _selectedColor = widget.item.color.isNotEmpty
         ? widget.item.color
         : (widget.item.colors.isNotEmpty ? widget.item.colors.first : 'Emerald Green');
@@ -142,6 +153,278 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _transformationController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _openCart() {
+    if (widget.onOpenCart != null) {
+      widget.onOpenCart!();
+    } else {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => CartScreen(
+            cartItems: widget.cartItems ?? [],
+            onCartUpdated: () {
+              if (mounted) {
+                setState(() {
+                  _cartCount = widget.cartItems?.fold<int>(0, (sum, i) => sum + i.quantity) ?? _cartCount;
+                });
+              }
+            },
+            onNavigateToProducts: () => Navigator.pop(context),
+            onNavigateToOrders: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const HomeScreen(initialTabIndex: 1)),
+                (route) => false,
+              );
+              OrderService.notifyOrdersChanged();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildFloatingCartButton() {
+    return FloatingActionButton(
+      heroTag: 'floating_cart_product_detail',
+      backgroundColor: const Color(0xFFF2D370), // VEXA signature gold
+      elevation: 8,
+      shape: const CircleBorder(
+        side: BorderSide(color: Colors.white, width: 2),
+      ),
+      onPressed: _openCart,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(
+            Icons.shopping_bag_outlined,
+            color: Color(0xFF0F172A),
+            size: 24,
+          ),
+          if (_cartCount > 0)
+            Positioned(
+              top: -6,
+              right: -8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0C2340),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                child: Center(
+                  child: Text(
+                    '$_cartCount',
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _loadDeliveryAddress() async {
+    try {
+      final addr = await AddressService.getDefaultAddress();
+      if (mounted) {
+        setState(() {
+          _deliveryAddress = addr;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading default address: $e');
+    }
+  }
+
+  int get _deliveryDaysForAddress {
+    if (_deliveryAddress == null) return 3;
+    final city = _deliveryAddress!.city.toLowerCase().trim();
+    final state = _deliveryAddress!.state.toLowerCase().trim();
+    final street = _deliveryAddress!.street.toLowerCase().trim();
+    final pin = _deliveryAddress!.pincode.trim();
+
+    // Local Hyderabad / Gachibowli / HITEC City / Jubilee Hills (Fastest: 2 days)
+    if (city.contains('hyderabad') ||
+        city.contains('secunderabad') ||
+        street.contains('gachibowli') ||
+        street.contains('hitec') ||
+        street.contains('jubilee hills') ||
+        street.contains('pg for mens') ||
+        pin.startsWith('500') ||
+        pin.startsWith('501')) {
+      return 2;
+    }
+    // Rest of Telangana & Andhra Pradesh (3 days)
+    if (state.contains('telangana') ||
+        state.contains('andhra') ||
+        pin.startsWith('50') ||
+        pin.startsWith('51') ||
+        pin.startsWith('52') ||
+        pin.startsWith('53')) {
+      return 3;
+    }
+    // Major South & West Metros (Bengaluru, Chennai, Mumbai, Pune: 3 days)
+    if (city.contains('bangalore') ||
+        city.contains('bengaluru') ||
+        city.contains('chennai') ||
+        city.contains('mumbai') ||
+        city.contains('pune') ||
+        pin.startsWith('560') ||
+        pin.startsWith('600') ||
+        pin.startsWith('400')) {
+      return 3;
+    }
+    // North & East Metros (Delhi, Kolkata, Gurgaon, Noida, Ahmedabad: 4 days)
+    if (city.contains('delhi') ||
+        city.contains('noida') ||
+        city.contains('gurgaon') ||
+        city.contains('kolkata') ||
+        city.contains('ahmedabad') ||
+        pin.startsWith('110') ||
+        pin.startsWith('700')) {
+      return 4;
+    }
+    // Rest of India
+    if (pin.isNotEmpty) {
+      final codeNum = int.tryParse(pin.substring(0, pin.length > 2 ? 2 : pin.length)) ?? 50;
+      return 4 + (codeNum % 3);
+    }
+    return 4;
+  }
+
+  String get _estimatedDeliveryText {
+    final now = DateTime.now();
+    final days = _deliveryDaysForAddress;
+    final deliveryDate = now.add(Duration(days: days));
+    final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final dayName = weekdays[deliveryDate.weekday - 1];
+    final monthName = months[deliveryDate.month - 1];
+    return '$dayName, ${deliveryDate.day} $monthName';
+  }
+
+  Widget _buildDeliveryDetailsSection(BuildContext context) {
+    final addressDisplay = _deliveryAddress?.fullAddressText ??
+        'Sri Sai balaji pg for mens, keshava nagar, Gachibowli, 500032';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Delivery details',
+          style: GoogleFonts.outfit(
+            fontSize: 16.5,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 1. Delivery Address Card (Soft blue tint with location icon & chevron)
+        GestureDetector(
+          onTap: () => _openAddressSelectorScreen(context),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDBEAFE), width: 1),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 20, color: Color(0xFF334155)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    addressDisplay,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF64748B)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 2. Estimated Delivery Date Card (Soft light grey with truck icon, dynamically updated by address)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.local_shipping_outlined, size: 20, color: Color(0xFF334155)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.outfit(fontSize: 13.5, color: const Color(0xFF1E293B)),
+                    children: [
+                      const TextSpan(text: 'Delivery by '),
+                      TextSpan(
+                        text: _estimatedDeliveryText,
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_deliveryDaysForAddress <= 2)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'FASTEST',
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF15803D),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openAddressSelectorScreen(BuildContext context) async {
+    final selected = await Navigator.push<AddressModel>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SelectAddressScreen(
+          initialAddressId: _deliveryAddress?.id,
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _deliveryAddress = selected;
+      });
+    }
   }
 
   void _handleDoubleTap() {
@@ -751,9 +1034,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: Column(
+      body: Stack(
         children: [
-          // Main Scrollable Content
+          Column(
+            children: [
+              // Main Scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 controller: _scrollController,
@@ -1421,6 +1706,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           const SizedBox(height: 24),
 
+                          // Delivery Details Section
+                          _buildDeliveryDetailsSection(context),
+                          const SizedBox(height: 24),
+
                           // Description Section
                           Text(
                             'Description:',
@@ -1489,6 +1778,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                         MaterialPageRoute(
                                           builder: (_) => ProductDetailScreen(
                                             item: simItem,
+                                            cartItems: widget.cartItems,
                                             onAddToCart: widget.onAddToCart,
                                             onBuyNow: widget.onBuyNow,
                                             onOpenCart: widget.onOpenCart,
@@ -2084,21 +2374,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 if (widget.onAddToCart != null) {
                                   widget.onAddToCart!(sizedItem, _selectedColor, _selectedSize, _quantity);
                                 }
-                                VexaFeedback.showAddToCartSuccess(
-                                  context,
-                                  productName: widget.item.name,
-                                  onViewCart: () {
-                                    if (widget.onOpenCart != null) {
-                                      widget.onOpenCart!();
-                                    } else {
-                                      Navigator.of(context, rootNavigator: true).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => const CartScreen(cartItems: []),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                );
+                                setState(() {
+                                  _hasAddedToCart = true;
+                                  _cartCount += _quantity;
+                                });
                               },
                               child: Text(
                                 'Add to cart',
@@ -2181,6 +2460,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ],
       ),
-    );
+      // Cart Floating Button (pops up cleanly above the sticky bottom bar on the right)
+      Positioned(
+        right: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 80,
+        child: AnimatedScale(
+          scale: (_hasAddedToCart || _cartCount > 0) ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutBack,
+          child: AnimatedOpacity(
+            opacity: (_hasAddedToCart || _cartCount > 0) ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 200),
+            child: IgnorePointer(
+              ignoring: !(_hasAddedToCart || _cartCount > 0),
+              child: _buildFloatingCartButton(),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+);
   }
 }

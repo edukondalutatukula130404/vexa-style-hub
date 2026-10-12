@@ -67,11 +67,32 @@ export const onForegroundMessage = async (callback: (payload: any) => void) => {
   }
 };
 
+const recentNotificationsMap = new Map<string, number>();
+
 export const triggerWebTestPushNotification = (
   title = "⚡ VEXA Push Notification",
-  body = "Push notifications are working perfectly on your web browser!"
+  body = "Push notifications are working perfectly on your web browser!",
+  customTag?: string
 ) => {
   if (typeof window === "undefined") return;
+
+  // Deduplicate: suppress identical/repeated native desktop notifications within 5 seconds
+  const normalizedTitle = title.trim().toLowerCase();
+  const normalizedBody = body.trim().toLowerCase();
+  const dedupKey = customTag ? customTag.toLowerCase() : `${normalizedTitle}_${normalizedBody.slice(0, 40)}`;
+  const now = Date.now();
+  const lastFired = recentNotificationsMap.get(dedupKey) || 0;
+
+  if (now - lastFired < 5000) {
+    return; // Suppress duplicate desktop popup
+  }
+  recentNotificationsMap.set(dedupKey, now);
+
+  if (recentNotificationsMap.size > 50) {
+    for (const [k, t] of recentNotificationsMap.entries()) {
+      if (now - t > 10000) recentNotificationsMap.delete(k);
+    }
+  }
 
   // Synthesize notification chime audio
   try {
@@ -94,12 +115,15 @@ export const triggerWebTestPushNotification = (
 
   if (!("Notification" in window)) return;
 
+  // Use stable tag so the browser updates existing notification instead of stacking duplicate windows
+  const stableTag = customTag || `vexa-${normalizedTitle.replace(/[^a-z0-9]/g, "-").slice(0, 24)}`;
+
   const notifOptions: NotificationOptions = {
     body,
     icon: "/vexa_logo.png",
     badge: "/vexa_logo.png",
-    tag: `vexa-notif-${Date.now()}`,
-    requireInteraction: true,
+    tag: stableTag,
+    requireInteraction: false,
     silent: false,
   };
 

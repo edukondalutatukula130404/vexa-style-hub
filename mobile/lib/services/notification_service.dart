@@ -36,53 +36,8 @@ class NotificationService {
   /// FCM Token store
   static String? fcmToken;
 
-  /// Central notification list accessible across the app
-  static final List<Map<String, dynamic>> notifications = [
-    {
-      'id': 'vx-notif-1806',
-      'title': 'Order Out for Delivery 🚚',
-      'body': 'Your order #VX-1806 is out for delivery. Courier reaching today by 6:00 PM.',
-      'time': 'Just now',
-      'isRead': false,
-      'icon': Icons.local_shipping_outlined,
-      'color': const Color(0xFFB8860B),
-      'type': 'order_status_update',
-      'data': {'orderId': '#VX-1806', 'status': 'Out for Delivery'},
-    },
-    {
-      'id': '2',
-      'title': 'Order Dispatched 📦',
-      'body': 'Your order #VX-8834 is out for delivery. Track package in your profile.',
-      'time': '2h ago',
-      'isRead': false,
-      'icon': Icons.local_shipping_outlined,
-      'color': const Color(0xFF2563EB),
-      'type': 'order_status_update',
-      'data': {'orderId': '#VX-8834'},
-    },
-    {
-      'id': '1',
-      'title': 'Limited Edition Drop Live! 🚀',
-      'body': 'Urban Silhouette 240 GSM Collection is now live. Claim yours before stocks run out.',
-      'time': '3h ago',
-      'isRead': false,
-      'icon': Icons.bolt_rounded,
-      'color': const Color(0xFFB8860B),
-      'type': 'GENERAL',
-      'data': {'orderId': '#VX-1806'},
-    },
-    {
-      'id': '3',
-      'title': 'VIP Loyalty Access Unlocked 👑',
-      'body': 'You earned 150 VEXA Points! Enjoy early preview for next week\'s dropped styles.',
-      'time': '1d ago',
-      'isRead': false,
-      'icon': Icons.workspace_premium_outlined,
-      'color': const Color(0xFFD97706),
-      'type': 'GENERAL',
-      'data': {'orderId': '#VX-1806'},
-    },
-  ];
+  /// Central notification list accessible across the app (starts clean for logged in user)
+  static final List<Map<String, dynamic>> notifications = [];
 
   static int get unreadCount => notifications.where((n) => n['isRead'] == false).length;
 
@@ -175,6 +130,7 @@ class NotificationService {
   }
 
   static IconData _getIconForStatus(String status) {
+    if (status == 'Resolved' || status == 'support_reply') return Icons.support_agent_rounded;
     if (status == 'Shipped' || status == 'Out for Delivery') return Icons.local_shipping_rounded;
     if (status == 'Delivered') return Icons.check_circle_rounded;
     if (status == 'Cancelled') return Icons.cancel_rounded;
@@ -183,6 +139,7 @@ class NotificationService {
   }
 
   static Color _getColorForStatus(String status) {
+    if (status == 'Resolved' || status == 'support_reply') return const Color(0xFF10B981);
     if (status == 'Delivered') return const Color(0xFF10B981);
     if (status == 'Cancelled') return const Color(0xFFEF4444);
     if (status == 'Shipped' || status == 'Out for Delivery') return const Color(0xFF2563EB);
@@ -309,7 +266,13 @@ class NotificationService {
         final title = notification?.title ?? data['title'] ?? 'VEXA Order Update 📦';
         final body = notification?.body ?? data['body'] ?? data['message'] ?? '';
         final status = data['status']?.toString() ?? '';
-        final targetOrderId = data['orderId']?.toString() ?? data['id']?.toString();
+        String? targetOrderId = data['associatedOrderId']?.toString();
+        if (targetOrderId == null || targetOrderId.isEmpty || targetOrderId.toUpperCase().contains('SUP')) {
+          final rawId = data['orderId']?.toString() ?? data['id']?.toString();
+          if (rawId != null && !rawId.toUpperCase().contains('SUP') && rawId != 'SUPPORT') {
+            targetOrderId = rawId;
+          }
+        }
 
         addNotification(
           title: title,
@@ -320,7 +283,7 @@ class NotificationService {
           data: data,
         );
 
-        onNotificationTap.add(targetOrderId ?? 'OPEN_NOTIFICATIONS');
+        onNotificationTap.add(targetOrderId ?? 'OPEN_ORDER');
       });
 
       // Handle initial message from terminated state
@@ -332,7 +295,13 @@ class NotificationService {
         final title = notification?.title ?? data['title'] ?? 'VEXA Order Update 📦';
         final body = notification?.body ?? data['body'] ?? data['message'] ?? '';
         final status = data['status']?.toString() ?? '';
-        final targetOrderId = data['orderId']?.toString() ?? data['id']?.toString();
+        String? targetOrderId = data['associatedOrderId']?.toString();
+        if (targetOrderId == null || targetOrderId.isEmpty || targetOrderId.toUpperCase().contains('SUP')) {
+          final rawId = data['orderId']?.toString() ?? data['id']?.toString();
+          if (rawId != null && !rawId.toUpperCase().contains('SUP') && rawId != 'SUPPORT') {
+            targetOrderId = rawId;
+          }
+        }
 
         addNotification(
           title: title,
@@ -343,7 +312,7 @@ class NotificationService {
           data: data,
         );
 
-        onNotificationTap.add(targetOrderId ?? 'OPEN_NOTIFICATIONS');
+        onNotificationTap.add(targetOrderId ?? 'OPEN_ORDER');
       }
     } catch (e) {
       debugPrint('Firebase Messaging initialization error: $e');
@@ -432,20 +401,47 @@ class NotificationService {
     notifications.insert(0, newNotif);
     notifyListeners();
 
-    // Trigger system notification banner
-    try {
-      String? payloadOrderId = data?['orderId']?.toString() ?? data?['id']?.toString();
-      if (payloadOrderId == null || payloadOrderId.isEmpty) {
-        final match = RegExp(r'#?VX-([A-Za-z0-9-]+)', caseSensitive: false).firstMatch('$title $body');
+    // Resolve target order payload for navigation when notification is tapped
+    String? payloadOrderId;
+    if (data != null) {
+      if (data['associatedOrderId'] != null && data['associatedOrderId'].toString().isNotEmpty) {
+        payloadOrderId = data['associatedOrderId'].toString();
+      } else if (data['orderId'] != null &&
+          !data['orderId'].toString().toUpperCase().contains('SUP') &&
+          data['orderId'].toString() != 'SUPPORT') {
+        payloadOrderId = data['orderId'].toString();
+      } else if (data['id'] != null &&
+          !data['id'].toString().toUpperCase().contains('SUP') &&
+          data['id'].toString() != 'SUPPORT') {
+        payloadOrderId = data['id'].toString();
+      }
+    }
+
+    if (payloadOrderId == null || payloadOrderId.isEmpty || payloadOrderId.toUpperCase().contains('SUP')) {
+      final refMatch = RegExp(r'Ref:\s*(#?VX-[A-Za-z0-9-]+)', caseSensitive: false).firstMatch('$title $body');
+      if (refMatch != null) {
+        payloadOrderId = refMatch.group(1);
+      } else {
+        final match = RegExp(r'#?VX-([0-9]{3,8})', caseSensitive: false).firstMatch('$title $body');
         if (match != null) {
           payloadOrderId = match.group(0);
         }
       }
+    }
+
+    if (payloadOrderId == null || payloadOrderId.isEmpty || payloadOrderId.toUpperCase().contains('SUP')) {
+      if (type == 'SUPPORT_REPLY' || type == 'support_reply') {
+        payloadOrderId = 'OPEN_ORDER';
+      }
+    }
+
+    // Trigger system notification banner
+    try {
       localNotifications.show(
         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
         title: title,
         body: body,
-        payload: payloadOrderId ?? 'OPEN_NOTIFICATIONS',
+        payload: payloadOrderId ?? 'OPEN_ORDER',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
             'high_importance_channel',
@@ -465,14 +461,7 @@ class NotificationService {
     }
 
     if (context != null && context.mounted) {
-      String? payloadOrderId = data?['orderId']?.toString() ?? data?['id']?.toString();
-      if (payloadOrderId == null || payloadOrderId.isEmpty) {
-        final match = RegExp(r'#?VX-([A-Za-z0-9-]+)', caseSensitive: false).firstMatch('$title $body');
-        if (match != null) {
-          payloadOrderId = match.group(0);
-        }
-      }
-      showInAppBanner(context, title: title, body: body, icon: icon, color: color, orderId: payloadOrderId);
+      showInAppBanner(context, title: title, body: body, icon: icon, color: color, orderId: payloadOrderId ?? 'OPEN_ORDER');
     }
   }
 
@@ -543,7 +532,7 @@ class NotificationService {
         content: InkWell(
           onTap: () {
             scaffoldMessenger.hideCurrentSnackBar();
-            onNotificationTap.add(orderId ?? 'OPEN_NOTIFICATIONS');
+            onNotificationTap.add(orderId ?? 'OPEN_ORDER');
           },
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,

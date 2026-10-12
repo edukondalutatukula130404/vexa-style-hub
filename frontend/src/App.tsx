@@ -70,12 +70,18 @@ function Layout() {
     });
 
     onForegroundMessage((payload) => {
+      const isSupportMsg = payload?.data?.type === "support_message" || payload?.notification?.title?.includes("Support");
+      if (isSupportMsg && window.location.pathname.startsWith("/admin")) {
+        return; // admin.tsx already handles live support alerts with sound & toast
+      }
       const title = payload?.notification?.title || "VEXA Notification";
       const body = payload?.notification?.body || "";
+      const toastId = payload?.data?.ticketId ? `toast-${payload.data.ticketId}` : `toast-fcm-${title.slice(0, 20)}`;
       toast.info(title, {
+        id: toastId,
         description: body,
       });
-      triggerWebTestPushNotification(title, body);
+      triggerWebTestPushNotification(title, body, toastId);
     });
 
     // Listen to live WebSocket broadcast events for system push notifications
@@ -101,14 +107,6 @@ function Layout() {
         const title = `❌ Order was cancelled #${shortCode}`;
         const body = `Order #${shortCode} was cancelled by ${customerName}${reason}`;
         toast.error(title, { description: body, duration: 8000 });
-        triggerWebTestPushNotification(title, body);
-      } else if (type === "SUPPORT_MESSAGE" || type === "SUPPORT_TICKET_CREATED") {
-        const sender = data?.userName || data?.customerName || data?.userEmail || "Customer";
-        const msgText = data?.text || data?.message || data?.query || "New customer support query";
-        const title = `💬 Customer Support Message: ${sender}`;
-        const body = `${msgText}`;
-        toast.info(title, { description: body, duration: 8000 });
-        triggerWebTestPushNotification(title, body);
       }
     });
 
@@ -161,7 +159,7 @@ function NotFound() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" richColors />
+      <Toaster position="top-right" richColors visibleToasts={1} />
       <NoInternetOverlay />
       <ProductQueryRedirect />
       <Routes>

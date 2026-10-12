@@ -82,6 +82,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
           item: item,
+          cartItems: widget.cartItems,
           onAddToCart: widget.onAddToCart,
           onOpenCart: widget.onOpenCart,
           favoriteIds: widget.favoriteIds,
@@ -231,27 +232,102 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                       ],
                                     ]),
                                     const SizedBox(height: 8),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 32,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: _goldDark,
-                                          padding: EdgeInsets.zero,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    Row(
+                                      children: [
+                                        // Add to Cart Button (White Outlined)
+                                        Expanded(
+                                          child: SizedBox(
+                                            height: 32,
+                                            child: OutlinedButton(
+                                              style: OutlinedButton.styleFrom(
+                                                backgroundColor: Colors.white,
+                                                side: const BorderSide(color: _goldDark, width: 1.2),
+                                                padding: EdgeInsets.zero,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                              onPressed: () {
+                                                if (widget.onAddToCart != null) {
+                                                  widget.onAddToCart!(item, item.color, 'M', 1);
+                                                }
+                                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                                  content: Text('Added ${item.name} to cart'),
+                                                  duration: const Duration(seconds: 1),
+                                                  backgroundColor: _goldDark,
+                                                ));
+                                              },
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                  child: Text(
+                                                    'Add to Cart',
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 10.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: _goldDark,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                        onPressed: () {
-                                          if (widget.onAddToCart != null) {
-                                            widget.onAddToCart!(item, item.color, 'M', 1);
-                                          }
-                                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                            content: Text('Added ${item.name} to cart'),
-                                            duration: const Duration(seconds: 1),
-                                            backgroundColor: _goldDark,
-                                          ));
-                                        },
-                                        child: Text('Add to Cart', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                                      ),
+                                        const SizedBox(width: 6),
+                                        // Buy Now Button (Gold Filled)
+                                        Expanded(
+                                          child: SizedBox(
+                                            height: 32,
+                                            child: ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: _goldDark,
+                                                elevation: 0,
+                                                padding: EdgeInsets.zero,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                              onPressed: () {
+                                                if (widget.onAddToCart != null) {
+                                                  widget.onAddToCart!(item, item.color, 'M', 1);
+                                                }
+                                                if (widget.onOpenCart != null) {
+                                                  widget.onOpenCart!();
+                                                } else {
+                                                  Navigator.of(context, rootNavigator: true).push(
+                                                    MaterialPageRoute(
+                                                      builder: (_) => CartScreen(
+                                                        cartItems: widget.cartItems ?? [],
+                                                        onCartUpdated: () => setState(() {}),
+                                                        onNavigateToProducts: () => Navigator.pop(context),
+                                                        onNavigateToOrders: () {
+                                                          Navigator.of(context).pushAndRemoveUntil(
+                                                            MaterialPageRoute(builder: (_) => const HomeScreen(initialTabIndex: 1)),
+                                                            (route) => false,
+                                                          );
+                                                          OrderService.notifyOrdersChanged();
+                                                        },
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                  child: Text(
+                                                    'Buy Now',
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 10.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),

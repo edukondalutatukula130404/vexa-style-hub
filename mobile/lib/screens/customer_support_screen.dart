@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import '../services/notification_service.dart';
 import '../services/websocket_service.dart';
+import 'order_details_screen.dart';
 
 const Color _gold = Color(0xFFB8860B);
 const Color _goldDark = Color(0xFF8B6508);
@@ -61,8 +63,130 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
 
   int? _expandedFaqIndex;
 
+  List<Map<String, dynamic>> _myTickets = [];
+  bool _loadingTickets = false;
+  StreamSubscription? _wsTicketSub;
+  StreamSubscription<String>? _notifTapSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMyTickets();
+    _wsTicketSub = VexaWebSocketService().stream.listen((event) {
+      final type = event['type']?.toString();
+      if (type == 'SUPPORT_REPLY' || type == 'SUPPORT_TICKET_UPDATED') {
+        _fetchMyTickets();
+      }
+    });
+
+    _notifTapSub = NotificationService.onNotificationTap.stream.listen((payload) {
+      if (mounted) {
+        _openOrderDetailsForTicket({'orderId': payload});
+      }
+    });
+  }
+
+  Future<void> _openOrderDetailsForTicket(Map<String, dynamic> ticket) async {
+    String? orderId = (ticket['associatedOrderId'] ?? ticket['orderId'])?.toString();
+    if (orderId != null && (orderId.toUpperCase().contains('SUP') || orderId == 'SUPPORT' || orderId == 'OPEN_ORDER')) {
+      orderId = null;
+    }
+    if (orderId == null || orderId.isEmpty) {
+      final msg = (ticket['message'] ?? ticket['text'] ?? '').toString();
+      final refMatch = RegExp(r'Ref:\s*(#?VX-[A-Za-z0-9-]+)', caseSensitive: false).firstMatch(msg);
+      if (refMatch != null) {
+        orderId = refMatch.group(1);
+      }
+    }
+
+    OrderModel? targetOrder = widget.order;
+    try {
+      final user = await AuthService.getUser();
+      final orders = await OrderService.getOrders(email: user?.email);
+      if (orderId != null && orderId.isNotEmpty) {
+        final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+        for (var o in orders) {
+          final cleanId = o.id.replaceAll('#', '').toLowerCase().trim();
+          if (cleanId == cleanTarget ||
+              cleanId.endsWith(cleanTarget) ||
+              cleanTarget.endsWith(cleanId) ||
+              (cleanTarget.length >= 4 && cleanId.contains(cleanTarget))) {
+            targetOrder = o;
+            break;
+          }
+        }
+      }
+      if (targetOrder == null && orders.isNotEmpty) {
+        targetOrder = orders.first;
+      }
+    } catch (e) {
+      debugPrint('Error finding order for ticket: $e');
+    }
+
+    targetOrder ??= OrderModel(
+      id: (orderId != null && orderId.isNotEmpty)
+          ? (orderId.startsWith('#') ? orderId : '#$orderId')
+          : '#VX-1806',
+      customerName: widget.order?.customerName ?? 'Valued Customer',
+      shippingAddress: '123 Luxury Avenue, Fashion District, Pincode: 400001',
+      phone: '+91 98765 43210',
+      paymentMethod: 'Razorpay NetBanking (Punjab National Bank)',
+      totalAmount: 1899.0,
+      status: 'Out for Delivery',
+      createdAt: DateTime(2026, 10, 7, 6, 33),
+      items: [
+        OrderItem(
+          itemId: 'vx-08',
+          name: 'Emerald Acid Wash Boxy Tee',
+          price: 1899.0,
+          quantity: 1,
+          color: 'Emerald Green',
+          size: 'M',
+          image: 'assets/images/tee-emerald.png',
+        ),
+      ],
+    );
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderDetailsScreen(order: targetOrder!),
+        ),
+      );
+    }
+  }
+
+  Future<void> _fetchMyTickets() async {
+    try {
+      final user = await AuthService.getUser();
+      if (user?.email == null || user!.email.isEmpty) return;
+
+      if (mounted) setState(() => _loadingTickets = true);
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/notifications/my-tickets?email=${Uri.encodeComponent(user.email)}'),
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        final list = body['data'] as List?;
+        if (list != null && mounted) {
+          setState(() {
+            _myTickets = list.map((e) => Map<String, dynamic>.from(e)).toList();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching user tickets: $e');
+    } finally {
+      if (mounted) setState(() => _loadingTickets = false);
+    }
+  }
+
   @override
   void dispose() {
+    _wsTicketSub?.cancel();
+    _notifTapSub?.cancel();
     _messageController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -190,32 +314,36 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
                 'userName': widget.order?.customerName ?? 'Customer',
                 'customerName': widget.order?.customerName ?? 'Customer',
                 'orderId': widget.order?.id ?? '',
+                'associatedOrderId': widget.order?.id ?? '',
                 'category': 'VIP Concierge Chat',
                 'text': cleanText,
                 'message': cleanText,
                 'timestamp': DateTime.now().toIso8601String(),
               };
 
-              VexaWebSocketService().send('SUPPORT_MESSAGE', supportPayload);
-
+              // Forward customer support message to Admin (authoritative HTTP POST that broadcasts once via server)
               () async {
                 try {
                   final user = await AuthService.getUser();
                   final postData = Map<String, dynamic>.from(supportPayload);
                   if (user?.email != null) postData['userEmail'] = user!.email;
-                  await http.post(
+                  final res = await http.post(
                     Uri.parse('${ApiConfig.baseUrl}/notifications/support'),
                     headers: {'Content-Type': 'application/json'},
                     body: jsonEncode(postData),
                   ).timeout(const Duration(seconds: 4));
+                  if (res.statusCode != 200) {
+                    VexaWebSocketService().send('SUPPORT_MESSAGE', supportPayload);
+                  }
                 } catch (e) {
                   debugPrint('Support message HTTP forward notice: $e');
+                  VexaWebSocketService().send('SUPPORT_MESSAGE', supportPayload);
                 }
               }();
 
               Future.delayed(const Duration(milliseconds: 900), () {
                 if (!ctx.mounted) return;
-                String reply = 'Our VIP concierge agent is reviewing your query. A dedicated stylist will reach out within 2 minutes!';
+                String reply = 'Our concierge agent is reviewing your query. A dedicated stylist will reach out within 2 minutes!';
                 final lower = text.toLowerCase();
                 if (lower.contains('track') || lower.contains('order') || lower.contains('where')) {
                   reply = widget.order != null
@@ -266,7 +394,7 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('VIP CONCIERGE LIVE CHAT', style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1)),
+                                Text('CONCIERGE LIVE CHAT', style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1)),
                                 Row(
                                   children: [
                                     Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
@@ -441,27 +569,31 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
         'message': queryText,
         'phone': phoneText,
         'orderId': widget.order?.id ?? '',
+        'associatedOrderId': widget.order?.id ?? '',
         'userName': widget.order?.customerName ?? 'Customer',
         'customerName': widget.order?.customerName ?? 'Customer',
         'createdAt': DateTime.now().toIso8601String(),
       };
 
-      VexaWebSocketService().send('SUPPORT_TICKET_CREATED', ticketPayload);
-      VexaWebSocketService().send('SUPPORT_MESSAGE', ticketPayload);
-
+      // Forward ticket to backend (authoritative HTTP POST that broadcasts once via server)
       () async {
         try {
           final user = await AuthService.getUser();
           final postData = Map<String, dynamic>.from(ticketPayload);
           if (user?.email != null) postData['userEmail'] = user!.email;
-          await http.post(
+          final res = await http.post(
             Uri.parse('${ApiConfig.baseUrl}/notifications/support'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(postData),
           ).timeout(const Duration(seconds: 4));
+          if (res.statusCode != 200) {
+            VexaWebSocketService().send('SUPPORT_TICKET_CREATED', ticketPayload);
+          }
         } catch (e) {
           debugPrint('Support ticket HTTP forward notice: $e');
+          VexaWebSocketService().send('SUPPORT_TICKET_CREATED', ticketPayload);
         }
+        if (mounted) _fetchMyTickets();
       }();
 
       showDialog(
@@ -598,34 +730,62 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                    colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)], // Light gold luxury tint
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, offset: const Offset(0, 4))],
+                  border: Border.all(color: const Color(0xFFE5C07B), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFB8860B).withAlpha(30),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: _gold.withAlpha(40), shape: BoxShape.circle),
-                      child: const Icon(Icons.forum_rounded, color: _gold, size: 26),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB8860B).withAlpha(30),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFB8860B).withAlpha(60), width: 1),
+                      ),
+                      child: const Icon(Icons.forum_rounded, color: Color(0xFF8B6508), size: 26),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('VIP Live Concierge Chat', style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5)),
+                          Text(
+                            'LIVE CONCIERGE CHAT',
+                            style: GoogleFonts.cinzel(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF3D2A00),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                           const SizedBox(height: 2),
-                          Text('Instant 24/7 AI & Stylist Support', style: GoogleFonts.outfit(fontSize: 12, color: Colors.white70)),
+                          Text(
+                            'Instant 24/7 AI & Stylist Support',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF78591A),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _goldDark,
+                        backgroundColor: const Color(0xFF8B6508),
+                        foregroundColor: Colors.white,
+                        elevation: 2,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
@@ -684,9 +844,244 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 24),
 
-              // 4. CREATE A SUPPORT TICKET FORM
+              // 4. MY SUPPORT TICKETS & REPLIES SECTION
+              if (_loadingTickets && _myTickets.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _border),
+                  ),
+                  child: const Center(
+                    child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: _goldDark, strokeWidth: 2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ] else if (_myTickets.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'MY SUPPORT TICKETS (${_myTickets.length})',
+                      style: GoogleFonts.cinzel(fontSize: 12.5, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, size: 18, color: _goldDark),
+                      onPressed: _fetchMyTickets,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ..._myTickets.map((t) {
+                  final ticketId = (t['orderId'] ?? t['ticketId'] ?? t['_id'] ?? '#VX-SUP').toString();
+                  final cleanTicketId = ticketId.startsWith('#') ? ticketId : '#$ticketId';
+                  final category = (t['category'] ?? 'Order Issue').toString();
+                  final status = (t['status'] ?? 'Open').toString();
+                  final isResolved = status.toLowerCase() == 'resolved';
+                  final query = (t['message'] ?? t['text'] ?? t['query'] ?? '').toString();
+                  final reply = (t['reply'] ?? t['adminReply'] ?? '').toString();
+                  final time = t['createdAt'] != null ? DateTime.tryParse(t['createdAt'].toString()) : null;
+                  final timeStr = time != null ? '${time.day}/${time.month}/${time.year}' : 'Recent';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isResolved ? const Color(0xFF10B981).withAlpha(80) : _border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(5),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header: ID + Status Badge
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                  decoration: BoxDecoration(
+                                    color: _gold.withAlpha(25),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    cleanTicketId,
+                                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: _goldDark),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: _bgColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: _border),
+                                  ),
+                                  child: Text(
+                                    category,
+                                    style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: isResolved ? const Color(0xFF10B981).withAlpha(25) : const Color(0xFFF59E0B).withAlpha(25),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isResolved ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                                    size: 12,
+                                    color: isResolved ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isResolved ? 'RESOLVED' : 'IN REVIEW',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: isResolved ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // User Inquiry
+                        Text(
+                          'Your Query ($timeStr):',
+                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: _subtext),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          query.isNotEmpty ? query : 'Ticket details registered.',
+                          style: GoogleFonts.outfit(fontSize: 12.5, color: _textDark, fontStyle: FontStyle.italic),
+                        ),
+
+                        // Official Concierge Reply Box
+                        if (reply.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBEB), // luxury gold tint
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE5C07B), width: 1.2),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF10B981),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.support_agent_rounded, size: 13, color: Colors.white),
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Text(
+                                      'VEXA CONCIERGE RESPONSE',
+                                      style: GoogleFonts.cinzel(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF78591A),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  reply,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF3D2A00),
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                InkWell(
+                                  onTap: () => _openOrderDetailsForTicket(t),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0F172A),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.receipt_long_rounded, color: Color(0xFFE5C07B), size: 14),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'VIEW ORDER DETAILS',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 9),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const SizedBox(
+                                width: 10,
+                                height: 10,
+                                child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFFD97706)),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Awaiting Concierge stylist review (within 2 mins)...',
+                                style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFFD97706), fontStyle: FontStyle.italic),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 16),
+              ],
+
+              // 5. CREATE A SUPPORT TICKET FORM
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(

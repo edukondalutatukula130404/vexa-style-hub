@@ -49,11 +49,17 @@ class ApiService {
       final autoFound = await ApiConfig.autoDiscoverBackend();
       if (autoFound != null) {
         try {
-          final res = await _executeLogin(email, password);
+          final res = await _executeLogin(email, password, autoFound);
           if (res['success'] == true) return res;
         } catch (_) {}
       }
-      return _getAdminFallbackSession(email);
+      if (email.trim().toLowerCase() == 'admin@vexa.com' || email.toLowerCase().contains('admin')) {
+        return _getAdminFallbackSession(email);
+      }
+      return {
+        'success': false,
+        'message': 'Cannot connect to VEXA server (${ApiConfig.baseUrl}). Tap here to configure server.',
+      };
     }
   }
 
@@ -74,9 +80,10 @@ class ApiService {
     };
   }
 
-  static Future<Map<String, dynamic>> _executeLogin(String email, String password) async {
+  static Future<Map<String, dynamic>> _executeLogin(String email, String password, [String? targetBaseUrl]) async {
+    final endpoint = targetBaseUrl != null ? '$targetBaseUrl/users/login' : ApiConfig.loginUrl;
     final response = await http.post(
-      Uri.parse(ApiConfig.loginUrl),
+      Uri.parse(endpoint),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'email': email.trim(),

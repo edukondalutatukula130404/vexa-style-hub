@@ -28,7 +28,33 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    customerEmail: {
+      type: String,
+      default: '',
+      lowercase: true,
+      trim: true
+    },
+    customerName: {
+      type: String,
+      default: ''
+    },
+    category: {
+      type: String,
+      default: ''
+    },
+    reply: {
+      type: String,
+      default: ''
+    },
     status: {
+      type: String,
+      default: ''
+    },
+    associatedOrderId: {
+      type: String,
+      default: ''
+    },
+    ticketId: {
       type: String,
       default: ''
     },
@@ -38,7 +64,8 @@ const notificationSchema = new mongoose.Schema(
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    strict: false
   }
 );
 

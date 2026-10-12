@@ -33,8 +33,10 @@ class VexaFeedback {
       icon: Icons.shopping_bag_rounded,
       backgroundColor: const Color(0xFF0F172A),
       iconColor: const Color(0xFFB8860B),
-      actionLabel: 'VIEW CART',
+      actionLabel: onViewCart != null ? 'VIEW CART' : null,
       onActionTap: onViewCart,
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 84),
+      duration: const Duration(seconds: 2),
     );
   }
 
@@ -82,12 +84,13 @@ class VexaFeedback {
     String? actionLabel,
     VoidCallback? onActionTap,
     Duration duration = const Duration(seconds: 3),
+    EdgeInsetsGeometry? margin,
   }) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
+        margin: (margin as EdgeInsets?) ?? const EdgeInsets.all(16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         elevation: 6,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
+import '../services/notification_service.dart';
 import '../services/wallet_service.dart';
 import 'order_tracking_screen.dart';
 import 'order_details_screen.dart';
@@ -289,6 +290,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           onPressed: () async {
+                            OrderService.clearLocalSession();
+                            NotificationService.clearAll();
                             await AuthService.clearSession();
                             if (!context.mounted) return;
                             Navigator.pop(context);
@@ -439,6 +442,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           onPressed: () async {
                             final messenger = ScaffoldMessenger.of(context);
+                            OrderService.clearLocalSession();
+                            NotificationService.clearAll();
                             await AuthService.clearSession();
                             if (!dialogCtx.mounted) return;
                             Navigator.pop(dialogCtx);
@@ -909,35 +914,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
 
-                // Top Left Back Button
-                Positioned(
-                  top: topPadding + 12,
-                  left: 20,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        if (widget.onNavigateToDiscover != null) {
-                          widget.onNavigateToDiscover!();
-                        } else if (Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        } else {
-                          Navigator.pushReplacementNamed(context, '/home');
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(24),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(35),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withAlpha(200), width: 1.2),
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ),
-                ),
 
                 // Top Right Guest Pill Button
                 Positioned(

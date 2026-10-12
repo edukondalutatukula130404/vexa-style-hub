@@ -41,15 +41,25 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         final data = event['data'];
         if (type == 'ORDER_STATUS_UPDATED' || type == 'ORDERS_UPDATED') {
           if (data != null && data is Map) {
-            final orderId = (data['_id'] ?? data['id'] ?? '').toString();
-            final cleanCurrent = _currentOrder.id.replaceAll('#', '').toLowerCase().trim();
-            final cleanEvent = orderId.replaceAll('#', '').toLowerCase().trim();
+            final candidates = [
+              data['id'],
+              data['_id'],
+              data['orderId'],
+            ].where((v) => v != null).map((v) => v.toString().replaceAll('#', '').toLowerCase().trim()).where((v) => v.isNotEmpty).toList();
 
-            final isMatch = cleanCurrent == cleanEvent ||
-                (cleanEvent.isNotEmpty && cleanCurrent.endsWith(cleanEvent)) ||
-                (cleanCurrent.isNotEmpty && cleanEvent.endsWith(cleanCurrent)) ||
-                (cleanEvent.length >= 4 && cleanCurrent.contains(cleanEvent)) ||
-                (cleanCurrent.length >= 4 && cleanEvent.contains(cleanCurrent));
+            final cleanCurrent = _currentOrder.id.replaceAll('#', '').toLowerCase().trim();
+
+            bool isMatch = false;
+            for (final cleanEvent in candidates) {
+              if (cleanCurrent == cleanEvent ||
+                  (cleanEvent.isNotEmpty && cleanCurrent.endsWith(cleanEvent)) ||
+                  (cleanCurrent.isNotEmpty && cleanEvent.endsWith(cleanCurrent)) ||
+                  (cleanEvent.length >= 4 && cleanCurrent.contains(cleanEvent)) ||
+                  (cleanEvent.length >= 4 && cleanEvent.contains(cleanCurrent))) {
+                isMatch = true;
+                break;
+              }
+            }
 
             if (isMatch) {
               final newStatus = (data['status'] ?? '').toString();
@@ -62,6 +72,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 OrderService.updateOrderStatusLocally(
                   _currentOrder.id,
                   newStatus,
+                  altId: data['_id']?.toString(),
                   cancelReason: cancelReason,
                   createNotification: false,
                 );

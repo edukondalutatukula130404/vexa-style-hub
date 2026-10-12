@@ -3,8 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/order_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/vexa_button.dart';
+import '../widgets/server_config_dialog.dart';
 
 const Color _goldDark = Color(0xFF8B6508);
 
@@ -23,6 +26,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.text = 'naveen@gmail.com';
+    _passwordController.text = 'naveen123';
+  }
 
   @override
   void dispose() {
@@ -54,6 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (result['success'] == true) {
       final user = result['user'];
       final token = result['token'] ?? 'mock_token';
+      OrderService.clearLocalSession();
+      NotificationService.clearAll();
       await AuthService.saveSession(user, token);
       await AuthService.setOnboardingSeen();
 
@@ -79,6 +91,8 @@ class _LoginScreenState extends State<LoginScreen> {
       email: 'guest@vexa.app',
       role: 'guest',
     );
+    OrderService.clearLocalSession();
+    NotificationService.clearAll();
     await AuthService.saveSession(guestUser, 'guest_token');
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/onboarding');
@@ -135,29 +149,38 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  // Top Left Back Button
+
+                  // Top Left Server Config Pill Button
                   Positioned(
                     top: topPadding + 12,
                     left: 20,
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          } else {
-                            Navigator.pushReplacementNamed(context, '/home');
-                          }
-                        },
+                        onTap: () => ServerConfigDialog.show(context),
                         borderRadius: BorderRadius.circular(24),
                         child: Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                           decoration: BoxDecoration(
                             color: Colors.white.withAlpha(35),
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(24),
                             border: Border.all(color: Colors.white.withAlpha(200), width: 1.2),
                           ),
-                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.wifi_rounded, color: Colors.white, size: 14),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Server',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -306,24 +329,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       // Error Box if any
                       if (_errorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.errorColor.withAlpha(15),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.errorColor.withAlpha(60)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline_rounded, color: AppTheme.errorColor, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: GoogleFonts.outfit(color: AppTheme.errorColor, fontSize: 12.5, fontWeight: FontWeight.w600),
+                        InkWell(
+                          onTap: () {
+                            ServerConfigDialog.show(context).then((_) {
+                              if (mounted) setState(() { _errorMessage = null; });
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.errorColor.withAlpha(15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.errorColor.withAlpha(60)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline_rounded, color: AppTheme.errorColor, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: GoogleFonts.outfit(color: AppTheme.errorColor, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                const Icon(Icons.tune_rounded, size: 16, color: _goldDark),
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),

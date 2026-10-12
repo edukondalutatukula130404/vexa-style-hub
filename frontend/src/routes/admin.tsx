@@ -34,7 +34,13 @@ import {
   BellRing,
   CheckCheck,
   Megaphone,
-  Send
+  Send,
+  Headphones,
+  MessageSquare,
+  LifeBuoy,
+  Phone,
+  Mail,
+  FileText
 } from "lucide-react";
 import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
 import promoBanner1 from "@/assets/promo_banner_1.png";
@@ -102,7 +108,7 @@ export function Admin() {
   const navigate = useNavigate();
   const { user, isLoggedIn, logout } = useAuth();
   const { products: catalogProducts } = useProducts();
-  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "orders" | "add-item" | "categories" | "users" | "home-media" | "coupons" | "reviews" | "settings" | string>("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "orders" | "add-item" | "categories" | "users" | "support" | "home-media" | "coupons" | "reviews" | "settings" | string>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -204,6 +210,7 @@ export function Admin() {
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
   const knownCancelledOrderIdsRef = useRef<Set<string>>(new Set());
   const isFirstFetchRef = useRef(true);
+  const knownSupportTicketIdsRef = useRef<Set<string>>(new Set());
 
 
   // Admin Broadcast Message Modal State
@@ -286,130 +293,78 @@ export function Admin() {
   };
 
   // Realtime notification sync with new orders
-  useEffect(() => {
-    const handleNewOrderNotif = (event?: any) => {
-      if (typeof window === "undefined") return;
-      try {
-        let orderData = event?.detail;
+  const handleNewOrderNotif = (event?: any) => {
+    if (typeof window === "undefined") return;
+    try {
+      let orderData = event?.detail;
 
-        if (!orderData || (!orderData._id && !orderData.id)) {
-          const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
-          if (cached && cached.length > 0) {
-            orderData = cached[0];
-          }
+      if (!orderData || (!orderData._id && !orderData.id)) {
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        if (cached && cached.length > 0) {
+          orderData = cached[0];
         }
+      }
 
-        if (orderData && (orderData._id || orderData.id)) {
-          const mongoId = orderData._id ? String(orderData._id).trim() : "";
-          const customId = orderData.id ? String(orderData.id).trim() : "";
-          const rawId = customId || mongoId || Date.now().toString();
+      if (orderData && (orderData._id || orderData.id)) {
+        const mongoId = orderData._id ? String(orderData._id).trim() : "";
+        const customId = orderData.id ? String(orderData.id).trim() : "";
+        const rawId = customId || mongoId || Date.now().toString();
 
-          // Strip leading '#' characters to prevent double hash "##VX-1502"
-          const cleanCode = rawId.replace(/^#+/, "").trim();
-          const shortCode = cleanCode.length > 8 ? cleanCode.slice(-8).toUpperCase() : cleanCode.toUpperCase();
-          const notifId = `notif-order-${cleanCode}`;
+        // Strip leading '#' characters to prevent double hash "##VX-1502"
+        const cleanCode = rawId.replace(/^#+/, "").trim();
+        const shortCode = cleanCode.length > 8 ? cleanCode.slice(-8).toUpperCase() : cleanCode.toUpperCase();
+        const notifId = `notif-order-${cleanCode}`;
 
-          const customerName = orderData.userName || orderData.userEmail || "Customer";
-          const amount = Number(orderData.totalAmount) || 0;
-          const itemsCount = Array.isArray(orderData.items) ? orderData.items.length : 1;
+        const customerName = orderData.userName || orderData.userEmail || "Customer";
+        const amount = Number(orderData.totalAmount) || 0;
+        const itemsCount = Array.isArray(orderData.items) ? orderData.items.length : 1;
 
-          setNotifications((prev) => {
-            const isDuplicate = prev.some((n) => {
-              if (n.id === notifId) return true;
-              if (mongoId && n.id.includes(mongoId)) return true;
-              if (customId && n.id.includes(customId.replace(/^#+/, ""))) return true;
-              if (shortCode && n.message.includes(shortCode)) return true;
-              return false;
-            });
-
-            if (isDuplicate) return prev;
-
-            const newNotif: NotificationItem = {
-              id: notifId,
-              title: "⚡ Realtime Booking Received",
-              message: `New Order #${shortCode} placed by ${customerName} for ₹${amount.toLocaleString("en-IN")} (${itemsCount} item${itemsCount > 1 ? "s" : ""})`,
-              time: "Just now",
-              timestamp: Date.now(),
-              read: false,
-              type: "order",
-              targetTab: "orders",
-            };
-            return [newNotif, ...prev];
+        setNotifications((prev) => {
+          const isDuplicate = prev.some((n) => {
+            if (n.id === notifId) return true;
+            if (mongoId && n.id.includes(mongoId)) return true;
+            if (customId && n.id.includes(customId.replace(/^#+/, ""))) return true;
+            if (shortCode && n.message.includes(shortCode)) return true;
+            return false;
           });
 
-          // Track all ID variations in known IDs set so polling will not trigger a second notification
-          if (mongoId) knownOrderIdsRef.current.add(mongoId);
-          if (customId) knownOrderIdsRef.current.add(customId);
-          knownOrderIdsRef.current.add(cleanCode);
+          if (isDuplicate) return prev;
 
-          // Play Audio Chime & Trigger System Native Push Notification
-          playNotifChime();
-          triggerWebTestPushNotification(
-            "⚡ Realtime Booking Received",
-            `New Order #${shortCode} placed by ${customerName} for ₹${amount.toLocaleString("en-IN")}`
-          );
-
-          // Refresh orders list state automatically in real time
-          fetchOrders();
-        }
-      } catch (e) {
-        console.warn("Realtime order notification update error:", e);
-      }
-    };
-
-    const handleOrdersUpdatedEvent = () => {
-      fetchOrders();
-    };
-
-    const handleWsMessage = (e: any) => {
-      const payload = e?.detail;
-      if (!payload) return;
-      if (payload.type === "ORDER_CREATED") {
-        if (payload.data) {
-          handleNewOrderNotif({ detail: payload.data });
-        }
-      } else if (payload.type === "ORDER_CANCELLED") {
-        const data = payload.data;
-        const rawId = data?.orderId || data?.id || data?._id || "ORDER";
-        const cleanCode = String(rawId).replace(/^#+/, "").trim();
-        const shortCode = cleanCode.slice(-8).toUpperCase();
-        const customerName = data?.customerName || data?.userName || data?.userEmail || "Customer";
-        const reason = data?.cancelReason ? ` - Reason: ${data.cancelReason}` : "";
-        playNotifChime();
-        toast.error(`Order was cancelled #${shortCode}`, {
-          description: `Order #${shortCode} was cancelled by ${customerName}${reason}`,
-          duration: 8000,
+          const newNotif: NotificationItem = {
+            id: notifId,
+            title: "⚡ Realtime Booking Received",
+            message: `New Order #${shortCode} placed by ${customerName} for ₹${amount.toLocaleString("en-IN")} (${itemsCount} item${itemsCount > 1 ? "s" : ""})`,
+            time: "Just now",
+            timestamp: Date.now(),
+            read: false,
+            type: "order",
+            targetTab: "orders",
+          };
+          return [newNotif, ...prev];
         });
+
+        // Track all ID variations in known IDs set so polling will not trigger a second notification
+        if (mongoId) knownOrderIdsRef.current.add(mongoId);
+        if (customId) knownOrderIdsRef.current.add(customId);
+        knownOrderIdsRef.current.add(cleanCode);
+
+        // Play Audio Chime & Trigger System Native Push Notification
+        playNotifChime();
         triggerWebTestPushNotification(
-          `Order was cancelled #${shortCode}`,
-          `Order #${shortCode} was cancelled by ${customerName}${reason}`
+          "⚡ Realtime Booking Received",
+          `New Order #${shortCode} placed by ${customerName} for ₹${amount.toLocaleString("en-IN")}`
         );
+
+        // Refresh orders list state automatically in real time
         fetchOrders();
-      } else if (payload.type === "SUPPORT_MESSAGE" || payload.type === "SUPPORT_TICKET_CREATED") {
-        const data = payload.data;
-        const sender = data?.userName || data?.customerName || data?.userEmail || "Customer";
-        const msgText = data?.text || data?.message || data?.query || "New customer support query";
-        playNotifChime();
-        toast.info(`💬 Customer Support Message: ${sender}`, {
-          description: `${msgText}`,
-          duration: 8000,
-        });
-        triggerWebTestPushNotification(
-          `💬 Customer Support Message: ${sender}`,
-          `${msgText}`
-        );
       }
-    };
+    } catch (e) {
+      console.warn("Realtime order notification update error:", e);
+    }
+  };
 
+  useEffect(() => {
     requestWebNotificationPermission().catch(() => {});
-
-    window.addEventListener("vexa_orders_updated", handleOrdersUpdatedEvent);
-    window.addEventListener("vexa_ws_message", handleWsMessage);
-
-    return () => {
-      window.removeEventListener("vexa_orders_updated", handleOrdersUpdatedEvent);
-      window.removeEventListener("vexa_ws_message", handleWsMessage);
-    };
   }, []);
 
   const handleMarkAllRead = () => {
@@ -576,6 +531,97 @@ export function Admin() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedUserDetails, setSelectedUserDetails] = useState<DbUser | null>(null);
 
+  // Customer Support State
+  type SupportTicket = {
+    _id: string;
+    id?: string;
+    ticketId?: string;
+    orderId?: string;
+    customerName?: string;
+    userName?: string;
+    userEmail?: string;
+    phone?: string;
+    category?: string;
+    message?: string;
+    query?: string;
+    text?: string;
+    title?: string;
+    status: "Open" | "In Progress" | "Resolved" | "Closed" | string;
+    createdAt: string;
+    reply?: string;
+  };
+
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("vexa_support_tickets");
+        if (saved) {
+          const list = JSON.parse(saved);
+          if (Array.isArray(list) && list.length > 0) {
+            const seen = new Set<string>();
+            const deduped: SupportTicket[] = [];
+            for (const item of list) {
+              const k = (item.ticketId || item._id || "").trim().toUpperCase() || `${item.userName}_${(item.message || "").slice(0, 30)}`;
+              if (!seen.has(k)) {
+                seen.add(k);
+                deduped.push(item);
+              }
+            }
+            return deduped;
+          }
+        }
+      } catch (e) {}
+    }
+    return [
+      {
+        _id: "sup-1",
+        ticketId: "#VX-SUP-8821",
+        userName: "Aarav Sharma",
+        customerName: "Aarav Sharma",
+        userEmail: "aarav.sharma@example.com",
+        phone: "+91 98201 44521",
+        category: "Order Delivery",
+        orderId: "VX-1502",
+        message: "Can you confirm the estimated delivery time for my Oversized Tee? I need it by this Friday for an event.",
+        status: "Open",
+        createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+      },
+      {
+        _id: "sup-2",
+        ticketId: "#VX-SUP-7619",
+        userName: "Priya Nair",
+        customerName: "Priya Nair",
+        userEmail: "priya.nair@example.com",
+        phone: "+91 97110 32890",
+        category: "Size & Fit Advice",
+        message: "I usually wear M in standard streetwear brands. Should I order M or S for the 240 GSM drop-shoulder tee?",
+        status: "In Progress",
+        createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+      },
+      {
+        _id: "sup-3",
+        ticketId: "#VX-SUP-6430",
+        userName: "Dev Patel",
+        customerName: "Dev Patel",
+        userEmail: "dev.patel@example.com",
+        phone: "+91 98450 12891",
+        category: "Returns & Refund",
+        orderId: "VX-849202",
+        message: "Received the wrong colorway for my order. How quickly can I get an exchange scheduled?",
+        status: "Resolved",
+        reply: "Replacement order #VX-849901 has been booked with priority express courier.",
+        createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+      },
+    ];
+  });
+  const [loadingSupport, setLoadingSupport] = useState(false);
+  const [supportSearch, setSupportSearch] = useState("");
+  const [supportStatusFilter, setSupportStatusFilter] = useState<string>("All");
+  const [supportCategoryFilter, setSupportCategoryFilter] = useState<string>("All");
+  const [selectedTicketForReply, setSelectedTicketForReply] = useState<SupportTicket | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState("");
+  const [replySending, setReplySending] = useState(false);
+
   // Coupons State
   type Coupon = {
     code: string;
@@ -715,11 +761,12 @@ export function Admin() {
     { id: "inventory", label: `Inventory Management (${catalogProducts.length})`, icon: Boxes },
     { id: "add-item", label: `Collection Catalog (${catalogProducts.length})`, icon: PlusCircle },
     { id: "orders", label: `Customer Bookings (${orders.length})`, icon: Package },
+    { id: "support", label: `Customer Support (${supportTickets.filter(t => t.status === "Open" || !t.status).length})`, icon: Headphones },
     { id: "users", label: `Registered Users (${usersList.length})`, icon: Users },
     { id: "home-media", label: "Home Page Media", icon: Image },
     { id: "settings", label: "Store Settings", icon: Settings },
     { id: "logout", label: "Logout", icon: LogOut, isLogout: true },
-  ], [orders.length, usersList.length, catalogProducts.length]);
+  ], [orders.length, usersList.length, catalogProducts.length, supportTickets]);
 
   // Home Page Media State
   const [heroImgUrl, setHeroImgUrl] = useState<string>(() => {
@@ -1368,9 +1415,161 @@ export function Admin() {
     }
   };
 
+  const fetchSupportTickets = async () => {
+    try {
+      setLoadingSupport(true);
+      const res = await fetch(`${API_URL}/notifications/support`);
+      if (res.ok) {
+        const json = await res.json();
+        const rawList = Array.isArray(json) ? json : (json.data || []);
+        if (rawList.length > 0) {
+          const seen = new Set<string>();
+          const deduped: SupportTicket[] = [];
+
+          for (const item of rawList) {
+            const rawId = item.ticketId || item.metadata?.ticketId || (item.orderId?.startsWith('#') ? item.orderId : '');
+            const cleanId = rawId ? String(rawId).trim().toUpperCase() : String(item._id || item.id || '');
+            const dedupeKey = cleanId || `${item.userName || item.customerName}_${(item.message || item.text || '').slice(0, 30)}`;
+
+            if (!seen.has(dedupeKey)) {
+              seen.add(dedupeKey);
+              deduped.push({
+                _id: String(item._id || item.id || `sup-${Date.now()}`),
+                ticketId: rawId || (item.orderId ? `#${String(item.orderId).replace(/^#+/, '')}` : `#VX-SUP-${String(item._id || '').slice(-5).toUpperCase()}`),
+                customerName: item.userName || item.customerName || "Customer",
+                userName: item.userName || item.customerName || "Customer",
+                userEmail: item.userEmail || "",
+                phone: item.phone || item.metadata?.phone || "",
+                category: item.category || item.metadata?.category || "General Inquiries",
+                orderId: item.orderId || item.metadata?.orderId || "",
+                message: item.message || item.text || item.query || item.title || "",
+                status: item.status || item.metadata?.status || "Open",
+                createdAt: item.createdAt || new Date().toISOString(),
+                reply: item.reply || "",
+              });
+            }
+          }
+
+          setSupportTickets(deduped);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("vexa_support_tickets", JSON.stringify(deduped));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("fetchSupportTickets error:", err);
+    } finally {
+      setLoadingSupport(false);
+    }
+  };
+
+  const handleUpdateTicketStatus = async (ticketId: string, newStatus: string) => {
+    setSupportTickets((prev) => {
+      const updated = prev.map((t) => (t._id === ticketId || t.ticketId === ticketId ? { ...t, status: newStatus } : t));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("vexa_support_tickets", JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    try {
+      await fetch(`${API_URL}/notifications/support/${ticketId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      toast.success(`Ticket Status Updated`, {
+        description: `Status changed to "${newStatus}"`,
+      });
+    } catch (err) {
+      console.warn("Update ticket status API error:", err);
+    }
+  };
+
+  const handleSendTicketReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicketForReply || !adminReplyText.trim()) return;
+
+    setReplySending(true);
+    const reply = adminReplyText.trim();
+    const targetId = selectedTicketForReply._id || selectedTicketForReply.ticketId || "";
+
+    setSupportTickets((prev) => {
+      const updated = prev.map((t) => {
+        if (t._id === targetId || t.ticketId === targetId) {
+          return { ...t, reply, status: "Resolved" };
+        }
+        return t;
+      });
+      if (typeof window !== "undefined") {
+        localStorage.setItem("vexa_support_tickets", JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    try {
+      await fetch(`${API_URL}/notifications/support/${targetId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "Resolved",
+          adminReply: reply,
+          customerEmail: selectedTicketForReply.userEmail,
+          orderId: selectedTicketForReply.orderId || "",
+          associatedOrderId: selectedTicketForReply.orderId || "",
+        }),
+      });
+    } catch (err) {
+      console.warn("Reply API error:", err);
+    }
+
+    vexaSocket.send("SUPPORT_REPLY", {
+      ticketId: selectedTicketForReply.ticketId || targetId,
+      customerEmail: selectedTicketForReply.userEmail,
+      customerName: selectedTicketForReply.userName,
+      orderId: selectedTicketForReply.orderId || "",
+      associatedOrderId: selectedTicketForReply.orderId || "",
+      reply,
+      timestamp: Date.now(),
+    });
+
+    toast.success("Concierge Response Dispatched", {
+      description: `Reply sent to ${selectedTicketForReply.customerName || selectedTicketForReply.userName || "Customer"}.`,
+    });
+
+    setReplySending(false);
+    setSelectedTicketForReply(null);
+    setAdminReplyText("");
+  };
+
+  const filteredSupportTickets = useMemo(() => {
+    const seen = new Set<string>();
+    return supportTickets.filter((t) => {
+      const matchStatus = supportStatusFilter === "All" || t.status === supportStatusFilter;
+      const matchCategory = supportCategoryFilter === "All" || t.category === supportCategoryFilter;
+      const q = supportSearch.toLowerCase().trim();
+      const matchQuery =
+        !q ||
+        (t.ticketId && t.ticketId.toLowerCase().includes(q)) ||
+        (t.userName && t.userName.toLowerCase().includes(q)) ||
+        (t.customerName && t.customerName.toLowerCase().includes(q)) ||
+        (t.userEmail && t.userEmail.toLowerCase().includes(q)) ||
+        (t.message && t.message.toLowerCase().includes(q)) ||
+        (t.orderId && t.orderId.toLowerCase().includes(q));
+
+      if (!matchStatus || !matchCategory || !matchQuery) return false;
+
+      const dedupeKey = (t.ticketId || t._id || "").trim().toUpperCase() || `${t.userName}_${(t.message || "").slice(0, 30)}`;
+      if (seen.has(dedupeKey)) return false;
+      seen.add(dedupeKey);
+      return true;
+    });
+  }, [supportTickets, supportStatusFilter, supportCategoryFilter, supportSearch]);
+
   useEffect(() => {
     fetchOrders();
     fetchUsers();
+    fetchSupportTickets();
 
     // Listen to WebSocket events AND local custom events
     const handleOrdersUpdated = () => { fetchOrders(); };
@@ -1379,6 +1578,9 @@ export function Admin() {
       const data = e?.detail?.data;
       if (t === "ORDER_CREATED" || t === "ORDERS_UPDATED" || t === "ORDER_STATUS_UPDATED") {
         fetchOrders();
+        if (t === "ORDER_CREATED" && data) {
+          handleNewOrderNotif({ detail: data });
+        }
       }
 
       if (t === "ORDER_CANCELLED") {
@@ -1392,7 +1594,9 @@ export function Admin() {
 
         if (cleanCode) knownCancelledOrderIdsRef.current.add(cleanCode);
 
+        toast.dismiss();
         toast.error(`Order was cancelled #${shortCode}`, {
+          id: `toast-cancel-${shortCode}`,
           description: `Order #${shortCode} was cancelled by ${customerName}${reason}`,
           duration: 7000,
         });
@@ -1419,35 +1623,83 @@ export function Admin() {
       }
 
       if (t === "SUPPORT_MESSAGE" || t === "SUPPORT_TICKET_CREATED") {
+        const ticketIdRaw = String(data?.ticketId || data?._id || "").trim();
         const sender = data?.userName || data?.customerName || data?.userEmail || "Customer";
         const msgText = data?.text || data?.message || data?.query || "New customer support query";
+        const cleanMsgKey = `${sender}_${msgText.slice(0, 30)}`.toLowerCase();
+        const dedupeKey = ticketIdRaw ? ticketIdRaw.toUpperCase() : cleanMsgKey;
+
+        // Strictly check if we already handled this ticket recently to prevent duplicates!
+        if (knownSupportTicketIdsRef.current.has(dedupeKey)) {
+          return;
+        }
+        knownSupportTicketIdsRef.current.add(dedupeKey);
+        if (ticketIdRaw) knownSupportTicketIdsRef.current.add(cleanMsgKey);
+
         const category = data?.category ? ` [${data.category}]` : "";
         const orderRef = data?.orderId ? ` (Ref: #${String(data.orderId).replace(/^#+/, "").slice(-8).toUpperCase()})` : "";
-        const notifId = `notif-support-${Date.now()}`;
+        const notifId = `notif-support-${dedupeKey}`;
+
+        // Dismiss all active toasts to guarantee exactly ONE single toast appears on screen
+        toast.dismiss();
 
         toast.info(`💬 Customer Support Message${category}`, {
+          id: "toast-support-message",
           description: `${sender}: "${msgText.slice(0, 90)}${msgText.length > 90 ? "..." : ""}"${orderRef}`,
           duration: 7000,
         });
         triggerWebTestPushNotification(
-          `💬 Customer Support Message: ${sender}`,
-          `${msgText}${orderRef}`
+          `💬 Customer Support Message${category}: ${sender}`,
+          `${msgText}${orderRef}`,
+          `support-${dedupeKey}`
         );
         playNotifChime();
 
-        setNotifications((prev) => [
-          {
-            id: notifId,
-            title: `💬 Support: ${sender}${category}`,
-            message: `"${msgText}"${orderRef}`,
-            time: "Just now",
-            timestamp: Date.now(),
-            read: false,
-            type: "system",
-            targetTab: "orders",
-          },
-          ...prev,
-        ]);
+        setNotifications((prev) => {
+          if (prev.some((n) => n.id === notifId || (ticketIdRaw && n.message.includes(ticketIdRaw)))) return prev;
+          return [
+            {
+              id: notifId,
+              title: `💬 Support: ${sender}${category}`,
+              message: `"${msgText}"${orderRef}`,
+              time: "Just now",
+              timestamp: Date.now(),
+              read: false,
+              type: "system",
+              targetTab: "support",
+            },
+            ...prev,
+          ];
+        });
+
+        const newT: SupportTicket = {
+          _id: data?._id || `sup-${ticketIdRaw || Date.now()}`,
+          ticketId: data?.ticketId || (ticketIdRaw ? ticketIdRaw : `#VX-SUP-${Date.now().toString().slice(-4)}`),
+          customerName: sender,
+          userName: sender,
+          userEmail: data?.userEmail || "",
+          phone: data?.phone || "",
+          category: data?.category || "General Inquiries",
+          orderId: data?.orderId || "",
+          message: msgText,
+          status: "Open",
+          createdAt: new Date().toISOString(),
+        };
+
+        setSupportTickets((prev) => {
+          const exists = prev.some((t) => 
+            (ticketIdRaw && (t.ticketId === ticketIdRaw || t._id === ticketIdRaw)) ||
+            (t.userName === sender && t.message === msgText)
+          );
+          if (exists) return prev;
+          const updated = [newT, ...prev];
+          if (typeof window !== "undefined") {
+            localStorage.setItem("vexa_support_tickets", JSON.stringify(updated));
+          }
+          return updated;
+        });
+
+        fetchSupportTickets();
       }
     };
 
@@ -1769,8 +2021,28 @@ export function Admin() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {/* CUSTOMER SUPPORT QUICK ACCESS BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("support")}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
+                    activeTab === "support"
+                      ? "bg-gold text-primary-foreground border-gold shadow-goldy font-extrabold"
+                      : "border-gold/40 bg-card/90 hover:bg-gold/15 text-gold font-bold"
+                  }`}
+                  title="Customer Support Desk"
+                >
+                  <Headphones className="size-4.5" />
+                  <span className="text-xs uppercase tracking-wider hidden sm:inline">Customer Support</span>
+                  {supportTickets.filter(t => t.status === "Open" || !t.status).length > 0 && (
+                    <span className="flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-black shadow-xs">
+                      {supportTickets.filter(t => t.status === "Open" || !t.status).length}
+                    </span>
+                  )}
+                </button>
+
                 {/* REALTIME ADMIN NOTIFICATION BELL */}
-              <div ref={notifRef} className="relative shrink-0">
+                <div ref={notifRef} className="relative shrink-0">
                 <button
                   type="button"
                   onClick={() => setNotifOpen(!notifOpen)}
@@ -2459,12 +2731,28 @@ export function Admin() {
                       <p className="text-xs text-muted-foreground mt-1">Review orders placed across the system and update shipment status. Click any product item to view full order details.</p>
                     </div>
 
-                    <button
-                      onClick={() => fetchOrders(true)}
-                      className="flex items-center gap-2 rounded-sm border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-semibold text-gold transition-colors hover:bg-gold hover:text-primary-foreground shadow-sm w-fit cursor-pointer"
-                    >
-                      <RefreshCw className={`size-3.5 ${loadingOrders ? "animate-spin" : ""}`} /> Refresh Orders
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("support")}
+                        className="flex items-center gap-2 rounded-sm border border-gold bg-gold text-primary-foreground px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all hover:bg-gold-dark shadow-goldy w-fit cursor-pointer hover:scale-105 active:scale-95"
+                        title="Open Customer Support Desk"
+                      >
+                        <Headphones className="size-3.5" />
+                        <span>Customer Support</span>
+                        {supportTickets.filter(t => t.status === "Open" || !t.status).length > 0 && (
+                          <span className="rounded-full bg-black text-gold px-1.5 py-0.5 text-[9px] font-black">
+                            {supportTickets.filter(t => t.status === "Open" || !t.status).length}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => fetchOrders(true)}
+                        className="flex items-center gap-2 rounded-sm border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-semibold text-gold transition-colors hover:bg-gold hover:text-primary-foreground shadow-sm w-fit cursor-pointer"
+                      >
+                        <RefreshCw className={`size-3.5 ${loadingOrders ? "animate-spin" : ""}`} /> Refresh Orders
+                      </button>
+                    </div>
                   </div>
 
                   {statusUpdatedMsg && (
@@ -3793,6 +4081,295 @@ export function Admin() {
 
 
 
+            {/* CUSTOMER SUPPORT DESK */}
+            {activeTab === "support" && (
+              <div className="space-y-8 animate-in fade-in duration-300">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5">
+                      <LifeBuoy className="size-3 text-gold" />
+                      VIP Concierge & Help Desk
+                    </span>
+                    <h2 className="font-display text-2xl font-semibold text-foreground flex items-center gap-2">
+                      Customer Support Desk
+                      <span className="text-xs font-bold rounded-full bg-gold/15 text-gold border border-gold/40 px-2.5 py-0.5 font-mono">
+                        {supportTickets.length} Total
+                      </span>
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Manage live support tickets, sizing queries, and delivery inquiries received from the VEXA mobile app and online boutique.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchSupportTickets()}
+                      className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:border-gold hover:text-gold transition-all cursor-pointer shadow-xs"
+                      title="Refresh inquiries"
+                    >
+                      <RefreshCw className={`size-3.5 ${loadingSupport ? "animate-spin text-gold" : ""}`} />
+                      <span>Refresh</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI Metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-xl border border-border/80 bg-surface/50 p-4 space-y-1">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Total Tickets</span>
+                      <MessageSquare className="size-4 text-gold" />
+                    </div>
+                    <p className="font-display text-2xl font-bold text-foreground">{supportTickets.length}</p>
+                    <p className="text-[10px] text-muted-foreground">All logged inquiries</p>
+                  </div>
+
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-1">
+                    <div className="flex items-center justify-between text-amber-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Open / Pending</span>
+                      <span className="flex size-2 rounded-full bg-amber-400 animate-pulse" />
+                    </div>
+                    <p className="font-display text-2xl font-bold text-amber-400">
+                      {supportTickets.filter((t) => t.status === "Open" || !t.status).length}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Requires admin action</p>
+                  </div>
+
+                  <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 space-y-1">
+                    <div className="flex items-center justify-between text-blue-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">In Progress</span>
+                      <Clock className="size-4 text-blue-400" />
+                    </div>
+                    <p className="font-display text-2xl font-bold text-blue-400">
+                      {supportTickets.filter((t) => t.status === "In Progress").length}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Under active review</p>
+                  </div>
+
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-1">
+                    <div className="flex items-center justify-between text-emerald-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Resolved</span>
+                      <CheckCircle2 className="size-4 text-emerald-400" />
+                    </div>
+                    <p className="font-display text-2xl font-bold text-emerald-400">
+                      {supportTickets.filter((t) => t.status === "Resolved" || t.status === "Closed").length}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Successfully answered</p>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-surface/30 p-3 rounded-2xl border border-border/80">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={supportSearch}
+                      onChange={(e) => setSupportSearch(e.target.value)}
+                      placeholder="Search tickets by ID, customer name, email, order #, or query..."
+                      className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Status Tabs */}
+                    <div className="flex items-center bg-background rounded-xl p-1 border border-border">
+                      {["All", "Open", "In Progress", "Resolved"].map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setSupportStatusFilter(st)}
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                            supportStatusFilter === st
+                              ? "bg-gold text-primary-foreground shadow-xs font-black"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {st}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Category Dropdown */}
+                    <select
+                      value={supportCategoryFilter}
+                      onChange={(e) => setSupportCategoryFilter(e.target.value)}
+                      aria-label="Filter tickets by inquiry category"
+                      className="px-3 py-2 text-xs font-semibold rounded-xl border border-border bg-background text-foreground focus:border-gold focus:outline-none cursor-pointer"
+                    >
+                      <option value="All">All Categories</option>
+                      <option value="Order Delivery">Order Delivery</option>
+                      <option value="Size & Fit Advice">Size & Fit Advice</option>
+                      <option value="Returns & Refund">Returns & Refund</option>
+                      <option value="General Inquiries">General Inquiries</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Ticket List */}
+                <div className="space-y-4">
+                  {filteredSupportTickets.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border p-12 text-center space-y-3">
+                      <LifeBuoy className="size-10 text-muted-foreground/40 mx-auto" />
+                      <h4 className="font-display text-base font-bold text-foreground">No Support Tickets Found</h4>
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        No support inquiries match your current search and filter criteria. You will be notified in real-time when new tickets are created.
+                      </p>
+                    </div>
+                  ) : (
+                    filteredSupportTickets.map((ticket) => {
+                      const isResolved = ticket.status === "Resolved" || ticket.status === "Closed";
+                      const isOpen = ticket.status === "Open" || !ticket.status;
+                      const isInProgress = ticket.status === "In Progress";
+
+                      return (
+                        <div
+                          key={ticket._id || ticket.ticketId}
+                          className={`rounded-2xl border transition-all duration-200 p-5 space-y-4 shadow-sm hover:shadow-md ${
+                            isOpen
+                              ? "border-amber-500/40 bg-card hover:border-amber-500/70"
+                              : isResolved
+                              ? "border-border/60 bg-card/60 hover:border-border"
+                              : "border-blue-500/40 bg-card hover:border-blue-500/70"
+                          }`}
+                        >
+                          {/* Top Row: Ticket ID, Category, Date, Status */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="font-mono text-xs font-black text-gold bg-gold/10 border border-gold/30 px-2.5 py-1 rounded-lg">
+                                {ticket.ticketId || ticket._id}
+                              </span>
+                              <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-surface text-foreground border border-border">
+                                {ticket.category || "General"}
+                              </span>
+                              {ticket.orderId && (
+                                <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold font-mono uppercase bg-gold/15 text-gold border border-gold/30 flex items-center gap-1">
+                                  <Package className="size-3" />
+                                  Order Ref: #{String(ticket.orderId).replace(/^#+/, "").slice(-8).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] text-muted-foreground font-medium">
+                                {new Date(ticket.createdAt).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+
+                              {/* Status Dropdown Selector */}
+                              <select
+                                value={ticket.status || "Open"}
+                                onChange={(e) => handleUpdateTicketStatus(ticket._id || ticket.ticketId || "", e.target.value)}
+                                aria-label="Update ticket status"
+                                className={`rounded-xl px-2.5 py-1 text-xs font-bold uppercase tracking-wider border cursor-pointer focus:outline-none transition-all ${
+                                  isOpen
+                                    ? "bg-amber-500/15 text-amber-400 border-amber-500/40"
+                                    : isInProgress
+                                    ? "bg-blue-500/15 text-blue-400 border-blue-500/40"
+                                    : "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                }`}
+                              >
+                                <option value="Open" className="bg-card text-foreground">Open</option>
+                                <option value="In Progress" className="bg-card text-foreground">In Progress</option>
+                                <option value="Resolved" className="bg-card text-foreground">Resolved</option>
+                                <option value="Closed" className="bg-card text-foreground">Closed</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Customer Details & Query Message */}
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center gap-4 text-xs">
+                              <div className="flex items-center gap-1.5 font-bold text-foreground">
+                                <Users className="size-3.5 text-gold" />
+                                <span>{ticket.customerName || ticket.userName || "Customer"}</span>
+                              </div>
+                              {ticket.userEmail && (
+                                <a
+                                  href={`mailto:${ticket.userEmail}`}
+                                  className="flex items-center gap-1 text-muted-foreground hover:text-gold transition-colors font-mono"
+                                >
+                                  <Mail className="size-3 text-gold" />
+                                  <span>{ticket.userEmail}</span>
+                                </a>
+                              )}
+                              {ticket.phone && (
+                                <a
+                                  href={`tel:${ticket.phone}`}
+                                  className="flex items-center gap-1 text-muted-foreground hover:text-gold transition-colors font-mono"
+                                >
+                                  <Phone className="size-3 text-gold" />
+                                  <span>{ticket.phone}</span>
+                                </a>
+                              )}
+                            </div>
+
+                            {/* Customer Query Quote */}
+                            <div className="rounded-xl border border-border/80 bg-surface/50 p-3.5 text-xs text-foreground/90 leading-relaxed font-sans flex items-start gap-2.5">
+                              <MessageSquare className="size-4 text-gold shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <p className="font-normal text-[13px]">{ticket.message || "Customer query submitted via mobile support."}</p>
+                              </div>
+                            </div>
+
+                            {/* Admin Reply Block if present */}
+                            {ticket.reply && (
+                              <div className="rounded-xl border border-gold/40 bg-gold/5 p-3.5 text-xs space-y-1.5">
+                                <div className="flex items-center gap-1.5 font-bold text-gold text-[10px] uppercase tracking-wider">
+                                  <CheckCircle2 className="size-3.5 text-gold" />
+                                  <span>Official Concierge Reply</span>
+                                </div>
+                                <p className="text-foreground/90 leading-relaxed text-[12.5px] font-sans">
+                                  {ticket.reply}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Bottom Action Controls */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/40">
+                            <span className="text-[11px] text-muted-foreground">
+                              {ticket.reply ? "✓ Customer inquiry answered" : "Pending concierge response"}
+                            </span>
+
+                            <div className="flex items-center gap-2">
+                              {!isResolved && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateTicketStatus(ticket._id || ticket.ticketId || "", "Resolved")}
+                                  className="px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                                >
+                                  Mark Resolved
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTicketForReply(ticket);
+                                  setAdminReplyText(ticket.reply || "");
+                                }}
+                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gold text-primary-foreground hover:bg-gold-dark text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-goldy hover:scale-105 active:scale-95"
+                              >
+                                <Send className="size-3" />
+                                <span>{ticket.reply ? "Edit Reply" : "Reply to Customer"}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
           </main>
 
             {/* Admin Aligned Footer */}
@@ -3917,6 +4494,126 @@ export function Admin() {
           </div>
         </div>
       )}
+
+      {/* CUSTOMER SUPPORT TICKET REPLY MODAL */}
+      {selectedTicketForReply && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-gold/50 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-gold/15 text-gold border border-gold/30">
+                  <Headphones className="size-5" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-bold text-foreground">
+                    Reply to Concierge Ticket
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    Ticket {selectedTicketForReply.ticketId || selectedTicketForReply._id} • {selectedTicketForReply.customerName || selectedTicketForReply.userName || "Customer"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTicketForReply(null)}
+                className="flex size-8 items-center justify-center rounded-full bg-surface text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Customer Inquiry Summary */}
+            <div className="rounded-xl border border-border/80 bg-surface/50 p-3.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span className="font-bold text-foreground">
+                  Inquiry Topic: <strong className="text-gold">{selectedTicketForReply.category || "General"}</strong>
+                </span>
+                {selectedTicketForReply.orderId && (
+                  <span className="font-mono text-[11px] text-gold">
+                    Order Ref: #{String(selectedTicketForReply.orderId).replace(/^#+/, "").slice(-8).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <p className="text-foreground/90 italic bg-background/50 p-2.5 rounded-lg border border-border/40 font-sans">
+                "{selectedTicketForReply.message || "Customer query details."}"
+              </p>
+            </div>
+
+            {/* Quick Templates */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-gold font-bold block mb-1.5">
+                Quick Response Templates
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  {
+                    label: "📦 Order In Transit",
+                    text: "Hello! Your order has been dispatched and is currently in transit with express priority. You can monitor live tracking in your profile.",
+                  },
+                  {
+                    label: "📏 Sizing & Fit",
+                    text: "Hi there! Our drop-shoulder tees are crafted with 240 GSM heavy cotton in an oversized silhouette. Ordering your regular size provides the tailored luxury drape.",
+                  },
+                  {
+                    label: "💵 Refund Processed",
+                    text: "Greetings! Your refund request has been verified and credited directly to your account wallet.",
+                  },
+                  {
+                    label: "🔄 Exchange Initiated",
+                    text: "Hello! An exchange replacement has been scheduled. Our logistics partner will pick up the item within 24-48 hours.",
+                  },
+                ].map((tpl) => (
+                  <button
+                    key={tpl.label}
+                    type="button"
+                    onClick={() => setAdminReplyText(tpl.text)}
+                    className="px-2.5 py-1 rounded-lg border border-border bg-surface text-[11px] font-semibold text-muted-foreground hover:border-gold hover:text-gold transition-colors cursor-pointer"
+                  >
+                    {tpl.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reply Form */}
+            <form onSubmit={handleSendTicketReply} className="space-y-4">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block mb-1.5">
+                  Your Official Response
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={adminReplyText}
+                  onChange={(e) => setAdminReplyText(e.target.value)}
+                  placeholder="Type your official concierge response to the customer..."
+                  className="w-full rounded-xl border border-border bg-surface p-3 text-xs text-foreground outline-none focus:border-gold font-sans min-h-[90px]"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTicketForReply(null)}
+                  className="flex-1 rounded-xl border border-border py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:bg-surface cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={replySending || !adminReplyText.trim()}
+                  className="flex-1 rounded-xl bg-gold text-primary-foreground hover:bg-gold-dark py-2.5 text-xs font-bold uppercase tracking-wider cursor-pointer shadow-goldy disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <Send className="size-3.5" />
+                  <span>{replySending ? "Dispatching..." : "Send Response"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* CANCELLATION REASON MODAL POPUP */}
       {cancellingOrder && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4 backdrop-blur-md animate-in fade-in duration-200">

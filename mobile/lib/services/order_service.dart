@@ -214,15 +214,38 @@ class OrderService {
     ordersChangeNotifier.value++;
   }
 
-  /// Automatic periodic polling disabled to prevent unnecessary screen refreshing; real-time events handled via WebSocket.
+  /// Periodic auto-polling keeps delivery status continuously synchronized with admin changes
   static void startAutoPoll({String? email}) {
     _pollingTimer?.cancel();
-    _pollingTimer = null;
+    _pollingTimer = Timer.periodic(const Duration(seconds: 8), (_) async {
+      try {
+        String? targetEmail = email;
+        if (targetEmail == null || targetEmail.isEmpty) {
+          final user = await AuthService.getUser();
+          targetEmail = user?.email;
+        }
+        if (targetEmail == null || targetEmail.isEmpty || targetEmail.toLowerCase() == 'guest@vexa.app') {
+          return;
+        }
+        final orders = await getOrders(email: targetEmail);
+        if (orders.isNotEmpty) {
+          notifyOrdersChanged();
+        }
+      } catch (_) {}
+    });
   }
 
   static void stopAutoPoll() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
+  }
+
+  /// Clear all locally cached orders, session cancellations, and paid states on logout / user switch
+  static void clearLocalSession() {
+    _inMemoryOrders.clear();
+    _cancelledOrderReasons.clear();
+    _paidOrderIds.clear();
+    notifyOrdersChanged();
   }
 
   /// Check if an order ID has been cancelled locally
@@ -241,35 +264,48 @@ class OrderService {
   static void updateOrderStatusLocally(
     String orderId,
     String newStatus, {
+    String? altId,
     String? paymentMethod,
     String? cancelReason,
     BuildContext? context,
     bool createNotification = true,
   }) {
-    final cleanTarget = orderId.replaceAll('#', '').toLowerCase().trim();
+    final targets = <String>[
+      orderId.replaceAll('#', '').toLowerCase().trim(),
+      if (altId != null && altId.isNotEmpty) altId.replaceAll('#', '').toLowerCase().trim(),
+    ].where((t) => t.isNotEmpty).toList();
 
     final stLower = newStatus.toLowerCase();
-    if (stLower == 'confirmed' || stLower == 'paid' || (paymentMethod != null && paymentMethod.isNotEmpty && !paymentMethod.toLowerCase().contains('cod') && !paymentMethod.toLowerCase().contains('cash'))) {
-      _paidOrderIds.add(cleanTarget);
-      _paidOrderIds.add(orderId);
-    }
+    for (final cleanTarget in targets) {
+      if (stLower == 'confirmed' || stLower == 'paid' || (paymentMethod != null && paymentMethod.isNotEmpty && !paymentMethod.toLowerCase().contains('cod') && !paymentMethod.toLowerCase().contains('cash'))) {
+        _paidOrderIds.add(cleanTarget);
+        _paidOrderIds.add(orderId);
+      }
 
-    if (newStatus.toLowerCase() == 'cancelled') {
-      final reasonStr = (cancelReason != null && cancelReason.isNotEmpty)
-          ? cancelReason
-          : 'Cancelled by customer';
-      _cancelledOrderReasons[cleanTarget] = reasonStr;
-      _cancelledOrderReasons[orderId] = reasonStr;
+      if (stLower == 'cancelled') {
+        final reasonStr = (cancelReason != null && cancelReason.isNotEmpty)
+            ? cancelReason
+            : 'Cancelled by customer';
+        _cancelledOrderReasons[cleanTarget] = reasonStr;
+        _cancelledOrderReasons[orderId] = reasonStr;
+      }
     }
 
     for (var order in _inMemoryOrders) {
       final cleanOrd = order.id.replaceAll('#', '').toLowerCase().trim();
-      if (order.id == orderId ||
-          cleanOrd == cleanTarget ||
-          (cleanTarget.length >= 4 && cleanOrd.contains(cleanTarget)) ||
-          (cleanOrd.length >= 4 && cleanTarget.contains(cleanOrd)) ||
-          cleanOrd.endsWith(cleanTarget) ||
-          cleanTarget.endsWith(cleanOrd)) {
+      bool matched = false;
+      for (final cleanTarget in targets) {
+        if (order.id == cleanTarget ||
+            cleanOrd == cleanTarget ||
+            (cleanTarget.length >= 4 && cleanOrd.contains(cleanTarget)) ||
+            (cleanOrd.length >= 4 && cleanTarget.contains(cleanOrd)) ||
+            cleanOrd.endsWith(cleanTarget) ||
+            cleanTarget.endsWith(cleanOrd)) {
+          matched = true;
+          break;
+        }
+      }
+      if (matched) {
         order.status = newStatus;
         if (paymentMethod != null && paymentMethod.isNotEmpty) {
           order.paymentMethod = paymentMethod;
@@ -298,156 +334,8 @@ class OrderService {
     notifyOrdersChanged();
   }
 
-  static final List<OrderModel> _inMemoryOrders = [
-    OrderModel(
-      id: '#VX-1806',
-      customerName: 'Tatukulaedukondalu',
-      shippingAddress: '123 Luxury Avenue, Fashion District, Pincode: 400001',
-      phone: '+91 98765 43210',
-      paymentMethod: 'Razorpay NetBanking (Punjab National Bank)',
-      totalAmount: 1899.0,
-      status: 'Out for Delivery',
-      createdAt: DateTime(2026, 10, 7, 6, 33),
-      items: [
-        OrderItem(
-          itemId: 'vx-08',
-          name: 'Emerald Acid Wash Boxy Tee',
-          price: 1899.0,
-          quantity: 1,
-          color: 'Emerald Green',
-          size: 'M',
-          image: 'assets/images/tee-emerald.png',
-        ),
-      ],
-    ),
-    OrderModel(
-      id: '#VX-9420',
-      customerName: 'Aarav Sharma',
-      shippingAddress: 'Flat 402, Royal Residency, Indiranagar, Bengaluru - 560038',
-      phone: '+91 98765 43210',
-      paymentMethod: 'Razorpay UPI (GPay)',
-      totalAmount: 1899.0,
-      status: 'Processing',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      items: [
-        OrderItem(
-          itemId: 'vx-01',
-          name: 'Obsidian Stealth Acid Tee',
-          price: 1899.0,
-          quantity: 1,
-          color: 'Obsidian Black',
-          size: 'M',
-          image: 'assets/images/tee-black.jpg',
-        ),
-      ],
-    ),
-    OrderModel(
-      id: '#VX-8834',
-      customerName: 'Aarav Sharma',
-      shippingAddress: 'Flat 402, Royal Residency, Indiranagar, Bengaluru - 560038',
-      phone: '+91 98765 43210',
-      paymentMethod: 'Razorpay UPI (GPay)',
-      totalAmount: 2499.0,
-      status: 'Out for Delivery',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      items: [
-        OrderItem(
-          itemId: 'vx-08',
-          name: 'Emerald Acid Wash Boxy Tee',
-          price: 1899.0,
-          quantity: 1,
-          color: 'Emerald Green',
-          size: 'L',
-          image: 'assets/images/tee-emerald.png',
-        ),
-      ],
-    ),
-    OrderModel(
-      id: '#VX-8245',
-      customerName: 'Aarav Sharma',
-      shippingAddress: 'Flat 402, Royal Residency, Indiranagar, Bengaluru - 560038',
-      phone: '+91 98765 43210',
-      paymentMethod: 'Net Banking (ICICI Bank)',
-      totalAmount: 2199.0,
-      status: 'Shipped',
-      createdAt: DateTime.now().subtract(const Duration(days: 4)),
-      items: [
-        OrderItem(
-          itemId: 'vx-12',
-          name: 'Lavender Dream Oversized Tee',
-          price: 2199.0,
-          quantity: 1,
-          color: 'Lavender Purple',
-          size: 'M',
-          image: 'assets/images/tee-lavender.png',
-        ),
-      ],
-    ),
-    OrderModel(
-      id: '#VX-7412',
-      customerName: 'Aarav Sharma',
-      shippingAddress: 'Flat 402, Royal Residency, Indiranagar, Bengaluru - 560038',
-      phone: '+91 98765 43210',
-      paymentMethod: 'Credit Card (HDFC **** 4819)',
-      totalAmount: 3598.0,
-      status: 'Delivered',
-      createdAt: DateTime.now().subtract(const Duration(days: 9)),
-      items: [
-        OrderItem(
-          itemId: 'vx-00',
-          name: 'Gold-Embroidered Luxe Tee',
-          price: 1799.0,
-          quantity: 2,
-          color: 'Luxury Cream & Gold',
-          size: 'XL',
-          image: 'assets/images/hero_luxury_tshirt.png',
-        ),
-      ],
-    ),
-    OrderModel(
-      id: '#VX-6890',
-      customerName: 'Aarav Sharma',
-      shippingAddress: 'Flat 402, Royal Residency, Indiranagar, Bengaluru - 560038',
-      phone: '+91 98765 43210',
-      paymentMethod: 'VEXA Wallet',
-      totalAmount: 1799.0,
-      status: 'Delivered',
-      createdAt: DateTime.now().subtract(const Duration(days: 16)),
-      items: [
-        OrderItem(
-          itemId: 'vx-07',
-          name: 'Vintage Rust Drop-Shoulder Tee',
-          price: 1799.0,
-          quantity: 1,
-          color: 'Vintage Rust',
-          size: 'L',
-          image: 'assets/images/tee-rust.png',
-        ),
-      ],
-    ),
-    OrderModel(
-      id: '#VX-5510',
-      customerName: 'Aarav Sharma',
-      shippingAddress: 'Flat 402, Royal Residency, Indiranagar, Bengaluru - 560038',
-      phone: '+91 98765 43210',
-      paymentMethod: 'Razorpay UPI',
-      totalAmount: 1999.0,
-      status: 'Cancelled',
-      cancelReason: 'Ordered wrong size or color variant',
-      createdAt: DateTime.now().subtract(const Duration(days: 22)),
-      items: [
-        OrderItem(
-          itemId: 'vx-03',
-          name: 'Midnight Indigo Heavyweight Tee',
-          price: 1999.0,
-          quantity: 1,
-          color: 'Midnight Indigo',
-          size: 'S',
-          image: 'assets/images/tee-navy.jpg',
-        ),
-      ],
-    ),
-  ];
+  // Active in-memory session orders placed on this device (no fake duplicate dummy orders)
+  static final List<OrderModel> _inMemoryOrders = [];
 
   /// Retrieve all user orders (combining in-memory + backend API if accessible)
   static Future<List<OrderModel>> getOrders({String? email}) async {
@@ -460,15 +348,20 @@ class OrderService {
     }
 
     try {
-      String userEmail = (email != null && email.isNotEmpty) ? email : '';
+      String userEmail = (email != null && email.isNotEmpty) ? email.trim() : '';
 
       if (userEmail.isEmpty) {
         final user = await AuthService.getUser();
-        userEmail = user?.email ?? 'admin@vexa.com';
+        userEmail = (user?.email ?? '').trim();
+      }
+
+      // If user is not logged in or is guest, NEVER fetch admin or seeded dummy orders!
+      if (userEmail.isEmpty || userEmail.toLowerCase() == 'guest@vexa.app') {
+        return [];
       }
 
       final response = await http
-          .get(Uri.parse('${ApiConfig.baseUrl}/orders/myorders?email=$userEmail'))
+          .get(Uri.parse('${ApiConfig.baseUrl}/orders/myorders?email=${Uri.encodeComponent(userEmail.toLowerCase())}'))
           .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
@@ -535,6 +428,12 @@ class OrderService {
       }
     } catch (_) {
       // Backend unreachable or offline, fallback to in-memory list
+    }
+
+    final user = await AuthService.getUser();
+    final currentEmail = (email ?? user?.email ?? '').trim().toLowerCase();
+    if (currentEmail.isEmpty || currentEmail == 'guest@vexa.app') {
+      return [];
     }
 
     for (var o in _inMemoryOrders) {

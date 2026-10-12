@@ -269,8 +269,18 @@ exports.updateOrderStatus = async (req, res, next) => {
     await order.save();
 
     // Broadcast Real-time WebSocket event for open dashboards/apps
-    broadcast('ORDER_STATUS_UPDATED', order);
-    broadcast('ORDERS_UPDATED', order);
+    const orderBroadcastData = {
+      ...(order.toObject ? order.toObject() : order),
+      id: order.id,
+      _id: String(order._id),
+      orderId: order.id || String(order._id),
+      status: newStatus,
+      cancelReason: order.cancelReason,
+      customerName: order.userName || order.customerName || order.userEmail || 'Customer',
+      userEmail: order.userEmail,
+    };
+    broadcast('ORDER_STATUS_UPDATED', orderBroadcastData);
+    broadcast('ORDERS_UPDATED', orderBroadcastData);
     if (newStatus.toUpperCase() === 'CANCELLED') {
       broadcast('ORDER_CANCELLED', {
         orderId: order.id || String(order._id),

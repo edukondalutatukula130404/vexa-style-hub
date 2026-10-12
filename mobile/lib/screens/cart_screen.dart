@@ -2819,6 +2819,8 @@ class _CartScreenState extends State<CartScreen> {
       MaterialPageRoute(
         builder: (context) => ProductDetailScreen(
           item: item,
+          cartItems: widget.cartItems,
+          onOpenCart: () => Navigator.pop(context),
           onAddToCart: (pItem, color, size, qty) {
             final existingIndex = widget.cartItems.indexWhere(
               (c) => c.item.id == pItem.id && c.selectedColor == color && c.selectedSize == size,

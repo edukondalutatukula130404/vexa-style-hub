@@ -1,6 +1,6 @@
-import { Link, NavLink, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronDown, Heart } from "lucide-react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState, useMemo } from "react";
+import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronLeft, ChevronDown, Heart, ArrowLeft, Bell } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
@@ -14,8 +14,38 @@ const baseLinks = [
 ];
 
 export function Navbar() {
+  const navigate = useNavigate();
   const location = useLocation();
   const isHomePage = location.pathname === "/";
+
+  // Dynamic screen title for native mobile experience on non-home pages
+  const screenTitle = useMemo(() => {
+    const pathname = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get("tab");
+
+    if (pathname === "/products") return "All Products";
+    if (pathname.startsWith("/product/")) return "Product Details";
+    if (pathname === "/cart") return "Shopping Bag";
+    if (pathname === "/dashboard") {
+      if (tab === "orders") return "My Orders";
+      if (tab === "wishlist") return "My Wishlist";
+      if (tab === "cart") return "Shopping Bag";
+      if (tab === "profile") return "My Profile";
+      if (tab === "addresses") return "Saved Addresses";
+      if (tab === "wallet") return "VEXA Wallet";
+      if (tab === "support") return "Customer Support";
+      return "My Profile";
+    }
+    if (pathname === "/about") return "About Us";
+    if (pathname === "/contact") return "Contact Us";
+    if (pathname === "/faq") return "Help & FAQ";
+    if (pathname === "/register") return "Create Account";
+    if (pathname === "/reset-password") return "Reset Password";
+
+    const clean = pathname.replace(/^\//, "").replace(/[-_]/g, " ");
+    return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "";
+  }, [location.pathname, location.search]);
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState(true);
@@ -24,6 +54,14 @@ export function Navbar() {
   const { wishlistItems } = useWishlist();
   const totalCartCount = (cartItems || []).reduce((acc, item) => acc + (item?.quantity || 1), 0);
   const wishlistCount = (wishlistItems || []).length;
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -58,8 +96,8 @@ export function Navbar() {
     };
   }, [open]);
 
-  // Hide header navigation completely on admin portal
-  if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
+  // Hide header navigation on admin portal and on login page (for native mobile experience)
+  if (location.pathname.startsWith("/admin") || location.pathname === "/login") {
     return null;
   }
 
@@ -77,26 +115,86 @@ export function Navbar() {
         }`}
       >
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6">
-          {/* Brand Logo & Name (Optimized for Mobile Responsive) */}
-          <Link to="/" className="group flex items-center gap-2.5 sm:gap-3 leading-none shrink-0">
-            <img
-              src="/vexa_logo.png"
-              alt="VEXA Logo"
-              loading="lazy"
-              decoding="async"
-              className="size-7 sm:size-8 rounded-md transition-transform duration-300 group-hover:scale-105 shrink-0 object-cover"
-            />
-            <div className="flex flex-col justify-center">
-              <span className="font-display text-xl sm:text-2xl font-bold tracking-[0.28em] sm:tracking-[0.35em] text-gold-gradient leading-none">
-                VEXA
-              </span>
-              <span className="mt-0.5 sm:mt-1 text-[8px] sm:text-[9px] font-semibold tracking-[0.22em] sm:tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
-                WEAR CONFIDENCE
-              </span>
-            </div>
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Header Back Button Symbol (Visible on all non-home pages) */}
+            {!isHomePage && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex size-8.5 sm:size-8.5 items-center justify-center rounded-full text-foreground hover:bg-muted/50 transition-all duration-200 cursor-pointer active:scale-90 shrink-0 -ml-1 sm:ml-0 sm:border sm:border-gold/40 sm:bg-card/90 sm:text-gold sm:hover:bg-gold sm:hover:text-primary-foreground"
+                title="Go Back"
+                aria-label="Go Back"
+              >
+                <ChevronLeft className="size-6 text-foreground sm:size-4.5 sm:text-inherit" strokeWidth={2.4} />
+              </button>
+            )}
 
-          {/* Navigation Links */}
+            {/* Brand Logo on Home Screen, or Dynamic Screen Title on other screens for Mobile */}
+            {isHomePage ? (
+              <Link to="/" className="group flex items-center gap-2 sm:gap-3 leading-none shrink-0">
+                <div className="flex size-8 sm:size-9 items-center justify-center rounded-[10px] bg-white border border-border/60 shadow-xs transition-transform duration-300 group-hover:scale-105 shrink-0 overflow-hidden p-0.5">
+                  <img
+                    src="/vexa_logo.png"
+                    alt="VEXA Logo"
+                    loading="lazy"
+                    decoding="async"
+                    className="size-full rounded-[8px] object-cover"
+                  />
+                </div>
+                <div className="flex flex-col justify-center">
+                  <span className="font-display text-lg sm:text-2xl font-black tracking-[0.32em] sm:tracking-[0.35em] text-gold-gradient leading-none">
+                    V E X A
+                  </span>
+                  <span className="mt-1 text-[7.5px] sm:text-[9px] font-semibold tracking-[0.24em] sm:tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
+                    WEAR CONFIDENCE
+                  </span>
+                </div>
+              </Link>
+            ) : (
+              <>
+                {/* Mobile View: Dynamic Screen Title (Hidden on desktop) */}
+                {location.pathname === "/dashboard" && (!new URLSearchParams(location.search).get("tab") || new URLSearchParams(location.search).get("tab") === "profile") ? (
+                  <div className="flex flex-col justify-center sm:hidden min-w-0">
+                    <span className="font-display text-[15px] font-black tracking-[0.08em] text-foreground leading-tight uppercase truncate">
+                      PROFILE &amp; SETTINGS
+                    </span>
+                    <span className="text-[10.5px] text-muted-foreground font-medium leading-tight mt-0.5 truncate">
+                      Manage account &amp; preferences
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center sm:hidden">
+                    <span className="text-[18px] font-bold tracking-tight text-foreground leading-none ml-0.5">
+                      {screenTitle}
+                    </span>
+                  </div>
+                )}
+
+                {/* Desktop View: Brand Logo */}
+                <Link to="/" className="group hidden sm:flex items-center gap-2 sm:gap-3 leading-none shrink-0">
+                  <div className="flex size-8 sm:size-9 items-center justify-center rounded-[10px] bg-white border border-border/60 shadow-xs transition-transform duration-300 group-hover:scale-105 shrink-0 overflow-hidden p-0.5">
+                    <img
+                      src="/vexa_logo.png"
+                      alt="VEXA Logo"
+                      loading="lazy"
+                      decoding="async"
+                      className="size-full rounded-[8px] object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col justify-center">
+                    <span className="font-display text-lg sm:text-2xl font-black tracking-[0.32em] sm:tracking-[0.35em] text-gold-gradient leading-none">
+                      V E X A
+                    </span>
+                    <span className="mt-1 text-[7.5px] sm:text-[9px] font-semibold tracking-[0.24em] sm:tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
+                      WEAR CONFIDENCE
+                    </span>
+                  </div>
+                </Link>
+              </>
+            )}
+          </div>
+
+        {/* Navigation Links (Desktop) */}
           <ul className="hidden items-center gap-8 lg:flex">
             {baseLinks.map((l) => (
               <li key={l.to}>
@@ -115,12 +213,28 @@ export function Navbar() {
           </ul>
 
           {/* Right Section Controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Wishlist Symbol / Icon (Only visible when user is logged in) */}
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            {/* Mobile Home Screen Notification Bell (Matches Flutter Mobile App Home Header 1:1) */}
+            {isHomePage && (
+              <div className="relative flex items-center sm:hidden mr-1">
+                <Link
+                  to="/dashboard?tab=support"
+                  className="flex size-10 items-center justify-center rounded-full border border-border bg-white dark:bg-[#1E293B] text-[#0F172A] dark:text-foreground shadow-sm active:scale-90 transition-transform"
+                  title="Notifications"
+                >
+                  <Bell className="size-5" />
+                </Link>
+                <span className="absolute -top-1 -right-1 flex min-w-4.5 h-4.5 px-1 items-center justify-center rounded-full bg-[#E5BF4E] text-[#0F172A] text-[9.5px] font-black border-2 border-white dark:border-[#0F172A] shadow-xs font-mono">
+                  57
+                </span>
+              </div>
+            )}
+
+            {/* Wishlist Symbol / Icon (Desktop / Tablet) */}
             {isLoggedIn && (
               <Link
                 to="/dashboard?tab=wishlist"
-                className="relative flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+                className="relative hidden sm:flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
                 title="My Wishlist"
               >
                 <Heart className="size-5 sm:size-6" />
@@ -132,11 +246,11 @@ export function Navbar() {
               </Link>
             )}
 
-            {/* Cart Symbol / Icon (Only visible when user is logged in) */}
+            {/* Cart Symbol / Icon (Hidden on mobile < sm; accessible via bottom nav & floating action) */}
             {isLoggedIn && (
               <Link
                 to="/dashboard?tab=cart"
-                className="relative flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+                className="relative hidden sm:flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
                 title="View Cart"
               >
                 <ShoppingCart className="size-5 sm:size-6" />
@@ -148,7 +262,7 @@ export function Navbar() {
               </Link>
             )}
 
-            {/* Account / Login Option in Navbar (Hidden on mobile responsive, shown on >= sm) */}
+            {/* Account / Login Option in Navbar (Shown on >= sm) */}
             {isLoggedIn ? (
               <Link
                 to={accountPath}
@@ -168,12 +282,12 @@ export function Navbar() {
               </Link>
             )}
 
-            {/* Mobile View: Hamburger Menu Button (Always shown on mobile responsive) */}
+            {/* Tablet/Desktop View: Hamburger Menu Button (Drawer for secondary pages like FAQ, About, Contact; hidden on mobile < sm) */}
             <button
               type="button"
               aria-label="Toggle Navigation Menu"
               onClick={() => setOpen((o) => !o)}
-              className="flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+              className="hidden sm:flex lg:hidden items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95 ml-0.5"
               title="Toggle Menu"
             >
               {open ? <X className="size-5" /> : <Menu className="size-5" />}

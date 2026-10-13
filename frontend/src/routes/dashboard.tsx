@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   Lock,
   HelpCircle,
+  Headphones,
   LogOut,
   CheckCircle2,
   Phone,
@@ -44,6 +45,10 @@ import {
   ArrowDownLeft,
   Copy,
   Check,
+  ChevronRight,
+  FileText,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { products, useProducts, SIZES, type Product, getProductImage } from "@/lib/products";
 import { Reveal } from "@/components/Reveal";
@@ -85,7 +90,7 @@ export interface WalletTxn {
   txnId: string;
 }
 
-type TabType = "profile" | "wallet" | "orders" | "addresses" | "cart" | "wishlist" | "support" | "booking";
+type TabType = "profile" | "wallet" | "orders" | "addresses" | "cart" | "wishlist" | "support";
 
 export function UserDashboard() {
   const navigate = useNavigate();
@@ -93,23 +98,6 @@ export function UserDashboard() {
   const { cartItems, totalAmount } = useCart();
   const { wishlistItems } = useWishlist();
   const { products: allProducts } = useProducts();
-
-  const [bookingCategoryFilter, setBookingCategoryFilter] = useState<string>("All");
-  const [bookingSearchQuery, setBookingSearchQuery] = useState<string>("");
-
-  const bookingDisplayProducts = useMemo(() => {
-    const source = Array.isArray(allProducts) && allProducts.length > 0 ? allProducts : products;
-    return source.filter((p) => {
-      const matchCategory =
-        bookingCategoryFilter === "All" ||
-        p.category === bookingCategoryFilter;
-      const matchSearch =
-        !bookingSearchQuery.trim() ||
-        p.name.toLowerCase().includes(bookingSearchQuery.toLowerCase()) ||
-        p.color.toLowerCase().includes(bookingSearchQuery.toLowerCase());
-      return matchCategory && matchSearch;
-    });
-  }, [allProducts, bookingCategoryFilter, bookingSearchQuery]);
   
   const [searchParams] = useSearchParams();
 
@@ -117,7 +105,7 @@ export function UserDashboard() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && ["profile", "wallet", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
+      if (tabParam && ["profile", "wallet", "orders", "addresses", "cart", "wishlist", "support"].includes(tabParam)) {
         return tabParam as TabType;
       }
     }
@@ -126,7 +114,7 @@ export function UserDashboard() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["profile", "wallet", "orders", "addresses", "cart", "wishlist", "support", "booking"].includes(tabParam)) {
+    if (tabParam && ["profile", "wallet", "orders", "addresses", "cart", "wishlist", "support"].includes(tabParam)) {
       setActiveTab(tabParam as TabType);
     }
   }, [searchParams]);
@@ -218,10 +206,152 @@ export function UserDashboard() {
   }, [isLoggedIn, navigate, activeTab, searchParams]);
 
   // Orders State & Sort Options
-  const [myOrders, setMyOrders] = useState<OrderItem[]>([]);
+  const [myOrders, setMyOrders] = useState<OrderItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = JSON.parse(localStorage.getItem("vexa_demo_orders") || "[]");
+        if (Array.isArray(cached) && cached.length > 0) return cached;
+      } catch (e) {}
+    }
+    return [
+      {
+        _id: "ORD-VX-801241",
+        id: "ORD-VX-801241",
+        userEmail: "tatukulaedukondalu@gmail.com",
+        userName: "Tatukula Edukondalu",
+        items: [
+          {
+            name: "Lavender Lilac Drop-Shoulder Tee",
+            price: 2241,
+            size: "L",
+            color: "Lavender Lilac",
+            quantity: 1,
+            image: "tee-lavender.png",
+          },
+        ],
+        totalAmount: 2241,
+        status: "Delivered",
+        paymentMethod: "UPI Instant Pay",
+        shippingAddress: "Plot 42, Jubilee Hills, Road No. 36, Hyderabad",
+        createdAt: "2026-10-11T10:30:00.000Z",
+      },
+      {
+        _id: "ORD-VX-801242",
+        id: "ORD-VX-801242",
+        userEmail: "tatukulaedukondalu@gmail.com",
+        userName: "Tatukula Edukondalu",
+        items: [
+          {
+            name: "Emerald Acid Wash Oversized Tee",
+            price: 2241,
+            size: "M",
+            color: "Emerald Green",
+            quantity: 1,
+            image: "tee-emerald.png",
+          },
+        ],
+        totalAmount: 2241,
+        status: "Processing",
+        paymentMethod: "Cash on Delivery",
+        shippingAddress: "Plot 42, Jubilee Hills, Road No. 36, Hyderabad",
+        createdAt: "2026-10-12T14:20:00.000Z",
+      },
+      {
+        _id: "ORD-VX-801243",
+        id: "ORD-VX-801243",
+        userEmail: "tatukulaedukondalu@gmail.com",
+        userName: "Tatukula Edukondalu",
+        items: [
+          {
+            name: "Emerald Acid Wash Oversized Tee",
+            price: 2241,
+            size: "L",
+            color: "Emerald Green",
+            quantity: 1,
+            image: "tee-emerald.png",
+          },
+        ],
+        totalAmount: 2241,
+        status: "Processing",
+        paymentMethod: "Razorpay Instant UPI",
+        shippingAddress: "Plot 42, Jubilee Hills, Road No. 36, Hyderabad",
+        createdAt: "2026-10-12T11:15:00.000Z",
+      },
+      {
+        _id: "ORD-VX-801244",
+        id: "ORD-VX-801244",
+        userEmail: "tatukulaedukondalu@gmail.com",
+        userName: "Tatukula Edukondalu",
+        items: [
+          {
+            name: "Midnight Obsidian Heavyweight Tee",
+            price: 2499,
+            size: "L",
+            color: "Obsidian Black",
+            quantity: 1,
+            image: "tee-black.jpg",
+          },
+        ],
+        totalAmount: 2499,
+        status: "Shipped",
+        paymentMethod: "Razorpay NetBanking",
+        shippingAddress: "Plot 42, Jubilee Hills, Road No. 36, Hyderabad",
+        createdAt: "2026-10-09T09:15:00.000Z",
+      },
+      {
+        _id: "ORD-VX-801245",
+        id: "ORD-VX-801245",
+        userEmail: "tatukulaedukondalu@gmail.com",
+        userName: "Tatukula Edukondalu",
+        items: [
+          {
+            name: "Lavender Lilac Drop-Shoulder Tee",
+            price: 2241,
+            size: "XL",
+            color: "Lavender Lilac",
+            quantity: 1,
+            image: "tee-lavender.png",
+          },
+        ],
+        totalAmount: 2241,
+        status: "Cancelled",
+        cancelReason: "Changed my mind / Placed by mistake",
+        paymentMethod: "Cash on Delivery",
+        shippingAddress: "Plot 42, Jubilee Hills, Road No. 36, Hyderabad",
+        createdAt: "2026-10-09T08:00:00.000Z",
+      },
+      {
+        _id: "ORD-VX-801246",
+        id: "ORD-VX-801246",
+        userEmail: "tatukulaedukondalu@gmail.com",
+        userName: "Tatukula Edukondalu",
+        items: [
+          {
+            name: "Terracotta Earth Raw Hem Tee",
+            price: 1999,
+            size: "M",
+            color: "Terracotta Brown",
+            quantity: 1,
+            image: "tee-rust.png",
+          },
+        ],
+        totalAmount: 1999,
+        status: "Shipped",
+        paymentMethod: "Razorpay Instant UPI",
+        shippingAddress: "Plot 42, Jubilee Hills, Road No. 36, Hyderabad",
+        createdAt: "2026-10-09T16:45:00.000Z",
+      },
+    ];
+  });
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [orderSortBy, setOrderSortBy] = useState<"recent" | "oldest" | "price-high" | "price-low">("recent");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("All");
+
+  // Mobile Orders Screen State (Matches Flutter Home Screen 1:1)
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [selectedMobileOrderFilter, setSelectedMobileOrderFilter] = useState<"All" | "Shipped" | "Delivered" | "Cancelled">("All");
+  const [showOrderFilterMenu, setShowOrderFilterMenu] = useState(false);
+  const [selectedOrderDetailsModal, setSelectedOrderDetailsModal] = useState<OrderItem | null>(null);
 
   const sortedOrders = useMemo(() => {
     if (!Array.isArray(myOrders)) return [];
@@ -249,9 +379,37 @@ export function UserDashboard() {
     });
   }, [myOrders, orderSortBy, orderStatusFilter]);
 
+  const filteredMobileOrders = useMemo(() => {
+    let list = Array.isArray(myOrders) ? myOrders.filter((o) => o && typeof o === "object") : [];
+    if (selectedMobileOrderFilter !== "All") {
+      if (selectedMobileOrderFilter === "Shipped") {
+        list = list.filter((o) => {
+          const s = (o?.status || "").toLowerCase();
+          return s.includes("ship") || s.includes("transit") || s.includes("process") || s.includes("pack");
+        });
+      } else {
+        list = list.filter((o) => (o?.status || "").toLowerCase().includes(selectedMobileOrderFilter.toLowerCase()));
+      }
+    }
+    if (orderSearchQuery.trim()) {
+      const q = orderSearchQuery.toLowerCase().trim();
+      list = list.filter((o) => {
+        const idMatch = String(o._id || o.id || "").toLowerCase().includes(q);
+        const statusMatch = String(o.status || "").toLowerCase().includes(q);
+        const itemMatch = (o.items || []).some((it) => String(it.name || "").toLowerCase().includes(q));
+        return idMatch || statusMatch || itemMatch;
+      });
+    }
+    return list.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [myOrders, selectedMobileOrderFilter, orderSearchQuery]);
+
   // Profile Form & Avatar State
-  const [profileName, setProfileName] = useState(user?.name || "Aarav Sharma");
-  const [profileEmail, setProfileEmail] = useState(user?.email || "aarav@example.com");
+  const [profileName, setProfileName] = useState(user?.name || "Tatukula Edukondalu");
+  const [profileEmail, setProfileEmail] = useState(user?.email || "tatukulaedukondalu@gmail.com");
   const [profileMobile, setProfileMobile] = useState("9876543210");
   const [profileSavedMsg, setProfileSavedMsg] = useState("");
   const [profilePic, setProfilePic] = useState<string>(() => {
@@ -260,6 +418,16 @@ export function UserDashboard() {
     }
     return "";
   });
+
+  // Mobile Profile Modals State (Matches Flutter Profile Screen 1:1)
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showBrandStoryModal, setShowBrandStoryModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [editProfileName, setEditProfileName] = useState(user?.name || "Tatukula Edukondalu");
+  const [editProfileEmail, setEditProfileEmail] = useState(user?.email || "tatukulaedukondalu@gmail.com");
+  const [editProfileMobile, setEditProfileMobile] = useState("9876543210");
 
   // Profile Extended Preferences State
   const [preferredSize, setPreferredSize] = useState<string>(() => {
@@ -358,11 +526,11 @@ export function UserDashboard() {
     return [
       {
         id: "1",
-        name: "Home Address",
-        address: "100 Feet Road, Indiranagar, Stage 2",
-        city: "Bengaluru",
-        state: "Karnataka",
-        pincode: "560038",
+        name: "Home",
+        address: "Plot 42, Jubilee Hills, Road No. 36",
+        city: "Hyderabad",
+        state: "Telangana",
+        pincode: "500033",
         mobile: "9876543210",
         isDefault: true,
       },
@@ -1009,6 +1177,9 @@ export function UserDashboard() {
         }
 
         // 5. Post to backend asynchronously in background with id and _id
+        const orderPaymentId = paymentId || (demoOrderObj.paymentMethod.toLowerCase().includes("cash") ? `cod_${Date.now()}` : `pay_${Date.now()}`);
+        const orderPaymentStatus = demoOrderObj.paymentMethod.toLowerCase().includes("cash") ? "Pending" : "Completed";
+
         fetch(`${API_URL}/orders`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1020,6 +1191,8 @@ export function UserDashboard() {
             items: itemsToOrder,
             totalAmount: finalPayable,
             paymentMethod: demoOrderObj.paymentMethod,
+            paymentId: orderPaymentId,
+            paymentStatus: orderPaymentStatus,
             shippingAddress: fullAddr,
           }),
         })
@@ -1148,6 +1321,17 @@ export function UserDashboard() {
                   razorpay_order_id: response.razorpay_order_id || (isRealRazorpayOrder ? orderData?.id : `order_rzp_${Date.now()}`),
                   razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
                   razorpay_signature: response.razorpay_signature || "",
+                  userEmail: email,
+                  userName: name,
+                  amount: finalPayable,
+                  currency: "INR",
+                  paymentMethod: isMobikwikWallet
+                    ? "Mobikwik Wallet Payment (Paid)"
+                    : isPayzappWallet
+                    ? "PayZapp Wallet Payment (Paid)"
+                    : isAirtelWallet
+                    ? "Airtel Money Wallet Payment (Paid)"
+                    : "Razorpay Online Payment (Paid)",
                 }),
               });
             } catch (verifyErr) {
@@ -1239,7 +1423,6 @@ export function UserDashboard() {
   const navItems = [
     { id: "profile", label: "My Profile", icon: UserIcon },
     { id: "orders", label: "My Orders", icon: Package },
-    { id: "booking", label: "Book Custom Tee", icon: Sparkles },
     { id: "cart", label: "My Cart", icon: ShoppingBag },
     { id: "wishlist", label: "My Wishlist", icon: Heart },
     { id: "addresses", label: "Addresses", icon: MapPin },
@@ -1254,8 +1437,8 @@ export function UserDashboard() {
     <div className="dashboard-page-root min-h-screen bg-background pt-20 sm:pt-24 pb-8 sm:pb-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="relative flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
-          {/* MOBILE RESPONSIVE TAB STRIP (< lg) */}
-          <div className="lg:hidden w-full sticky top-16 z-30 bg-background/95 backdrop-blur-md py-2 mb-8 sm:mb-8">
+          {/* MOBILE RESPONSIVE TAB STRIP (Hidden on mobile < md, retained on tablet md..lg) */}
+          <div className="hidden md:block lg:hidden w-full sticky top-16 z-30 bg-background/95 backdrop-blur-md py-2 mb-4 sm:mb-8">
             {/* Interactive Section Selector Button */}
             <button
               type="button"
@@ -1371,159 +1554,909 @@ export function UserDashboard() {
           <main className="flex-1 min-w-0 flex flex-col w-full space-y-6 self-start">
             {/* 1. MY PROFILE TAB */}
             {activeTab === "profile" && (
-              <div className="space-y-6 w-full">
-                {/* Profile Header Avatar Card */}
-                <div className="flex flex-col sm:flex-row items-center gap-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
-                  {/* Avatar Container with Hover Overlay */}
-                  <div className="relative group size-20 shrink-0">
-                    {profilePic ? (
-                      <img
-                        src={profilePic}
-                        alt={profileName}
-                        className="size-20 rounded-full object-cover border-2 border-gold shadow-md"
-                      />
-                    ) : (
-                      <div className="flex size-20 items-center justify-center rounded-full border-2 border-gold bg-gold/15 font-display text-3xl font-extrabold text-gold shadow-md">
-                        {(profileName || user?.name || "U")[0].toUpperCase()}
+              <div className="w-full space-y-6">
+                {/* ── MOBILE VIEW (< sm): 1:1 PIXEL-PERFECT REPLICA OF FLUTTER PROFILE SCREEN ── */}
+                <div className="block sm:hidden space-y-5">
+                  {/* 1. LUXURY USER HERO CARD */}
+                  <div
+                    onClick={() => {
+                      setEditProfileName(profileName);
+                      setEditProfileEmail(profileEmail);
+                      setEditProfileMobile(profileMobile);
+                      setShowEditProfileModal(true);
+                    }}
+                    className="rounded-[20px] bg-card border border-border/80 p-4 shadow-[0_4px_20px_rgba(212,175,55,0.06)] flex items-center gap-4 cursor-pointer active:scale-[0.99] transition-transform"
+                  >
+                    {/* Glowing Avatar Circle with Edit Badge */}
+                    <div className="relative shrink-0">
+                      <div className="size-[62px] rounded-full bg-[#FAF5E6] dark:bg-gold/15 border-2 border-gold flex items-center justify-center shadow-xs overflow-hidden">
+                        {profilePic ? (
+                          <img src={profilePic} alt={profileName} className="size-full object-cover" />
+                        ) : (
+                          <span className="font-display text-2xl font-bold text-[#8C6D23] dark:text-gold">
+                            {(profileName || "T")[0].toUpperCase()}
+                          </span>
+                        )}
                       </div>
-                    )}
-                    <label
-                      htmlFor="profile-pic-input-main"
-                      className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-gold"
-                      title="Upload / Change Photo"
-                    >
-                      <Camera className="size-6" />
-                    </label>
-                    <input
-                      type="file"
-                      id="profile-pic-input-main"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      className="hidden"
-                    />
+                      {/* Edit Pencil Icon Badge */}
+                      <div className="absolute bottom-0 right-0 size-5 rounded-full bg-[#8C6D23] border-[1.5px] border-white dark:border-background flex items-center justify-center text-white shadow-xs">
+                        <Edit3 className="size-2.5" />
+                      </div>
+                    </div>
+
+                    {/* User Info Column */}
+                    <div className="flex-1 min-w-0">
+                      <h2 className="font-display text-[17px] font-bold tracking-[0.05em] text-foreground uppercase truncate leading-tight">
+                        {profileName || "TATUKULA EDUKONDALU"}
+                      </h2>
+                      <p className="text-[12px] text-muted-foreground truncate leading-tight mt-1 font-normal">
+                        {profileEmail || "tatukulaedukondalu@gmail.com"}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Profile Text & Action Buttons */}
-                  <div className="flex-1 text-center sm:text-left space-y-1 overflow-hidden">
-                    <h3 className="font-display text-xl font-bold text-foreground truncate">{profileName}</h3>
-                    <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
-
-                    {/* Edit & Delete Profile Pic Controls */}
-                    <div className="flex items-center justify-center sm:justify-start gap-2 pt-3">
-                      <label
-                        htmlFor="profile-pic-input-btn"
-                        className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-gold/10 px-3.5 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
+                  {/* 2. ACCOUNT PREFERENCES LIST CARD */}
+                  <div className="space-y-2">
+                    <h3 className="font-display text-[12px] font-bold tracking-[0.14em] text-foreground uppercase px-0.5">
+                      ACCOUNT PREFERENCES
+                    </h3>
+                    <div className="rounded-[20px] border border-border/80 bg-card divide-y divide-border/60 overflow-hidden shadow-xs">
+                      {/* Tile 1: My Orders & Purchases */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("orders")}
+                        className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-muted/30 active:bg-muted/60 transition-colors text-left"
                       >
-                        <Camera className="size-3.5" />
-                        {profilePic ? "Edit Photo" : "Upload Photo"}
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-10 rounded-[12px] bg-[#F1F5F9] dark:bg-muted/60 flex items-center justify-center shrink-0 text-[#1E293B] dark:text-foreground">
+                            <ShoppingBag className="size-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold text-foreground leading-snug truncate">
+                              My Orders &amp; Purchases
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-snug truncate mt-0.5">
+                              View order history, status &amp; track delivery
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4.5 text-muted-foreground/70 shrink-0 ml-2" />
+                      </button>
+
+                      {/* Tile 2: Saved Delivery Addresses */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("addresses")}
+                        className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-muted/30 active:bg-muted/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-10 rounded-[12px] bg-[#F1F5F9] dark:bg-muted/60 flex items-center justify-center shrink-0 text-[#1E293B] dark:text-foreground">
+                            <MapPin className="size-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold text-foreground leading-snug truncate">
+                              Saved Delivery Addresses
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-snug truncate mt-0.5">
+                              {savedAddresses.find((a: any) => a.isDefault)
+                                ? `${savedAddresses.find((a: any) => a.isDefault).city}, ${savedAddresses.find((a: any) => a.isDefault).name?.replace(/ Address$/i, "")} · Default`
+                                : "Hyderabad, Home · Default"}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4.5 text-muted-foreground/70 shrink-0 ml-2" />
+                      </button>
+
+                      {/* Tile 3: VEXA Wallet & Rewards */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("wallet")}
+                        className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-muted/30 active:bg-muted/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-10 rounded-[12px] bg-[#F1F5F9] dark:bg-muted/60 flex items-center justify-center shrink-0 text-[#1E293B] dark:text-foreground">
+                            <Wallet className="size-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold text-foreground leading-snug truncate">
+                              VEXA Wallet &amp; Rewards
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-snug truncate mt-0.5">
+                              Balance: ₹{walletBalance.toFixed(0)}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4.5 text-muted-foreground/70 shrink-0 ml-2" />
+                      </button>
+
+                      {/* Tile 4: 24/7 VIP Customer Support */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("support")}
+                        className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-muted/30 active:bg-muted/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-10 rounded-[12px] bg-[#F1F5F9] dark:bg-muted/60 flex items-center justify-center shrink-0 text-[#1E293B] dark:text-foreground">
+                            <Headphones className="size-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold text-foreground leading-snug truncate">
+                              24/7 VIP Customer Support
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-snug truncate mt-0.5">
+                              Contact support@vexa.app or WhatsApp
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4.5 text-muted-foreground/70 shrink-0 ml-2" />
+                      </button>
+
+                      {/* Tile 5: About VEXA Brand Story */}
+                      <button
+                        type="button"
+                        onClick={() => setShowBrandStoryModal(true)}
+                        className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-muted/30 active:bg-muted/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-10 rounded-[12px] bg-[#F1F5F9] dark:bg-muted/60 flex items-center justify-center shrink-0 text-[#1E293B] dark:text-foreground">
+                            <Sparkles className="size-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold text-foreground leading-snug truncate">
+                              About VEXA Brand Story
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-snug truncate mt-0.5">
+                              Discover our design philosophy
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4.5 text-muted-foreground/70 shrink-0 ml-2" />
+                      </button>
+
+                      {/* Tile 6: Terms & Conditions */}
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsModal(true)}
+                        className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-muted/30 active:bg-muted/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-10 rounded-[12px] bg-[#F1F5F9] dark:bg-muted/60 flex items-center justify-center shrink-0 text-[#1E293B] dark:text-foreground">
+                            <FileText className="size-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold text-foreground leading-snug truncate">
+                              Terms &amp; Conditions
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-snug truncate mt-0.5">
+                              Usage guidelines &amp; service policies
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4.5 text-muted-foreground/70 shrink-0 ml-2" />
+                      </button>
+
+                      {/* Tile 7: Privacy Policy */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivacyPolicyModal(true)}
+                        className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-muted/30 active:bg-muted/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-10 rounded-[12px] bg-[#F1F5F9] dark:bg-muted/60 flex items-center justify-center shrink-0 text-[#1E293B] dark:text-foreground">
+                            <Shield className="size-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold text-foreground leading-snug truncate">
+                              Privacy Policy
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-snug truncate mt-0.5">
+                              Data protection &amp; privacy rights
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4.5 text-muted-foreground/70 shrink-0 ml-2" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. LOG OUT ACTION BUTTON */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        logout();
+                        navigate("/");
+                      }}
+                      className="w-full h-12 rounded-[14px] border border-border/80 bg-card hover:bg-muted/40 flex items-center justify-center gap-2 text-[12.5px] font-bold tracking-[0.08em] text-muted-foreground hover:text-foreground active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+                    >
+                      <LogOut className="size-4 text-muted-foreground" />
+                      <span>LOG OUT ACCOUNT</span>
+                    </button>
+                  </div>
+
+                  {/* 4. DELETE ACCOUNT ACTION BUTTON */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteAccountModal(true)}
+                      className="w-full h-12 rounded-[14px] border border-rose-200 bg-[#FEF2F2] hover:bg-rose-100/70 flex items-center justify-center gap-2 text-[12.5px] font-bold tracking-[0.08em] text-rose-600 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+                    >
+                      <Trash2 className="size-4 text-rose-600" />
+                      <span>DELETE ACCOUNT</span>
+                    </button>
+                  </div>
+
+                  {/* 5. BRAND FOOTER */}
+                  <div className="pt-2 pb-16 text-center">
+                    <p className="text-[10.5px] text-muted-foreground/80 font-medium">
+                      Version 1.0.0 (Production Build)
+                    </p>
+                  </div>
+                </div>
+
+                {/* ── DESKTOP VIEW (>= sm): KEEP COMPLETE CAPABLE DESKTOP PROFILE MANAGER ── */}
+                <div className="hidden sm:block space-y-6 w-full">
+                  {/* Profile Header Avatar Card */}
+                  <div className="flex flex-col sm:flex-row items-center gap-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
+                    {/* Avatar Container with Hover Overlay */}
+                    <div className="relative group size-20 shrink-0">
+                      {profilePic ? (
+                        <img
+                          src={profilePic}
+                          alt={profileName}
+                          className="size-20 rounded-full object-cover border-2 border-gold shadow-md"
+                        />
+                      ) : (
+                        <div className="flex size-20 items-center justify-center rounded-full border-2 border-gold bg-gold/15 font-display text-3xl font-extrabold text-gold shadow-md">
+                          {(profileName || user?.name || "U")[0].toUpperCase()}
+                        </div>
+                      )}
+                      <label
+                        htmlFor="profile-pic-input-main"
+                        className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-gold"
+                        title="Upload / Change Photo"
+                      >
+                        <Camera className="size-6" />
                       </label>
                       <input
                         type="file"
-                        id="profile-pic-input-btn"
+                        id="profile-pic-input-main"
                         accept="image/*"
                         onChange={handleAvatarUpload}
                         className="hidden"
                       />
+                    </div>
 
-                      {profilePic && (
-                        <button
-                          type="button"
-                          onClick={handleRemoveAvatar}
-                          className="flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
-                          title="Delete Profile Photo"
+                    {/* Profile Text & Action Buttons */}
+                    <div className="flex-1 text-center sm:text-left space-y-1 overflow-hidden">
+                      <h3 className="font-display text-xl font-bold text-foreground truncate">{profileName}</h3>
+                      <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
+
+                      {/* Edit & Delete Profile Pic Controls */}
+                      <div className="flex items-center justify-center sm:justify-start gap-2 pt-3">
+                        <label
+                          htmlFor="profile-pic-input-btn"
+                          className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-gold/10 px-3.5 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm active:scale-95"
                         >
-                          <Trash2 className="size-3.5" />
-                          Delete Photo
-                        </button>
-                      )}
+                          <Camera className="size-3.5" />
+                          {profilePic ? "Edit Photo" : "Upload Photo"}
+                        </label>
+                        <input
+                          type="file"
+                          id="profile-pic-input-btn"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          className="hidden"
+                        />
+
+                        {profilePic && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveAvatar}
+                            className="flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                            title="Delete Profile Photo"
+                          >
+                            <Trash2 className="size-3.5" />
+                            Delete Photo
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Account Quick Stats Grid (Hidden on Mobile Responsive, Visible on Desktop/Tablet sm+) */}
-                <div className="hidden sm:grid sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-gold/30 bg-surface/40 p-4 text-center">
-                    <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Member Since</span>
-                    <span className="font-display text-sm font-bold text-foreground mt-1 block">August 2026</span>
+                  {/* Account Quick Stats Grid */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="rounded-xl border border-gold/30 bg-surface/50 p-3 sm:p-4 text-center shadow-xs">
+                      <span className="text-[8.5px] sm:text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Orders</span>
+                      <span className="font-display text-sm sm:text-base font-bold text-gold mt-0.5 block">{myOrders.length}</span>
+                    </div>
+                    <div className="rounded-xl border border-gold/30 bg-surface/50 p-3 sm:p-4 text-center shadow-xs">
+                      <span className="text-[8.5px] sm:text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Wishlist</span>
+                      <span className="font-display text-sm sm:text-base font-bold text-foreground mt-0.5 block">{wishlistItems?.length || 0}</span>
+                    </div>
+                    <div className="rounded-xl border border-gold/30 bg-surface/50 p-3 sm:p-4 text-center shadow-xs">
+                      <span className="text-[8.5px] sm:text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Status</span>
+                      <span className="font-display text-xs sm:text-sm font-bold text-emerald-500 mt-1 block">VIP Member</span>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-gold/30 bg-surface/40 p-4 text-center">
-                    <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Orders Placed</span>
-                    <span className="font-display text-sm font-bold text-gold mt-1 block">{myOrders.length} Bookings</span>
-                  </div>
-                  <div className="rounded-xl border border-gold/30 bg-surface/40 p-4 text-center">
-                    <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block">Account Status</span>
-                    <span className="font-display text-sm font-bold text-emerald-500 mt-1 block">✓ Verified</span>
-                  </div>
-                </div>
 
-                {profileSavedMsg && (
-                  <div className="flex items-center gap-2.5 rounded-lg border border-gold/50 bg-gold/15 p-4 text-xs text-gold font-bold animate-in fade-in slide-in-from-top-1 duration-300 shadow-sm">
-                    <CheckCircle2 className="size-5 shrink-0 text-gold" />
-                    <span>{profileSavedMsg}</span>
-                  </div>
-                )}
+                  {profileSavedMsg && (
+                    <div className="flex items-center gap-2.5 rounded-lg border border-gold/50 bg-gold/15 p-4 text-xs text-gold font-bold animate-in fade-in slide-in-from-top-1 duration-300 shadow-sm">
+                      <CheckCircle2 className="size-5 shrink-0 text-gold" />
+                      <span>{profileSavedMsg}</span>
+                    </div>
+                  )}
 
-                <form onSubmit={handleUpdateProfile} className="space-y-6">
-                  {/* Personal Contact Info Card */}
-                  <div className="space-y-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
-                    <h3 className="font-display text-base font-bold text-foreground border-b border-border pb-3">
-                      Personal & Contact Details
-                    </h3>
-                    <div className="grid gap-5 sm:grid-cols-2">
+                  <form onSubmit={handleUpdateProfile} className="space-y-6">
+                    {/* Personal Contact Info Card */}
+                    <div className="space-y-5 rounded-xl border border-gold/30 bg-card p-5 sm:p-6 shadow-sm">
+                      <h3 className="font-display text-base font-bold text-foreground border-b border-border pb-3">
+                        Personal &amp; Contact Details
+                      </h3>
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
+                            <UserIcon className="size-3.5 text-gold" /> Full Name
+                          </label>
+                          <input
+                            type="text"
+                            value={profileName}
+                            onChange={(e) => setProfileName(e.target.value)}
+                            className="w-full rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
+                            <Mail className="size-3.5 text-gold" /> Email Address
+                          </label>
+                          <input
+                            type="email"
+                            value={profileEmail}
+                            onChange={(e) => setProfileEmail(e.target.value)}
+                            className="w-full rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                            required
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
-                          <UserIcon className="size-3.5 text-gold" /> Full Name
+                          <Phone className="size-3.5 text-gold" /> Mobile Number
                         </label>
                         <input
                           type="text"
-                          value={profileName}
-                          onChange={(e) => setProfileName(e.target.value)}
-                          className="w-full rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
-                          <Mail className="size-3.5 text-gold" /> Email Address
-                        </label>
-                        <input
-                          type="email"
-                          value={profileEmail}
-                          onChange={(e) => setProfileEmail(e.target.value)}
-                          className="w-full rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold transition-colors"
-                          required
+                          value={profileMobile}
+                          onChange={(e) => setProfileMobile(e.target.value)}
+                          placeholder="9876543210"
+                          className="w-full max-w-md rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-2">
-                        <Phone className="size-3.5 text-gold" /> Mobile Number
-                      </label>
-                      <input
-                        type="text"
-                        value={profileMobile}
-                        onChange={(e) => setProfileMobile(e.target.value)}
-                        placeholder="9876543210"
-                        className="w-full max-w-md rounded-lg border border-gold/30 bg-surface/50 px-4 py-3 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
-                      />
+                    <button
+                      type="submit"
+                      className="w-full sm:w-auto bg-gold text-primary-foreground hover:bg-gold/90 inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3.5 text-xs font-extrabold uppercase tracking-[0.18em] transition-all shadow-goldy cursor-pointer"
+                    >
+                      <Save className="size-4" /> UPDATE PROFILE
+                    </button>
+                  </form>
+                </div>
+
+                {/* ── EDIT PROFILE MODAL ── */}
+                {showEditProfileModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-2xl border border-gold/40 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+                      <div className="flex items-center justify-between border-b border-border pb-3">
+                        <h3 className="font-display text-base font-bold text-foreground">Edit Profile</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowEditProfileModal(false)}
+                          className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+
+                      {/* Avatar Uploader in Modal */}
+                      <div className="flex items-center gap-4">
+                        <div className="relative size-16 rounded-full bg-[#FAF5E6] dark:bg-gold/15 border-2 border-gold flex items-center justify-center overflow-hidden shrink-0">
+                          {profilePic ? (
+                            <img src={profilePic} alt={editProfileName} className="size-full object-cover" />
+                          ) : (
+                            <span className="font-display text-xl font-bold text-[#8C6D23] dark:text-gold">
+                              {(editProfileName || "T")[0].toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <label
+                            htmlFor="profile-pic-modal-input"
+                            className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-gold/10 px-3 py-1.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-xs active:scale-95"
+                          >
+                            <Camera className="size-3.5" />
+                            {profilePic ? "Change Photo" : "Upload Photo"}
+                          </label>
+                          <input
+                            type="file"
+                            id="profile-pic-modal-input"
+                            accept="image/*"
+                            onChange={handleAvatarUpload}
+                            className="hidden"
+                          />
+                          {profilePic && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveAvatar}
+                              className="flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                            >
+                              <Trash2 className="size-3.5" />
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          setProfileName(editProfileName);
+                          setProfileEmail(editProfileEmail);
+                          setProfileMobile(editProfileMobile);
+                          setShowEditProfileModal(false);
+                          setProfileSavedMsg("Profile updated successfully!");
+                          setTimeout(() => setProfileSavedMsg(""), 3500);
+                        }}
+                        className="space-y-4"
+                      >
+                        <div>
+                          <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                            <UserIcon className="size-3.5" /> Full Name
+                          </label>
+                          <input
+                            type="text"
+                            value={editProfileName}
+                            onChange={(e) => setEditProfileName(e.target.value)}
+                            className="w-full rounded-lg border border-border bg-surface/50 px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                            <Mail className="size-3.5" /> Email Address
+                          </label>
+                          <input
+                            type="email"
+                            value={editProfileEmail}
+                            onChange={(e) => setEditProfileEmail(e.target.value)}
+                            className="w-full rounded-lg border border-border bg-surface/50 px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold transition-colors"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5 mb-1.5">
+                            <Phone className="size-3.5" /> Mobile Number
+                          </label>
+                          <input
+                            type="text"
+                            value={editProfileMobile}
+                            onChange={(e) => setEditProfileMobile(e.target.value)}
+                            className="w-full rounded-lg border border-border bg-surface/50 px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold font-mono transition-colors"
+                          />
+                        </div>
+
+                        <div className="flex gap-2.5 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowEditProfileModal(false)}
+                            className="flex-1 rounded-lg border border-border bg-muted/30 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="flex-1 rounded-lg bg-gold py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-gold/90 transition-all shadow-goldy cursor-pointer"
+                          >
+                            Save Changes
+                          </button>
+                        </div>
+                      </form>
                     </div>
                   </div>
+                )}
 
-                  <button
-                    type="submit"
-                    className="w-full sm:w-auto bg-gold text-primary-foreground hover:bg-gold/90 inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3.5 text-xs font-extrabold uppercase tracking-[0.18em] transition-all shadow-goldy cursor-pointer"
-                  >
-                    <Save className="size-4" /> UPDATE PROFILE
-                  </button>
-                </form>
+                {/* ── BRAND STORY MODAL ── */}
+                {showBrandStoryModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-2xl border border-gold/40 bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+                      <div className="flex items-center justify-between border-b border-border pb-3">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="size-5 text-gold" />
+                          <h3 className="font-display text-base font-bold text-foreground">About VEXA Brand Story</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowBrandStoryModal(false)}
+                          className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                      <div className="text-xs text-muted-foreground leading-relaxed space-y-3">
+                        <p>
+                          Born from the confluence of avant-garde streetwear and bespoke modern minimalism, VEXA redefines luxury for the modern trendsetter.
+                        </p>
+                        <p>
+                          Every garment is meticulously engineered using heavyweight organic textiles, architectural silhouettes, and enduring craftsmanship designed to make you wear confidence every day.
+                        </p>
+                      </div>
+                      <div className="pt-2 flex gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBrandStoryModal(false);
+                            navigate("/about");
+                          }}
+                          className="flex-1 rounded-lg bg-gold py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-gold/90 transition-all shadow-goldy cursor-pointer"
+                        >
+                          Read Full Story
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowBrandStoryModal(false)}
+                          className="rounded-lg border border-border px-4 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── TERMS & CONDITIONS MODAL ── */}
+                {showTermsModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-2xl border border-gold/40 bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
+                      <div className="flex items-center justify-between border-b border-border pb-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="size-5 text-gold" />
+                          <h3 className="font-display text-base font-bold text-foreground">Terms &amp; Conditions</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(false)}
+                          className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                      <div className="text-xs text-muted-foreground leading-relaxed space-y-3">
+                        <div>
+                          <p className="font-bold text-foreground mb-1">1. Acceptance of Service</p>
+                          <p>By browsing or purchasing from VEXA, you agree to our terms of premium service, authentic verification guarantee, and digital account policies.</p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-foreground mb-1">2. Shipping &amp; Real-time Tracking</p>
+                          <p>All luxury deliveries are insured and fulfilled via priority express carriers with live OTP tracking and verified dispatch.</p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-foreground mb-1">3. 7-Day Hassle-free Exchange</p>
+                          <p>Unworn items with original luxury tags and packaging can be exchanged or credited within 7 calendar days of delivery.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsModal(false)}
+                        className="w-full rounded-lg bg-gold py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-gold/90 transition-all shadow-goldy cursor-pointer mt-2"
+                      >
+                        I Understand
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── PRIVACY POLICY MODAL ── */}
+                {showPrivacyPolicyModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-2xl border border-gold/40 bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
+                      <div className="flex items-center justify-between border-b border-border pb-3">
+                        <div className="flex items-center gap-2">
+                          <Shield className="size-5 text-gold" />
+                          <h3 className="font-display text-base font-bold text-foreground">Privacy Policy</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowPrivacyPolicyModal(false)}
+                          className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                      <div className="text-xs text-muted-foreground leading-relaxed space-y-3">
+                        <div>
+                          <p className="font-bold text-foreground mb-1">1. Encryption &amp; Security</p>
+                          <p>Your payment methods, passwords, and personal details are protected using enterprise-grade AES-256 and SSL encryption protocols.</p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-foreground mb-1">2. Strict Zero Data Sale Guarantee</p>
+                          <p>VEXA will never sell, rent, or trade your personal information or address credentials to advertisers or third parties.</p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-foreground mb-1">3. Account Ownership &amp; Erasure</p>
+                          <p>You have full authority to request complete deletion of your profile history, wallet points, and saved addresses at any time.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivacyPolicyModal(false)}
+                        className="w-full rounded-lg bg-gold py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-gold/90 transition-all shadow-goldy cursor-pointer mt-2"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── DELETE ACCOUNT CONFIRMATION MODAL ── */}
+                {showDeleteAccountModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md rounded-2xl border border-destructive/40 bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+                      <div className="flex items-center justify-between border-b border-border pb-3">
+                        <div className="flex items-center gap-2 text-destructive">
+                          <Trash2 className="size-5" />
+                          <h3 className="font-display text-base font-bold">Delete Account?</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowDeleteAccountModal(false)}
+                          className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Are you sure you want to delete your VEXA profile? This action will permanently remove all your order history, delivery addresses, wallet credits, and VIP status. This cannot be undone.
+                      </p>
+                      <div className="flex gap-2.5 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowDeleteAccountModal(false)}
+                          className="flex-1 rounded-lg border border-border bg-muted/30 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDeleteAccountModal(false);
+                            logout();
+                            navigate("/");
+                          }}
+                          className="flex-1 rounded-lg bg-destructive py-2.5 text-xs font-bold uppercase tracking-wider text-destructive-foreground hover:bg-destructive/90 transition-all cursor-pointer shadow-sm"
+                        >
+                          Yes, Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* 2. MY ORDERS TAB */}
             {activeTab === "orders" && (
-              <div className="space-y-6 min-w-0 pt-3 sm:pt-0">
+              <div className="w-full">
+                {/* ── MOBILE VIEW (< sm): 1:1 PIXEL-PERFECT REPLICA OF FLUTTER MY ORDERS SCREEN ── */}
+                <div className="block sm:hidden -mx-4 -mt-4 pb-20">
+                  {/* 1. SEARCH BAR & FILTERS BUTTON (SIDE-BY-SIDE) */}
+                  <div className="px-4 py-3 bg-background sticky top-14 z-20">
+                    <div className="flex items-center gap-2.5">
+                      {/* Pill Search Input */}
+                      <div className="flex-1 h-11 rounded-full border border-slate-200 dark:border-border bg-white dark:bg-card px-3.5 flex items-center gap-2 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+                        <Search className="size-4.5 text-slate-400 shrink-0" />
+                        <input
+                          type="text"
+                          value={orderSearchQuery}
+                          onChange={(e) => setOrderSearchQuery(e.target.value)}
+                          placeholder="Search your order here"
+                          className="w-full bg-transparent text-xs text-foreground placeholder:text-slate-400 outline-none"
+                        />
+                        {orderSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setOrderSearchQuery("")}
+                            className="text-slate-400 hover:text-foreground p-0.5 shrink-0"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Filters Pill Button with Dropdown Popup */}
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setShowOrderFilterMenu((o) => !o)}
+                          className="h-11 px-4 rounded-full border border-slate-200 dark:border-border bg-white dark:bg-card flex items-center gap-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] text-xs font-semibold text-slate-700 dark:text-foreground cursor-pointer active:scale-95 transition-transform"
+                        >
+                          <SlidersHorizontal className="size-3.5 text-slate-600 dark:text-foreground shrink-0" />
+                          <span>{selectedMobileOrderFilter !== "All" ? selectedMobileOrderFilter : "Filters"}</span>
+                        </button>
+
+                        {/* Filter Options Menu */}
+                        {showOrderFilterMenu && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setShowOrderFilterMenu(false)}
+                            />
+                            <div className="absolute right-0 top-12 z-40 w-44 rounded-2xl border border-border bg-card p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150 space-y-0.5">
+                              {[
+                                { label: "All Orders", value: "All" },
+                                { label: "Expected / Shipped", value: "Shipped" },
+                                { label: "Delivered", value: "Delivered" },
+                                { label: "Cancelled", value: "Cancelled" },
+                              ].map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMobileOrderFilter(opt.value as any);
+                                    setShowOrderFilterMenu(false);
+                                  }}
+                                  className={`flex w-full items-center justify-between px-3 py-2 text-xs font-medium rounded-xl transition-colors ${
+                                    selectedMobileOrderFilter === opt.value
+                                      ? "bg-gold/15 text-gold font-bold"
+                                      : "text-foreground hover:bg-muted/50"
+                                  }`}
+                                >
+                                  <span>{opt.label}</span>
+                                  {selectedMobileOrderFilter === opt.value && (
+                                    <Check className="size-3.5 text-gold shrink-0" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. ORDERS LIST */}
+                  {filteredMobileOrders.length === 0 ? (
+                    <div className="mx-4 my-8 p-8 rounded-2xl border border-border bg-card text-center space-y-3">
+                      <div className="size-16 rounded-full bg-gold/15 text-gold flex items-center justify-center mx-auto">
+                        <Truck className="size-8" />
+                      </div>
+                      <h4 className="font-display text-base font-bold text-foreground">
+                        {orderSearchQuery || selectedMobileOrderFilter !== "All"
+                          ? "No Matching Orders"
+                          : "No Orders Placed Yet"}
+                      </h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                        {orderSearchQuery || selectedMobileOrderFilter !== "All"
+                          ? "Try changing your filter settings or search query to view other purchases."
+                          : "Explore our luxury garment collection and place your first order."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-card divide-y divide-slate-100 dark:divide-border/60">
+                      {filteredMobileOrders.map((ord, idx) => {
+                        const firstItem = ord.items && ord.items.length > 0 ? ord.items[0] : null;
+                        const status = (ord.status || "").toLowerCase();
+                        const isDelivered = status.includes("deliver");
+                        const isCancelled = status.includes("cancel");
+                        const isShipped = status.includes("ship") || status.includes("transit");
+                        const isCOD = ord.paymentMethod?.toLowerCase().includes("cod") || ord.paymentMethod?.toLowerCase().includes("cash");
+                        const isUnpaidOrActive = isCOD && !isDelivered && !isCancelled;
+
+                        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                        const orderDate = ord.createdAt ? new Date(ord.createdAt) : new Date();
+
+                        let headerText = "";
+                        if (isCancelled) {
+                          const m = months[orderDate.getMonth()];
+                          const d = String(orderDate.getDate()).padStart(2, "0");
+                          headerText = `Cancelled on ${m} ${d}, ${orderDate.getFullYear()}`;
+                        } else if (isDelivered) {
+                          const delDate = new Date(orderDate.getTime() + 2 * 24 * 3600 * 1000);
+                          const m = months[delDate.getMonth()];
+                          const d = String(delDate.getDate()).padStart(2, "0");
+                          headerText = `Delivered on ${m} ${d}`;
+                        } else {
+                          const expDate = new Date(orderDate.getTime() + 3 * 24 * 3600 * 1000);
+                          const m = months[expDate.getMonth()];
+                          const d = String(expDate.getDate()).padStart(2, "0");
+                          headerText = `Delivery expected by ${m} ${d}`;
+                        }
+
+                        let subtitleText = "";
+                        if (isCancelled) {
+                          subtitleText = ord.cancelReason || "Changed my mind / Placed by mistake";
+                        } else if (isDelivered) {
+                          subtitleText = firstItem
+                            ? `Item delivered at doorstep · ${firstItem.name}`
+                            : "Package delivered to customer successfully";
+                        } else if (isShipped) {
+                          subtitleText = "In Transit via VEXA Express Courier...";
+                        } else if (status.includes("qc") || status.includes("quality")) {
+                          subtitleText = "Quality Check Active at Central QC Hub...";
+                        } else {
+                          subtitleText = "Warehouse Dispatch Active · Packing Garment...";
+                        }
+
+                        return (
+                          <div key={ord._id || ord.id || idx}>
+                            <div
+                              onClick={() => setSelectedOrderDetailsModal(ord)}
+                              className="px-4 py-3.5 flex items-start gap-3.5 hover:bg-muted/20 active:bg-muted/40 transition-colors cursor-pointer"
+                            >
+                              {/* Thumbnail Box */}
+                              <div className="size-16 rounded-[10px] bg-slate-100 dark:bg-muted border border-slate-200 dark:border-border overflow-hidden shrink-0 flex items-center justify-center">
+                                {firstItem ? (
+                                  <img
+                                    src={getProductImage(firstItem)}
+                                    alt={firstItem.name}
+                                    className="size-full object-cover"
+                                  />
+                                ) : (
+                                  <Package className="size-6 text-muted-foreground" />
+                                )}
+                              </div>
+
+                              {/* Details Stack */}
+                              <div className="flex-1 min-w-0 pt-0.5">
+                                <h3 className="font-bold text-[14px] text-[#0F172A] dark:text-foreground leading-snug truncate">
+                                  {headerText}
+                                </h3>
+                                <p className="text-[12px] text-slate-500 dark:text-muted-foreground leading-snug line-clamp-2 mt-0.5 font-normal">
+                                  {subtitleText}
+                                </p>
+                              </div>
+
+                              {/* Chevron Right */}
+                              <ChevronRight className="size-5 text-[#0F172A] dark:text-foreground shrink-0 mt-2 ml-1" />
+                            </div>
+
+                            {/* COD Payment Banner (Matches Screenshot 1:1) */}
+                            {isUnpaidOrActive && (
+                              <div className="mx-4 mb-3.5 p-3 rounded-[10px] bg-[#FFFBEB] dark:bg-amber-950/20 border border-[#FDE68A] dark:border-amber-900/40 flex items-center justify-between gap-3 shadow-xs">
+                                <p className="text-xs text-[#92400E] dark:text-amber-200 font-medium leading-snug">
+                                  Pay right now and save the COD fee
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMyOrders((prev) =>
+                                      prev.map((o) =>
+                                        (o._id === ord._id || o.id === ord.id)
+                                          ? { ...o, paymentMethod: "Razorpay Instant UPI", status: "Processing" }
+                                          : o
+                                      )
+                                    );
+                                    setProfileSavedMsg("Payment of ₹" + (ord.totalAmount || 2241) + " received! COD fee saved.");
+                                    setTimeout(() => setProfileSavedMsg(""), 3500);
+                                  }}
+                                  className="rounded-lg border border-[#D4AF37] bg-white dark:bg-card px-3.5 py-1.5 text-xs font-bold text-[#92400E] dark:text-gold hover:bg-gold/10 transition-colors shrink-0 shadow-xs active:scale-95 cursor-pointer"
+                                >
+                                  Pay ₹{(ord.totalAmount || 2241).toFixed(0)}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── DESKTOP VIEW (>= sm): KEEP COMPLETE FULL CAPABILITY DESKTOP ORDER VIEW ── */}
+                <div className="hidden sm:block space-y-6 min-w-0 pt-0">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
                   <div>
                     <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground">My Orders</h2>
@@ -1549,17 +2482,17 @@ export function UserDashboard() {
 
                 {/* Sort & Filter Controls Bar */}
                 {myOrders.length > 0 && (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5 rounded-xl border border-border bg-card p-3 sm:p-4 shadow-sm min-w-0">
+                  <div className="rounded-xl border border-border bg-card p-3 sm:p-4 shadow-sm min-w-0 space-y-3">
                     {/* Status Filter Chips */}
-                    <div className="flex flex-wrap items-center gap-1.5 min-w-0 max-w-full">
+                    <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0">
                       {["All", "Processing", "Shipped", "Delivered", "Cancelled"].map((st) => (
                         <button
                           key={st}
                           type="button"
                           onClick={() => setOrderStatusFilter(st)}
-                          className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                          className={`rounded-full px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                             orderStatusFilter === st
-                              ? "bg-gold text-primary-foreground shadow-sm"
+                              ? "bg-gold text-primary-foreground shadow-sm font-bold"
                               : "border border-border bg-background text-muted-foreground hover:border-gold/50 hover:text-gold"
                           }`}
                         >
@@ -1568,19 +2501,28 @@ export function UserDashboard() {
                       ))}
                     </div>
 
-                    {/* Sort Selector Dropdown */}
-                    <div className="flex items-center justify-between sm:justify-start gap-2 shrink-0 pt-2 sm:pt-0 border-t border-border/40 sm:border-t-0">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Sort By:</span>
-                      <select
-                        value={orderSortBy}
-                        onChange={(e) => setOrderSortBy(e.target.value as any)}
-                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-gold outline-none focus:border-gold cursor-pointer"
-                      >
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="price-high">Price: High to Low</option>
-                        <option value="price-low">Price: Low to High</option>
-                      </select>
+                    {/* Divider between Filter and Sort */}
+                    <div className="h-px w-full bg-border/60" />
+
+                    {/* Sort & Count Row - cleanly aligned */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] sm:text-xs font-medium text-muted-foreground">
+                        Showing <span className="font-bold text-foreground">{sortedOrders.length}</span> {sortedOrders.length === 1 ? "order" : "orders"}
+                      </span>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground whitespace-nowrap">Sort by:</span>
+                        <select
+                          value={orderSortBy}
+                          onChange={(e) => setOrderSortBy(e.target.value as any)}
+                          className="rounded-lg border border-border bg-background px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-gold outline-none focus:border-gold cursor-pointer"
+                        >
+                          <option value="newest">Newest First</option>
+                          <option value="oldest">Oldest First</option>
+                          <option value="price-high">Price: High to Low</option>
+                          <option value="price-low">Price: Low to High</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1708,7 +2650,108 @@ export function UserDashboard() {
                   </div>
                 )}
               </div>
-            )}
+
+              {/* ── ORDER DETAILS BOTTOM SHEET / MODAL ON MOBILE ── */}
+              {selectedOrderDetailsModal && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200">
+                  <div className="w-full sm:max-w-md rounded-t-[24px] sm:rounded-2xl border border-gold/40 bg-card p-5 sm:p-6 shadow-2xl max-h-[88vh] overflow-y-auto space-y-4 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between border-b border-border pb-3">
+                      <div>
+                        <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Order Details</span>
+                        <h3 className="font-display text-base font-bold text-foreground">
+                          #{String(selectedOrderDetailsModal._id || selectedOrderDetailsModal.id || "ORD").slice(-8).toUpperCase()}
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderDetailsModal(null)}
+                        className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
+
+                    {/* Status Badge & Total */}
+                    <div className="flex items-center justify-between bg-muted/40 p-3 rounded-xl border border-border/70">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block">Current Status</span>
+                        <span className="font-bold text-xs uppercase text-gold">
+                          {selectedOrderDetailsModal.status || "Processing"}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-muted-foreground block">Total Amount</span>
+                        <span className="font-display font-bold text-sm text-foreground">
+                          ₹{(selectedOrderDetailsModal.totalAmount || 0).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Items List */}
+                    <div className="space-y-2.5">
+                      <span className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground block">
+                        Ordered Garments ({selectedOrderDetailsModal.items?.length || 0})
+                      </span>
+                      {(selectedOrderDetailsModal.items || []).map((item, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2 rounded-xl bg-surface/50 border border-border/60">
+                          <img
+                            src={getProductImage(item)}
+                            alt={item.name}
+                            className="size-12 rounded-lg object-cover border border-border/60 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-foreground truncate">{item.name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Size: {item.size} · Color: {item.color} · Qty: {item.quantity}
+                            </p>
+                          </div>
+                          <span className="text-xs font-bold text-gold shrink-0">
+                            ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Delivery Address */}
+                    <div className="p-3 rounded-xl bg-surface/40 border border-border/60 space-y-1">
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex items-center gap-1">
+                        <MapPin className="size-3 text-gold" /> Delivery Destination
+                      </span>
+                      <p className="text-xs text-foreground font-medium">
+                        {selectedOrderDetailsModal.shippingAddress || "Plot 42, Jubilee Hills, Hyderabad"}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-2 flex gap-2">
+                      {selectedOrderDetailsModal.status !== "Cancelled" && selectedOrderDetailsModal.status !== "Delivered" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCancellingOrderUser({
+                              id: selectedOrderDetailsModal._id || selectedOrderDetailsModal.id || "",
+                              bookingIdStr: String(selectedOrderDetailsModal._id || selectedOrderDetailsModal.id || "").slice(-8).toUpperCase(),
+                            });
+                            setSelectedOrderDetailsModal(null);
+                          }}
+                          className="flex-1 rounded-xl border border-destructive/40 bg-destructive/10 py-2.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all cursor-pointer"
+                        >
+                          Cancel Order
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderDetailsModal(null)}
+                        className="flex-1 rounded-xl bg-gold py-2.5 text-xs font-bold text-primary-foreground uppercase tracking-wider shadow-goldy cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
             {/* 3. ADDRESSES TAB */}
             {activeTab === "addresses" && (
@@ -2417,13 +3460,10 @@ export function UserDashboard() {
 
                       {/* DEMO PAYMENT OPTION SELECTOR */}
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div>
                           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                             Select Payment Method
                           </label>
-                          <span className="rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider">
-                            ⚡ Razorpay Online Enabled
-                          </span>
                         </div>
 
                         <div className="grid gap-2.5 sm:grid-cols-2">
@@ -2726,433 +3766,8 @@ export function UserDashboard() {
               </div>
             )}
 
-            {/* 6. BOOK NEW TEE / CHECKOUT PAGE TAB */}
-            {activeTab === "booking" && (
-              <div className="space-y-6 pt-3 sm:pt-0">
-                {isCartCheckout || selectedProduct ? (
-                  /* INLINE ORDER CHECKOUT PAGE SECTION WITH 2 STEPS */
-                  <div className="space-y-6 max-w-2xl animate-in fade-in duration-300">
-                    <div className="flex items-center justify-between border-b border-border pb-4">
-                      <div>
-                        <span className="text-[10px] uppercase tracking-widest text-gold font-bold">
-                          {isCartCheckout ? "Cart Order Checkout" : "Direct Item Booking"}
-                        </span>
-                        <h2 className="font-display text-2xl font-bold text-foreground">
-                          {checkoutStep === 1 ? "Step 1: Delivery Address Details" : "Step 2: Demo Payment & Place Order"}
-                        </h2>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsCartCheckout(false);
-                          setSelectedProduct(null);
-                          setCheckoutStep(1);
-                        }}
-                        className="text-xs font-semibold uppercase tracking-wider text-gold hover:underline cursor-pointer"
-                      >
-                        ← Back to Catalog
-                      </button>
-                    </div>
-
-                    {/* STEP PROGRESS BAR */}
-                    <div className="flex items-center gap-3">
-                      <div className={`flex-1 rounded-full h-1.5 transition-colors ${checkoutStep >= 1 ? "bg-gold" : "bg-border"}`} />
-                      <span className="text-[11px] font-bold text-gold uppercase tracking-wider">Step {checkoutStep} of 2</span>
-                      <div className={`flex-1 rounded-full h-1.5 transition-colors ${checkoutStep >= 2 ? "bg-gold" : "bg-border"}`} />
-                    </div>
-
-                    {orderSuccessMsg ? (
-                      <div className="rounded-xl border border-gold/40 bg-card p-8 text-center space-y-3 shadow-goldy">
-                        <CheckCircle2 className="mx-auto size-12 text-gold animate-bounce" />
-                        <h4 className="font-display text-lg font-bold text-foreground">{orderSuccessMsg}</h4>
-                        <p className="text-xs text-muted-foreground">Redirecting to your orders list...</p>
-                      </div>
-                    ) : checkoutStep === 1 ? (
-                      /* STEP 1: ADDRESS DETAILS FORM */
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          const fullAddr = `${shippingName} (+91 ${shippingPhone}), ${shippingStreet}, ${shippingCity}, ${shippingState} - ${shippingPincode}`;
-                          setShippingAddress(fullAddr);
-                          setCheckoutStep(2);
-                        }}
-                        className="rounded-xl border border-gold/40 bg-card p-6 shadow-sm space-y-5"
-                      >
-                        <div className="border-b border-border pb-3">
-                          <h3 className="font-display text-base font-bold text-foreground">Enter Delivery Shipping Address</h3>
-                          <p className="text-xs text-muted-foreground">Provide full recipient details for delivery.</p>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Full Name *</label>
-                            <input
-                              required
-                              type="text"
-                              value={shippingName}
-                              onChange={(e) => setShippingName(e.target.value)}
-                              placeholder="Full Name"
-                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Mobile Phone Number *</label>
-                            <input
-                              required
-                              type="tel"
-                              value={shippingPhone}
-                              onChange={(e) => setShippingPhone(e.target.value)}
-                              placeholder="10-digit phone number"
-                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Street / Building / Area Address *</label>
-                          <textarea
-                            required
-                            rows={2}
-                            value={shippingStreet}
-                            onChange={(e) => setShippingStreet(e.target.value)}
-                            placeholder="House No, Building name, Street name, Area"
-                            className="mt-1.5 w-full rounded-sm border border-border bg-background p-3 text-xs text-foreground outline-none focus:border-gold"
-                          />
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          <div>
-                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">City *</label>
-                            <input
-                              required
-                              type="text"
-                              value={shippingCity}
-                              onChange={(e) => setShippingCity(e.target.value)}
-                              placeholder="Bengaluru"
-                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">State *</label>
-                            <input
-                              required
-                              type="text"
-                              value={shippingState}
-                              onChange={(e) => setShippingState(e.target.value)}
-                              placeholder="Karnataka"
-                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Pincode *</label>
-                            <input
-                              required
-                              type="text"
-                              value={shippingPincode}
-                              onChange={(e) => setShippingPincode(e.target.value)}
-                              placeholder="560038"
-                              className="mt-1.5 w-full rounded-sm border border-border bg-background px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-gold font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="btn-gold hover:btn-gold-hover w-full rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                        >
-                          Continue to Demo Payment <ArrowRight className="size-4" />
-                        </button>
-                      </form>
-                    ) : (
-                      /* STEP 2: DEMO PAYMENT OPTION & ORDER CONFIRMATION */
-                      <form onSubmit={handlePlaceOrder} className="rounded-xl border border-gold/40 bg-card p-6 shadow-sm space-y-5">
-                        {/* Address Summary Banner */}
-                        <div className="flex items-center justify-between rounded-lg border border-gold/30 bg-gold/10 p-3.5 text-xs">
-                          <div>
-                            <span className="text-[10px] uppercase tracking-wider text-gold font-bold">Delivery Address</span>
-                            <p className="font-bold text-foreground mt-0.5">{shippingName} (+91 {shippingPhone})</p>
-                            <p className="text-[11px] text-muted-foreground">{shippingStreet}, {shippingCity}, {shippingState} - {shippingPincode}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setCheckoutStep(1)}
-                            className="text-[11px] font-bold text-gold uppercase tracking-wider hover:underline shrink-0 ml-3 cursor-pointer"
-                          >
-                            Edit Address
-                          </button>
-                        </div>
-
-                        {/* Items Summary */}
-                        {isCartCheckout ? (
-                          <div className="space-y-3 max-h-60 overflow-y-auto rounded-lg border border-border bg-surface/50 p-4">
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                              Cart Order Items ({cartItems.reduce((acc, i) => acc + (i.quantity || 1), 0)})
-                            </p>
-                            {cartItems.map((ci, idx) => (
-                              <div key={idx} className="flex items-center justify-between gap-3 text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0">
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                  <img src={ci.product?.image || ""} alt={ci.product?.name || "Item"} className="size-12 rounded-md object-cover shrink-0 border border-border" />
-                                  <div className="overflow-hidden">
-                                    <p className="font-bold text-foreground truncate">{ci.product?.name || "Product"}</p>
-                                    <p className="text-[11px] text-muted-foreground">Size: <span className="text-gold font-bold">{ci.size}</span> • Qty: {ci.quantity}</p>
-                                  </div>
-                                </div>
-                                <span className="font-bold text-gold shrink-0">₹{((ci.product?.price || 0) * ci.quantity).toLocaleString("en-IN")}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : selectedProduct ? (
-                          <div className="flex items-center gap-4 rounded-lg border border-border bg-surface/50 p-4">
-                            <img src={selectedProduct.image} alt={selectedProduct.name} className="size-18 rounded-md object-cover shrink-0 border border-border" />
-                            <div>
-                              <p className="font-display text-base font-semibold text-foreground">{selectedProduct.name}</p>
-                              <p className="text-xs text-gold font-bold">₹{selectedProduct.price.toLocaleString("en-IN")}</p>
-                              <p className="text-[10px] text-muted-foreground font-semibold">Color: {selectedProduct.color} • Size: {selectedSize} • Qty: {quantity}</p>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {/* DEMO PAYMENT OPTION SELECTOR */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                              Select Payment Method
-                            </label>
-                            <span className="rounded-full bg-gold/15 border border-gold/40 px-2.5 py-0.5 text-[9px] font-bold text-gold uppercase tracking-wider">
-                              ⚡ Razorpay Online Enabled
-                            </span>
-                          </div>
-
-                          <div className="grid gap-2.5 sm:grid-cols-2">
-                            {[
-                              { id: "Razorpay Online Payment (UPI, Cards, NetBanking, Wallets)", label: "Razorpay Online Payment", desc: "Official Razorpay (UPI, Cards, Wallets, NetBanking)" },
-                              { id: "Demo Cash on Delivery (COD)", label: "Cash on Delivery", desc: "Pay cash upon physical delivery" },
-                            ].map((pm) => (
-                              <div
-                                key={pm.id}
-                                onClick={() => setPaymentMethod(pm.id)}
-                                className={`cursor-pointer rounded-lg border p-3.5 transition-all ${
-                                  paymentMethod === pm.id
-                                    ? "border-gold bg-gold/10 shadow-sm"
-                                    : "border-border bg-background hover:border-gold/50"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <input
-                                    type="radio"
-                                    name="demoPayment"
-                                    checked={paymentMethod === pm.id}
-                                    onChange={() => setPaymentMethod(pm.id)}
-                                    className="accent-gold"
-                                  />
-                                  <div>
-                                    <p className="text-xs font-bold text-foreground">{pm.label}</p>
-                                    <p className="text-[10px] text-muted-foreground">{pm.desc}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-
-                        {/* Price Total */}
-                        <div className="rounded-lg border border-gold/40 bg-gold/10 p-4 space-y-2 text-xs">
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Subtotal:</span>
-                            <span className="text-foreground font-semibold">₹{(isCartCheckout ? totalAmount : (selectedProduct ? selectedProduct.price * quantity : 0)).toLocaleString("en-IN")}</span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Express Shipping:</span>
-                            <span className="text-gold font-bold">FREE</span>
-                          </div>
-                          <div className="flex justify-between border-t border-gold/30 pt-2 font-bold text-foreground text-base">
-                            <span>Total Payable:</span>
-                            <span className="text-gold">₹{(isCartCheckout ? totalAmount : (selectedProduct ? selectedProduct.price * quantity : 0)).toLocaleString("en-IN")}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setCheckoutStep(1)}
-                            className="btn-outline-gold rounded-sm px-6 py-3.5 text-xs font-bold uppercase tracking-wider cursor-pointer"
-                          >
-                            ← Edit Address
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={orderSubmitting}
-                            className="btn-gold hover:btn-gold-hover flex-1 rounded-sm py-3.5 text-xs font-bold uppercase tracking-wider disabled:opacity-70 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                          >
-                            {orderSubmitting ? (
-                              <>
-                                <RefreshCw className="size-4 animate-spin" /> Processing Demo Order...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="size-4" /> Confirm & Place Demo Order — Total ₹{(isCartCheckout ? totalAmount : (selectedProduct ? selectedProduct.price * quantity : 0)).toLocaleString("en-IN")}
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </form>
-                    )}
-                  </div>
-                ) : (
-                  /* DEFAULT CATALOG GRID WITH FILTERS & NEW DROPS */
-                  <>
-                    <div className="border-b border-border pb-4 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          <span className="text-[10px] uppercase tracking-widest text-gold font-bold flex items-center gap-1.5">
-                            <Sparkles className="size-3.5" /> VEXA Premium Catalog
-                          </span>
-                          <h2 className="font-display text-2xl font-bold text-foreground">Book New Heavyweight Tee</h2>
-                        </div>
-                        
-                        {/* Search Input */}
-                        <div className="relative max-w-xs w-full">
-                          <input
-                            type="text"
-                            placeholder="Search color or name..."
-                            value={bookingSearchQuery}
-                            onChange={(e) => setBookingSearchQuery(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background px-3.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none"
-                          />
-                          {bookingSearchQuery && (
-                            <button
-                              type="button"
-                              onClick={() => setBookingSearchQuery("")}
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground">Select any premium 240 GSM drop to configure custom size, delivery address & place a direct order booking.</p>
-
-                      {/* Category Filter Pills */}
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        {["All", "Limited", "Oversized", "Classic"].map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setBookingCategoryFilter(cat)}
-                            className={`rounded-full px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                              bookingCategoryFilter === cat
-                                ? "bg-gold text-primary-foreground shadow-goldy"
-                                : "bg-surface border border-border text-muted-foreground hover:border-gold hover:text-foreground"
-                            }`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                        <span className="ml-auto text-[11px] text-muted-foreground font-semibold">
-                          Showing <span className="text-gold font-bold">{bookingDisplayProducts.length}</span> Products
-                        </span>
-                      </div>
-                    </div>
-
-                    {bookingDisplayProducts.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border bg-card/40 p-12 text-center space-y-2">
-                        <p className="text-sm font-semibold text-foreground">No products found matching "{bookingSearchQuery}"</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingCategoryFilter("All");
-                            setBookingSearchQuery("");
-                          }}
-                          className="text-xs text-gold font-bold hover:underline cursor-pointer"
-                        >
-                          Clear Filters & View All Products
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {bookingDisplayProducts.map((p) => {
-                          const discountPercent = p.oldPrice && p.oldPrice > p.price 
-                            ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100)
-                            : 0;
-
-                          return (
-                            <div
-                              key={p.id}
-                              onClick={() => {
-                                setSelectedProduct(p);
-                                setIsCartCheckout(false);
-                                setSelectedSize("M");
-                                setQuantity(1);
-                                setOrderSuccessMsg("");
-                              }}
-                              className="group cursor-pointer rounded-xl border border-border bg-background p-4 transition-all duration-300 hover:border-gold hover:shadow-goldy space-y-3 relative flex flex-col justify-between"
-                            >
-                              <div className="space-y-3">
-                                <div className="relative overflow-hidden rounded-lg bg-surface/50">
-                                  <img
-                                    src={p.image}
-                                    alt={p.name}
-                                    className="h-52 w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                  />
-                                  <div className="absolute top-2 left-2 flex flex-col gap-1">
-                                    <span className="rounded-full border border-gold/60 bg-[#f4efe6] px-3 py-1 text-[9px] font-extrabold uppercase tracking-wider text-[#1c1917] shadow-md">
-                                      {p.category}
-                                    </span>
-                                  </div>
-
-                                  {discountPercent > 0 && (
-                                    <span className="absolute top-2 right-2 rounded-md bg-black/70 backdrop-blur-md border border-gold/40 text-gold px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">
-                                      {discountPercent}% OFF
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                                      240 GSM Heavyweight
-                                    </span>
-                                    <span className="text-[10px] text-gold font-bold">★ {p.rating.toFixed(1)}</span>
-                                  </div>
-
-                                  <h4 className="font-display text-sm font-bold text-foreground group-hover:text-gold transition-colors leading-tight">
-                                    {p.name}
-                                  </h4>
-                                  <p className="text-[11px] text-muted-foreground font-medium">
-                                    Color: <span className="text-foreground font-semibold">{p.color}</span>
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-2">
-                                <div>
-                                  <div className="flex items-baseline gap-1.5">
-                                    <span className="font-display text-base font-bold text-gold">₹{p.price.toLocaleString("en-IN")}</span>
-                                    {p.oldPrice > p.price && (
-                                      <span className="text-[11px] text-muted-foreground line-through">₹{p.oldPrice.toLocaleString("en-IN")}</span>
-                                    )}
-                                  </div>
-                                  <p className="text-[9px] text-emerald-500 font-semibold">In Stock ({p.stock || 12} left)</p>
-                                </div>
-
-                                <span className="btn-gold rounded-sm px-3.5 py-1.5 text-[10px] uppercase font-bold tracking-wider group-hover:bg-gold-hover shadow-sm">
-                                  Book Now →
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
             {/* Dashboard Aligned Footer */}
-            <div className="w-full mt-auto pt-8">
+            <div className="hidden sm:block w-full mt-auto pt-8">
               <Footer />
             </div>
           </main>

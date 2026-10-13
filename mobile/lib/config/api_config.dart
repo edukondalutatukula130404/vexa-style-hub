@@ -21,7 +21,7 @@ class ApiConfig {
 
   /// Reactive notifier to broadcast server URL updates to all UI components
   static final ValueNotifier<String> baseUrlNotifier = ValueNotifier<String>(
-    cloudTunnelUrl,
+    localWifiUrl,
   );
 
   /// API State Simulator for testing UI states (normal, slow, empty, error, offline)
@@ -127,7 +127,7 @@ class ApiConfig {
     if (_discoveredBaseUrl.isNotEmpty) {
       return _discoveredBaseUrl;
     }
-    return cloudTunnelUrl;
+    return localWifiUrl;
   }
 
   static void _notifyUrlChanged() {
@@ -261,8 +261,8 @@ class ApiConfig {
       return found;
     }
 
-    // 4. Fallback if no local subnet responded: use cloud tunnel
-    _discoveredBaseUrl = cloudTunnelUrl;
+    // 4. Fallback if no local subnet responded: use local wifi
+    _discoveredBaseUrl = localWifiUrl;
     _notifyUrlChanged();
     return _discoveredBaseUrl;
   }

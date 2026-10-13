@@ -30,8 +30,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _emailController.text = 'naveen@gmail.com';
-    _passwordController.text = 'naveen123';
   }
 
   @override
@@ -150,41 +148,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
 
-                  // Top Left Server Config Pill Button
-                  Positioned(
-                    top: topPadding + 12,
-                    left: 20,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => ServerConfigDialog.show(context),
-                        borderRadius: BorderRadius.circular(24),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(35),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: Colors.white.withAlpha(200), width: 1.2),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.wifi_rounded, color: Colors.white, size: 14),
-                              const SizedBox(width: 5),
-                              Text(
-                                'Server',
-                                style: GoogleFonts.outfit(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
 
                   // Top Right Guest Pill Button
                   Positioned(
@@ -280,12 +243,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
             // ── BOTTOM ROUNDED SHEET CONTAINER ──────────────────────────────
             Transform.translate(
-              offset: const Offset(0, 12),
+              offset: const Offset(0, -22),
               child: Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(20),
+                      blurRadius: 16,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Form(
@@ -517,10 +487,147 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x3B000000),
+              blurRadius: 20,
+              spreadRadius: 1,
+              offset: Offset(0, -5),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFFFBE89C), // Light radiant gold top
+                  Color(0xFFF2D370), // Light Vexa Gold core
+                  Color(0xFFE5BF4E), // Warm light gold bottom
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withAlpha(220),
+                  width: 1.2,
+                ),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildGoldNavItem(
+                      label: 'Products',
+                      icon: Icons.grid_view_outlined,
+                      activeIcon: Icons.grid_view_rounded,
+                      isSelected: false,
+                      onTap: () => Navigator.pushReplacementNamed(context, '/home'),
+                    ),
+                    _buildGoldNavItem(
+                      label: 'My Orders',
+                      icon: Icons.inventory_2_outlined,
+                      activeIcon: Icons.inventory_2_rounded,
+                      isSelected: false,
+                      onTap: () => Navigator.pushReplacementNamed(context, '/home'),
+                    ),
+                    _buildGoldNavItem(
+                      label: 'Home',
+                      icon: Icons.home_outlined,
+                      activeIcon: Icons.home_rounded,
+                      isSelected: false,
+                      onTap: () => Navigator.pushReplacementNamed(context, '/home'),
+                    ),
+                    _buildGoldNavItem(
+                      label: 'Wishlist',
+                      icon: Icons.favorite_outline_rounded,
+                      activeIcon: Icons.favorite_rounded,
+                      isSelected: false,
+                      onTap: () => Navigator.pushReplacementNamed(context, '/home'),
+                    ),
+                    _buildGoldNavItem(
+                      label: 'Profile',
+                      icon: Icons.person_outline_rounded,
+                      activeIcon: Icons.person_rounded,
+                      isSelected: true,
+                      onTap: () {},
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoldNavItem({
+    required String label,
+    required IconData icon,
+    required IconData activeIcon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      splashColor: Colors.black12,
+      highlightColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0F172A) : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          border: isSelected
+              ? Border.all(color: const Color(0xFFFFD700).withAlpha(120), width: 1)
+              : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(80),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? const Color(0xFFFFD700) : const Color(0xFF0F172A),
+              size: isSelected ? 22 : 20,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                color: isSelected ? const Color(0xFFFFD700) : const Color(0xFF0F172A),
+                letterSpacing: 0.2,
               ),
             ),
           ],

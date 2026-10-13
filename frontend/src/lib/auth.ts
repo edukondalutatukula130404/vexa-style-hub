@@ -10,12 +10,20 @@ export type AuthUser = {
   token?: string;
 };
 
-export const API_URL =
-  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL)
-    ? import.meta.env.VITE_API_URL
-    : typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname || "localhost"}:5000/api`
-    : "http://localhost:5000/api";
+export const getApiUrl = (): string => {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host.startsWith("192.168.")) {
+      return `${window.location.protocol}//${host}:5000/api`;
+    }
+  }
+  if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  return "http://localhost:5000/api";
+};
+
+export const API_URL = getApiUrl();
 
 export function getAuthUser(): AuthUser | null {
   if (typeof window === "undefined") return null;

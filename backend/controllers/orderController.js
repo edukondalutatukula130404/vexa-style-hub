@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const User = require('../models/User');
+const Payment = require('../models/Payment');
 const Notification = require('../models/Notification');
 const mongoose = require('mongoose');
 const { broadcast } = require('../config/websocket');
@@ -41,14 +42,28 @@ const NOTIFICATION_MAP = {
 // @access  Public
 exports.createOrder = async (req, res, next) => {
   try {
-    const { userEmail, userName, items, totalAmount, paymentMethod, shippingAddress, id, _id } = req.body;
+    const {
+      userEmail,
+      userName,
+      items,
+      totalAmount,
+      paymentMethod,
+      shippingAddress,
+      id,
+      _id,
+      paymentId: customPaymentId,
+      paymentStatus: customPaymentStatus
+    } = req.body;
 
     if (!userEmail || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Invalid order details provided' });
     }
 
-    const orderId = id || _id || '';
+    const orderId = id || _id || `ORD-${Date.now()}`;
     const cleanEmail = userEmail.toLowerCase().trim();
+    const isCOD = !paymentMethod || paymentMethod.toLowerCase().includes('cash');
+    const assignedPaymentId = customPaymentId || (isCOD ? `cod_${Date.now()}` : `pay_${Date.now()}`);
+    const assignedPaymentStatus = customPaymentStatus || (isCOD ? 'Pending' : 'Completed');
 
     const order = await Order.create({
       id: orderId,
@@ -58,8 +73,44 @@ exports.createOrder = async (req, res, next) => {
       totalAmount,
       status: 'Order Placed',
       paymentMethod: paymentMethod || 'Cash on Delivery',
+      paymentId: assignedPaymentId,
+      paymentStatus: assignedPaymentStatus,
       shippingAddress: shippingAddress || 'Indiranagar 100ft Road, Bengaluru'
     });
+
+    // Automatically store / sync Payment document in MongoDB
+    try {
+      const existingPay = await Payment.findOne({
+        $or: [
+          { paymentId: assignedPaymentId },
+          { orderId: orderId }
+        ]
+      });
+
+      if (!existingPay) {
+        await Payment.create({
+          paymentId: assignedPaymentId,
+          orderId: order.id || String(order._id),
+          userEmail: cleanEmail,
+          userName: userName || 'Customer',
+          amount: Number(totalAmount) || 0,
+          currency: 'INR',
+          status: isCOD ? 'Pending' : 'Success',
+          paymentMethod: paymentMethod || 'Cash on Delivery',
+          metadata: {
+            orderDbId: String(order._id),
+            itemCount: items.length
+          }
+        });
+      } else {
+        if (!existingPay.orderId) {
+          existingPay.orderId = order.id || String(order._id);
+          await existingPay.save();
+        }
+      }
+    } catch (paySyncErr) {
+      console.warn('Payment recording note during order creation:', paySyncErr.message);
+    }
 
     // Real-time WebSocket Broadcast
     broadcast('ORDER_CREATED', order);
@@ -266,6 +317,43 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (cancelReason !== undefined) {
       order.cancelReason = cancelReason;
     }
+
+    // Sync Payment status in MongoDB
+    if (newStatus.toUpperCase() === 'CANCELLED') {
+      try {
+        await Payment.updateMany(
+          {
+            $or: [
+              { orderId: order.id },
+              { orderId: String(order._id) },
+              { paymentId: order.paymentId }
+            ]
+          },
+          { status: 'Refunded' }
+        );
+        order.paymentStatus = 'Refunded';
+      } catch (payCancelErr) {
+        console.warn('Payment refund status sync note:', payCancelErr.message);
+      }
+    } else if (newStatus.toLowerCase() === 'delivered') {
+      try {
+        await Payment.updateMany(
+          {
+            $or: [
+              { orderId: order.id },
+              { orderId: String(order._id) },
+              { paymentId: order.paymentId }
+            ],
+            status: 'Pending'
+          },
+          { status: 'Success' }
+        );
+        order.paymentStatus = 'Completed';
+      } catch (payDeliverErr) {
+        console.warn('Payment success status sync note:', payDeliverErr.message);
+      }
+    }
+
     await order.save();
 
     // Broadcast Real-time WebSocket event for open dashboards/apps

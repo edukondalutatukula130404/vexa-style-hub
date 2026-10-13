@@ -1,4 +1,4 @@
-﻿import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import {
   Star,
@@ -1276,6 +1276,48 @@ export function ProductDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Sticky Mobile Bottom Bar (Matches Flutter Product Detail Screen 1:1) */}
+      <div className="fixed inset-x-0 bottom-16 z-30 md:hidden border-t border-gold/30 bg-background/95 backdrop-blur-xl p-3 shadow-[0_-5px_20px_rgba(0,0,0,0.15)] flex items-center justify-between gap-3">
+        <div className="flex flex-col justify-center min-w-0">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Price</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-display text-base font-bold text-gold">₹{product.price.toLocaleString("en-IN")}</span>
+            {product.oldPrice > product.price && (
+              <span className="text-[10px] text-muted-foreground line-through">₹{product.oldPrice.toLocaleString("en-IN")}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-1 justify-end">
+          <button
+            type="button"
+            disabled={!isVariantInStock}
+            onClick={handleAddToCart}
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95 ${
+              isVariantInStock
+                ? "border border-gold text-gold hover:bg-gold hover:text-primary-foreground bg-card shadow-sm"
+                : "border border-border bg-muted/40 text-muted-foreground cursor-not-allowed opacity-60"
+            }`}
+          >
+            <ShoppingBag className="size-3.5" />
+            <span>Bag</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={!isVariantInStock}
+            onClick={handleBuyNow}
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 px-3.5 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer shadow-goldy active:scale-95 ${
+              isVariantInStock
+                ? "bg-gold text-primary-foreground hover:bg-gold/90"
+                : "border border-border bg-card/20 text-muted-foreground cursor-not-allowed opacity-60"
+            }`}
+          >
+            <span>{isVariantInStock ? "Buy Now" : "Out of Stock"}</span>
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

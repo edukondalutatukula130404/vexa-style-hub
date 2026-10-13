@@ -1,18 +1,16 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
-  Shirt,
-  Wind,
-  Sparkles,
-  ShieldCheck,
-  Truck,
-  BadgeIndianRupee,
-  MessageCircle,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
   Search,
   X,
+  LayoutGrid,
+  Palette,
+  Lock,
+  Truck,
+  ShoppingBag,
 } from "lucide-react";
 import heroImg from "@/assets/hero.jpg";
 import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
@@ -23,19 +21,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { useAuth } from "@/lib/auth";
 
-const features = [
-  { icon: Shirt, title: "Premium Cotton Fabric", text: "240 GSM combed long-staple cotton." },
-  { icon: Sparkles, title: "Oversized Modern Fit", text: "Drop shoulder, sculpted drape." },
-  { icon: Wind, title: "Soft & Breathable", text: "Bio-washed for all-day comfort." },
-  { icon: ShieldCheck, title: "Wrinkle Resistant", text: "Holds its shape wash after wash." },
-];
 
-const services = [
-  { icon: MessageCircle, title: "WhatsApp Order", text: "Order in one message" },
-  { icon: Truck, title: "Fast Delivery", text: "2–4 day dispatch" },
-  { icon: BadgeIndianRupee, title: "Cash on Delivery", text: "Pay when it arrives" },
-  { icon: ShieldCheck, title: "Quality Guarantee", text: "30-day easy returns" },
-];
 
 const heroBanners = [
   {
@@ -65,16 +51,16 @@ const heroBanners = [
     discount: "Free Ship",
   },
   {
-    tag: "Bespoke Branding & Concierge",
-    title: "Custom Tee Booking",
-    highlight: "Booking",
-    description: "Order personalized colorways, custom logo embroidery, and bulk tee reservations directly from your user dashboard.",
-    ctaText: "Book Custom Tee",
-    ctaLink: "/dashboard?tab=booking",
+    tag: "Bespoke Streetwear Essentials",
+    title: "Signature Heavyweight Edition",
+    highlight: "Heavyweight",
+    description: "Experience handcrafted luxury with 240 GSM combed cotton, custom boxy drape, and premium drop-shoulder construction.",
+    ctaText: "Shop Collection",
+    ctaLink: "/products",
     secondaryText: "Customer Support",
     secondaryLink: "/dashboard?tab=support",
     image: heroLuxuryImg,
-    badgeText: "Custom Service",
+    badgeText: "Signature Fit",
     discount: "Express",
   },
 ];
@@ -90,12 +76,12 @@ const promoCarouselBanners = [
     image: promoBanner1,
   },
   {
-    tag: "BESPOKE CUSTOMISATION",
-    title: "BOOK YOUR CUSTOM TEE",
-    subtitle: "PERSONALIZED EMBROIDERY & BULK ORDERS",
-    text: "Personalize colorways, custom embroidery & bulk orders directly from your user dashboard with live tracking and concierge support.",
-    ctaText: "BOOK CUSTOM TEE",
-    ctaLink: "/dashboard?tab=booking",
+    tag: "EXCLUSIVE STREETWEAR DROP",
+    title: "HEAVYWEIGHT BOX-FIT TEES",
+    subtitle: "240 GSM COMBED COTTON ESSENTIALS",
+    text: "Engineered for superior structure, premium drop-shoulder aesthetic, and zero shrinkage with long-staple combed cotton.",
+    ctaText: "EXPLORE COLLECTION",
+    ctaLink: "/products",
     image: promoBanner2,
   },
   {
@@ -129,9 +115,26 @@ export function Home() {
     (new URLSearchParams(window.location.search).has("id") ||
       new URLSearchParams(window.location.search).has("product"));
 
+  const { user, isLoggedIn } = useAuth();
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return "GOOD MORNING";
+    if (hour >= 12 && hour < 17) return "GOOD AFTERNOON";
+    if (hour >= 17 && hour < 21) return "GOOD EVENING";
+    return "GOOD NIGHT";
+  }, []);
+
+  const cleanDisplayName = useMemo(() => {
+    let name = user?.name?.trim();
+    if (!name || name.toLowerCase() === "collector" || name.toLowerCase().includes("guest")) {
+      return "TATUKULA EDUKONDALU";
+    }
+    return name.toUpperCase();
+  }, [user]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [featureIndex, setFeatureIndex] = useState(0);
   const [heroIndex, setHeroIndex] = useState(0);
   const [bannerIndex, setBannerIndex] = useState(0);
   const newArrivalsRef = useRef<HTMLDivElement>(null);
@@ -187,12 +190,12 @@ export function Home() {
       imgPosition: "object-top md:object-right",
     },
     {
-      tag: "BESPOKE CUSTOMISATION",
-      title: "BOOK YOUR CUSTOM TEE",
-      subtitle: "PERSONALIZED EMBROIDERY & BULK ORDERS",
-      text: "Personalize colorways, custom embroidery & bulk orders directly from your user dashboard with live tracking and concierge support.",
-      ctaText: "BOOK CUSTOM TEE",
-      ctaLink: "/dashboard?tab=booking",
+      tag: "EXCLUSIVE STREETWEAR DROP",
+      title: "HEAVYWEIGHT BOX-FIT TEES",
+      subtitle: "240 GSM COMBED COTTON ESSENTIALS",
+      text: "Engineered for superior structure, premium drop-shoulder aesthetic, and zero shrinkage with long-staple combed cotton.",
+      ctaText: "EXPLORE COLLECTION",
+      ctaLink: "/products",
       image: banner2ImgState,
       imgPosition: "object-top md:object-right",
     },
@@ -208,12 +211,6 @@ export function Home() {
     },
   ], [banner1ImgState, banner2ImgState, heroImgState]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setFeatureIndex((prev) => (prev + 1) % features.length);
-    }, 3500);
-    return () => clearInterval(timer);
-  }, []);
 
 
 
@@ -268,8 +265,20 @@ export function Home() {
 
   return (
     <div className="home-page-root no-scrollbar w-full overflow-x-hidden pt-16 sm:pt-20 md:pt-28">
-      {/* 0. HERO BANNER SECTION (Visible on all viewports, optimized for Mobile Responsive) */}
-      <section className="block mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-2 sm:pt-4 pb-8 sm:pb-12 border-b border-border/30">
+      {/* 0. MOBILE GREETING HEADER (Matches Flutter Mobile App 1:1) */}
+      <div className="block md:hidden px-4 pt-2 pb-2">
+        <div className="w-full rounded-2xl border border-[#E5C158]/70 bg-gradient-to-br from-[#FFFDF2] to-[#FFF4D1] dark:from-[#1E1B15] dark:to-[#17140E] px-5 py-4.5 shadow-sm">
+          <span className="block font-display text-[13px] font-black uppercase tracking-[0.16em] text-[#B8860B] leading-none mb-2">
+            {greeting}
+          </span>
+          <h2 className="font-display text-lg xs:text-xl font-bold uppercase tracking-[0.05em] text-[#0F172A] dark:text-foreground leading-tight">
+            {cleanDisplayName}
+          </h2>
+        </div>
+      </div>
+
+      {/* 0. HERO BANNER SECTION (Desktop & Tablet only; hidden on Mobile) */}
+      <section className="hidden md:block mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-2 sm:pt-4 pb-8 sm:pb-12 border-b border-border/30">
         <div className="grid grid-cols-1 gap-8 sm:gap-10 lg:grid-cols-2 lg:items-center">
           <Reveal>
             <div className="space-y-4 sm:space-y-6">
@@ -307,16 +316,18 @@ export function Home() {
       </section>
 
       {/* 1. LUXURY PROMO BANNER CAROUSEL SLIDER */}
-      <section id="promotional-showcase" className="scroll-mt-28 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-12 pt-8">
-        <Reveal className="mb-6 text-center">
-          <p className="text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.3em] text-[#B8860B]">Featured Highlights</p>
-          <h2 className="mt-1 font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground">
-            Promotional <span className="text-[#B8860B]">Showcase</span>
+      <section id="promotional-showcase" className="scroll-mt-28 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8 pt-3 md:pt-8">
+        <Reveal className="mb-3.5 text-left md:text-center">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] text-[#B8860B]">
+            FEATURED HIGHLIGHTS
+          </p>
+          <h2 className="mt-1 font-display text-xl sm:text-3xl lg:text-4xl font-bold text-foreground">
+            PROMOTIONAL <span className="text-[#B8860B]">SHOWCASE</span>
           </h2>
         </Reveal>
 
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-[#B8860B]/40 bg-card shadow-2xl transition-all hover:border-[#B8860B]">
-          <div className="relative min-h-[440px] sm:min-h-[480px] lg:min-h-[520px] w-full overflow-hidden flex flex-col md:flex-row items-stretch">
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-[#B8860B]/40 bg-card shadow-xl transition-all hover:border-[#B8860B]">
+          <div className="relative h-[420px] sm:min-h-[480px] lg:min-h-[520px] w-full overflow-hidden flex flex-col md:flex-row items-stretch">
             {/* Background / Right Side Image Container */}
             <div className="absolute inset-0 md:left-auto md:right-0 md:w-1/2 lg:w-[48%] h-full overflow-hidden">
               <img
@@ -355,22 +366,22 @@ export function Home() {
               </div>
             </div>
 
-            {/* Left Navigation Arrow Button */}
+            {/* Left Navigation Arrow Button (Desktop Only) */}
             <button
               type="button"
               onClick={() => setBannerIndex((prev) => (prev - 1 + activePromoBanners.length) % activePromoBanners.length)}
-              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 flex items-center justify-center text-white/90 hover:text-[#B8860B] hover:scale-125 active:scale-95 transition-all cursor-pointer drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] bg-transparent border-none p-1.5"
+              className="hidden md:flex absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 items-center justify-center text-[#F5D77F] hover:text-[#D4AF37] hover:scale-125 active:scale-95 transition-all cursor-pointer drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] bg-transparent border-none p-1.5"
               aria-label="Previous Showcase Banner"
               title="Previous Banner"
             >
               <ChevronLeft className="size-8 sm:size-9 stroke-[2.5]" />
             </button>
 
-            {/* Right Navigation Arrow Button */}
+            {/* Right Navigation Arrow Button (Desktop Only) */}
             <button
               type="button"
               onClick={() => setBannerIndex((prev) => (prev + 1) % activePromoBanners.length)}
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 flex items-center justify-center text-white/90 hover:text-[#B8860B] hover:scale-125 active:scale-95 transition-all cursor-pointer drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] bg-transparent border-none p-1.5"
+              className="hidden md:flex absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 items-center justify-center text-[#F5D77F] hover:text-[#D4AF37] hover:scale-125 active:scale-95 transition-all cursor-pointer drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] bg-transparent border-none p-1.5"
               aria-label="Next Showcase Banner"
               title="Next Banner"
             >
@@ -379,35 +390,51 @@ export function Home() {
           </div>
         </div>
 
-
+        {/* Showcase Banner Dots Indicator (Hidden on Mobile to match screenshot) */}
+        <div className="hidden md:flex items-center justify-center gap-2 pt-4">
+          {activePromoBanners.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setBannerIndex(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                bannerIndex === i ? "w-6 bg-gold shadow-sm" : "w-2 bg-border hover:bg-gold/50"
+              }`}
+              aria-label={`Slide ${i + 1}`}
+            />
+          ))}
+        </div>
       </section>
 
       {/* 2. NEW ARRIVALS */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-5 py-8 border-t border-border/40">
-        <div className="flex items-center justify-between mb-4 gap-4">
+      <section className="mx-auto max-w-7xl px-4 sm:px-5 py-6 md:py-8 border-t border-border/40">
+        <div className="flex items-center justify-between mb-3.5 gap-4">
           <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.3em] text-gold">LATEST DROPS</p>
-            <h2 className="mt-0.5 font-display text-2xl sm:text-4xl font-bold text-foreground">
-              New Arrivals
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] text-[#B8860B]">
+              LATEST DROPS
+            </p>
+            <h2 className="mt-0.5 font-display text-xl sm:text-3xl font-bold text-foreground">
+              NEW ARRIVALS
             </h2>
           </div>
           <Link
             to="/products"
-            className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gold hover:bg-gold hover:text-primary-foreground transition-all shrink-0"
+            className="inline-flex items-center gap-1 rounded-full border border-[#B8860B]/40 bg-[#B8860B]/15 px-3 py-1.5 text-[11px] font-bold text-[#B8860B] hover:bg-gold hover:text-primary-foreground transition-all shrink-0"
           >
-            Explore All <ArrowRight className="size-3.5" />
+            <span>Explore All</span>
+            <ArrowRight className="size-3.5" />
           </Link>
         </div>
 
         {/* New Arrivals Horizontal Scroll */}
         <div
           ref={newArrivalsRef}
-          className="mt-3 flex gap-4 sm:gap-5 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth no-scrollbar"
+          className="mt-3 flex gap-3 sm:gap-5 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth no-scrollbar"
         >
           {newArrivals.map((p, i) => (
             <div
               key={`new-${p.id}`}
-              className="w-[240px] xs:w-[270px] sm:w-[300px] shrink-0 snap-start flex flex-col h-full"
+              className="w-[180px] xs:w-[190px] sm:w-[260px] md:w-[300px] shrink-0 snap-start flex flex-col h-full"
             >
               <Reveal delay={i * 90} className="h-full w-full flex flex-col">
                 <ProductCard product={p} />
@@ -452,83 +479,95 @@ export function Home() {
         </div>
       </section>
 
-      {/* 5. ENGINEERED EXCELLENCE (2x2 Grid Features) */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-5 py-12 border-t border-border/30">
-        <Reveal className="text-center">
-          <p className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold">Engineered Excellence</p>
-          <h2 className="mt-1 font-display text-2xl sm:text-4xl font-bold">
-            Crafted to the <span className="text-gold-gradient">last stitch</span>
-          </h2>
-          <div className="hairline mx-auto mt-3 w-40" />
-        </Reveal>
 
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4 items-stretch">
-          {features.map((f, i) => {
-            const Icon = f.icon;
-            return (
-              <Reveal key={f.title} delay={i * 90} className="h-full w-full flex flex-col">
-                <div className="group flex h-full w-full flex-col items-center justify-center rounded-2xl border border-gold/40 bg-card p-4 sm:p-8 text-center shadow-goldy transition-all duration-300 hover:-translate-y-1 hover:border-gold">
-                  <div className="mx-auto flex size-10 sm:size-14 items-center justify-center rounded-2xl border border-gold/50 bg-gold/15 text-gold shadow-sm transition-transform group-hover:scale-110">
-                    <Icon className="size-5 sm:size-7 text-gold" />
-                  </div>
-                  <h3 className="mt-3 sm:mt-6 font-display text-xs sm:text-lg font-bold text-foreground uppercase tracking-wider">
-                    {f.title}
-                  </h3>
-                  <p className="mt-1.5 text-[10px] sm:text-sm text-muted-foreground leading-relaxed">
-                    {f.text}
-                  </p>
-                </div>
-              </Reveal>
-            );
-          })}
-        </div>
-      </section>
 
-      {/* 6. SERVICE BAR (WhatsApp Order, Fast Delivery, COD, Quality Guarantee) */}
-      <section className="border-y border-border bg-surface/40">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 sm:px-5 py-10 grid-cols-2 lg:grid-cols-4">
-          {services.map((s, i) => (
-            <Reveal key={s.title} delay={i * 90}>
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 sm:size-12 shrink-0 items-center justify-center rounded-full border border-gold/50 text-gold">
-                  <s.icon className="size-4 sm:size-5" />
-                </div>
-                <div>
-                  <p className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.15em] text-foreground">
-                    {s.title}
-                  </p>
-                  <p className="mt-0.5 text-[10px] sm:text-sm text-muted-foreground">{s.text}</p>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
 
-      {/* 7. JOIN VEXA CIRCLE CTA (Last) */}
-      <section className="mx-auto max-w-4xl px-4 sm:px-5 py-16 text-center">
-        <Reveal>
-          <h2 className="font-display text-2xl sm:text-4xl font-bold">
-            Join the <span className="text-gold-gradient">VEXA</span> circle
-          </h2>
-          <p className="mx-auto mt-3 max-w-xl text-xs sm:text-sm text-muted-foreground">
-            Create an account for early access to limited drops, member pricing and free express shipping.
-          </p>
-          <div className="mt-7 flex flex-wrap justify-center gap-3.5">
-            <Link
-              to="/register"
-              className="btn-gold hover:btn-gold-hover rounded-sm px-7 py-3 text-xs font-bold uppercase tracking-wider shadow-goldy"
-            >
-              Create account
-            </Link>
-            <Link
-              to="/contact"
-              className="btn-outline-gold rounded-sm px-7 py-3 text-xs font-bold uppercase tracking-wider hover:bg-gold hover:text-primary-foreground"
-            >
-              Talk to us
-            </Link>
+
+
+      {/* 5. HOW TO BOOK YOUR VEXA TEE (Exact 1:1 Mobile Responsive Match with Flutter App) */}
+      <section className="mx-auto max-w-xl px-4 pt-6 pb-20 sm:pb-24">
+        <div className="rounded-[24px] border-[1.5px] border-[#E5C158]/70 bg-gradient-to-br from-[#FFFDF5] to-[#FFF4D8] dark:from-[#1E293B]/90 dark:to-[#0F172A]/90 p-5 sm:p-6 shadow-[0_6px_18px_rgba(184,134,11,0.12)]">
+          {/* Title Header */}
+          <div className="text-left">
+            <h2 className="font-display text-[16.5px] sm:text-[18px] font-black tracking-[0.05em] text-[#0F172A] dark:text-foreground uppercase">
+              HOW TO BOOK YOUR VEXA TEE
+            </h2>
+            <p className="mt-1 text-[13px] text-slate-500 dark:text-muted-foreground leading-snug">
+              4 easy steps from catalog selection to custom doorstep delivery.
+            </p>
           </div>
-        </Reveal>
+
+          {/* 4 Step Cards */}
+          <div className="mt-5 space-y-3.5">
+            {[
+              {
+                stepNum: "01",
+                tag: "STEP 01",
+                title: "Browse Luxury Catalog Drops",
+                subtitle: "Explore 240 GSM luxury catalog drops and handpicked oversized streetwear silhouettes.",
+                icon: LayoutGrid,
+              },
+              {
+                stepNum: "02",
+                tag: "STEP 02",
+                title: "Choose Fit & Colorway",
+                subtitle: "Select long-staple combed cotton colorways, drop-shoulder fits, and preferred sizes.",
+                icon: Palette,
+              },
+              {
+                stepNum: "03",
+                tag: "STEP 03",
+                title: "Instant Secure Checkout",
+                subtitle: "Complete order seamlessly using Razorpay, UPI, NetBanking, Credit Cards, or COD.",
+                icon: Lock,
+              },
+              {
+                stepNum: "04",
+                tag: "STEP 04",
+                title: "Doorstep Luxury Delivery",
+                subtitle: "Track your shipment live from VEXA master tailors to your doorstep with luxury packaging.",
+                icon: Truck,
+              },
+            ].map((item, idx) => {
+              const StepIcon = item.icon;
+              return (
+                <div
+                  key={idx}
+                  className="rounded-[16px] border border-[#E5C158]/50 bg-white dark:bg-[#0F172A] p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-start gap-3.5 transition-all duration-200 hover:border-[#D4AF37]"
+                >
+                  {/* Icon Badge Circle */}
+                  <div className="size-11 rounded-full bg-[#FFF4D1] dark:bg-amber-950/40 border-[1.2px] border-[#D4AF37]/60 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                    <StepIcon className="size-5 text-[#A67C00] dark:text-gold" strokeWidth={2.2} />
+                  </div>
+
+                  {/* Title & Description Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[#E5BF4E]/20 text-[#A67C00] dark:text-gold text-[9.5px] font-black tracking-[0.08em] uppercase">
+                      {item.tag}
+                    </div>
+                    <h3 className="mt-1 font-bold text-[14.5px] text-[#0F172A] dark:text-foreground leading-tight">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1 text-[12px] text-slate-500 dark:text-muted-foreground leading-[1.38]">
+                      {item.subtitle}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Radiant VEXA Gold Action CTA Button */}
+          <Link
+            to="/products"
+            className="mt-4 flex h-[50px] w-full items-center justify-center gap-2 rounded-[24px] border border-white/80 bg-gradient-to-b from-[#FBE89C] via-[#F2D370] to-[#E5BF4E] text-[#0F172A] shadow-[0_4px_12px_rgba(242,211,112,0.4)] transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+          >
+            <ShoppingBag className="size-5 text-[#0F172A]" strokeWidth={2.2} />
+            <span className="font-display text-[13.5px] font-black tracking-[0.09em] uppercase text-[#0F172A]">
+              EXPLORE CATALOG NOW
+            </span>
+          </Link>
+        </div>
       </section>
     </div>
   );

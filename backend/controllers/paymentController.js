@@ -1,5 +1,7 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const Payment = require('../models/Payment');
+const { broadcast } = require('../config/websocket');
 
 // Lazy-initialize Razorpay instance with environment variables
 const getRazorpayInstance = () => {
@@ -73,12 +75,23 @@ exports.createOrder = async (req, res, next) => {
   }
 };
 
-// @desc    Verify Razorpay Payment Signature
+// @desc    Verify Razorpay Payment Signature and Save to MongoDB
 // @route   POST /api/payment/verify-payment
 // @access  Public
 exports.verifyPayment = async (req, res, next) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      userEmail,
+      userName,
+      amount,
+      currency = 'INR',
+      orderId,
+      paymentMethod = 'Razorpay Online Payment',
+      metadata = {}
+    } = req.body;
 
     if (!razorpay_payment_id) {
       return res.status(400).json({
@@ -95,7 +108,7 @@ exports.verifyPayment = async (req, res, next) => {
       hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
       const generatedSignature = hmac.digest('hex');
 
-      const isValid = generatedSignature === razorpay_signature;
+      const isValid = (generatedSignature === razorpay_signature);
 
       if (!isValid) {
         console.warn('⚠️ Razorpay Signature Mismatch detected');
@@ -108,11 +121,160 @@ exports.verifyPayment = async (req, res, next) => {
 
     console.log(`✅ Razorpay Payment verified successfully: ${razorpay_payment_id}`);
 
+    // Persist Payment to MongoDB
+    let savedPayment = null;
+    try {
+      const cleanEmail = (userEmail || 'customer@vexa.com').toLowerCase().trim();
+      const targetOrderId = orderId || razorpay_order_id || '';
+
+      savedPayment = await Payment.findOneAndUpdate(
+        { paymentId: razorpay_payment_id },
+        {
+          paymentId: razorpay_payment_id,
+          orderId: targetOrderId,
+          userEmail: cleanEmail,
+          userName: userName || 'Customer',
+          amount: amount ? Number(amount) : 0,
+          currency: currency || 'INR',
+          status: 'Success',
+          paymentMethod: paymentMethod || 'Razorpay Online Payment',
+          razorpayOrderId: razorpay_order_id || '',
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature || '',
+          metadata: metadata || {}
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      console.log(`💾 Payment saved to MongoDB: ${savedPayment._id} (${savedPayment.paymentId})`);
+
+      try {
+        broadcast('PAYMENT_RECEIVED', savedPayment);
+      } catch (wsErr) {
+        console.warn('WebSocket broadcast note:', wsErr.message);
+      }
+    } catch (dbErr) {
+      console.error('Error saving payment to MongoDB:', dbErr);
+    }
+
     return res.status(200).json({
       success: true,
-      message: 'Razorpay payment verified successfully',
+      message: 'Razorpay payment verified and saved to MongoDB successfully',
       paymentId: razorpay_payment_id,
-      orderId: razorpay_order_id || `order_rzp_${Date.now()}`
+      orderId: orderId || razorpay_order_id || `order_rzp_${Date.now()}`,
+      data: savedPayment
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Record or save any payment to MongoDB (Online, COD, Wallet)
+// @route   POST /api/payment/record
+// @access  Public
+exports.recordPayment = async (req, res, next) => {
+  try {
+    const {
+      paymentId,
+      orderId,
+      userEmail,
+      userName,
+      amount,
+      currency = 'INR',
+      status = 'Success',
+      paymentMethod = 'Online',
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+      metadata = {}
+    } = req.body;
+
+    if (!userEmail || amount === undefined || amount === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide userEmail and payment amount'
+      });
+    }
+
+    const cleanEmail = userEmail.toLowerCase().trim();
+    const finalPaymentId = paymentId || razorpayPaymentId || `pay_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const savedPayment = await Payment.findOneAndUpdate(
+      { paymentId: finalPaymentId },
+      {
+        paymentId: finalPaymentId,
+        orderId: orderId || '',
+        userEmail: cleanEmail,
+        userName: userName || 'Customer',
+        amount: Number(amount),
+        currency: currency || 'INR',
+        status: status || 'Success',
+        paymentMethod: paymentMethod || 'Online',
+        razorpayOrderId: razorpayOrderId || '',
+        razorpayPaymentId: razorpayPaymentId || '',
+        razorpaySignature: razorpaySignature || '',
+        metadata: metadata || {}
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    try {
+      broadcast('PAYMENT_RECEIVED', savedPayment);
+    } catch (wsErr) {
+      console.warn('WebSocket broadcast note:', wsErr.message);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Payment recorded and saved to MongoDB successfully',
+      data: savedPayment
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all payments from MongoDB (Admin / Accounting)
+// @route   GET /api/payment/all
+// @access  Public/Admin
+exports.getAllPayments = async (req, res, next) => {
+  try {
+    const payments = await Payment.find().sort({ createdAt: -1 });
+    return res.status(200).json({
+      success: true,
+      count: payments.length,
+      data: payments
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get payment history for a user
+// @route   GET /api/payment/my-payments
+// @access  Public
+exports.getUserPayments = async (req, res, next) => {
+  try {
+    const email = req.query.email || req.body.email;
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide user email'
+      });
+    }
+
+    const cleanEmail = String(email).toLowerCase().trim();
+    const payments = await Payment.find({
+      $or: [
+        { userEmail: cleanEmail },
+        { userEmail: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+      ]
+    }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: payments.length,
+      data: payments
     });
   } catch (error) {
     next(error);

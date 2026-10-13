@@ -881,11 +881,26 @@ export function Admin() {
       const matchQuery =
         !q ||
         (ord._id && ord._id.toLowerCase().includes(q)) ||
+        ((ord as any).id && String((ord as any).id).toLowerCase().includes(q)) ||
         (ord.userName && ord.userName.toLowerCase().includes(q)) ||
         (ord.userEmail && ord.userEmail.toLowerCase().includes(q));
       return matchStatus && matchQuery;
     });
   }, [orders, orderSearchQuery, orderStatusFilter]);
+
+  const liveRevenue = useMemo(() => {
+    return orders.reduce((sum, o) => {
+      if (o.status === "Cancelled") return sum;
+      return sum + (Number(o.totalAmount) || 0);
+    }, 0);
+  }, [orders]);
+
+  const liveKpis = useMemo(() => [
+    { icon: IndianRupee, label: "Total Revenue", value: `₹${liveRevenue.toLocaleString("en-IN")}`, delta: "Live Total" },
+    { icon: ShoppingCart, label: "Total Bookings", value: orders.length.toLocaleString("en-IN"), delta: `${orders.filter(o => o.status === "Order Placed" || o.status === "Processing").length} Active` },
+    { icon: Users, label: "Registered Users", value: Math.max(usersList.length, 1).toString(), delta: "Active Users" },
+    { icon: Boxes, label: "Items in Collection", value: catalogProducts.length.toString(), delta: "In Catalog" },
+  ], [liveRevenue, orders, usersList.length, catalogProducts.length]);
 
   // Catalog Management State & Handlers
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1194,8 +1209,21 @@ export function Admin() {
     if (isManual) setLoadingOrders(true);
     try {
       let fetchedList: OrderItem[] = [];
-      const res = await fetch(`${API_URL}/orders`);
-      if (res.ok) {
+      let res: Response | null = null;
+      try {
+        res = await fetch(`${API_URL}/orders`);
+      } catch (e) {}
+      if (!res || !res.ok) {
+        try {
+          const localUrl = typeof window !== "undefined"
+            ? `${window.location.protocol}//${window.location.hostname || "localhost"}:5000/api/orders`
+            : "http://localhost:5000/api/orders";
+          if (localUrl !== `${API_URL}/orders`) {
+            res = await fetch(localUrl);
+          }
+        } catch (e) {}
+      }
+      if (res && res.ok) {
         const data = await res.json();
         fetchedList = Array.isArray(data) ? data : (data.data || []);
       }
@@ -1235,13 +1263,12 @@ export function Admin() {
           let matchedKey = cachedKey;
           for (const [k, existingObj] of map.entries()) {
             const existingShort = String(existingObj._id || existingObj.id || "").slice(-8).toUpperCase();
+            const existingCustId = String((existingObj as any).id || "").replace(/^#+/, "").trim();
+            const cachedCustId = String((cached as any).id || "").replace(/^#+/, "").trim();
             if (
               k === cachedKey ||
               existingShort === cachedShort ||
-              (existingObj.userEmail &&
-                cached.userEmail &&
-                existingObj.userEmail.toLowerCase().trim() === cached.userEmail.toLowerCase().trim() &&
-                existingObj.totalAmount === cached.totalAmount)
+              (existingCustId && cachedCustId && existingCustId.toLowerCase() === cachedCustId.toLowerCase())
             ) {
               matchedKey = k;
               break;
@@ -1250,7 +1277,7 @@ export function Admin() {
 
           const existing = map.get(matchedKey);
           if (existing) {
-          map.set(matchedKey, {
+            map.set(matchedKey, {
               ...existing,
               status: existing.status || cached.status,
               cancelReason: (existing as any).cancelReason || cached.cancelReason,
@@ -1262,6 +1289,11 @@ export function Admin() {
       });
 
       const allOrders = Array.from(map.values());
+      allOrders.sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
       setOrders(allOrders);
 
       // ─── PERMANENT NOTIFICATION FIX ─────────────────────────────────────────
@@ -1401,8 +1433,21 @@ export function Admin() {
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const res = await fetch(`${API_URL}/users`);
-      if (res.ok) {
+      let res: Response | null = null;
+      try {
+        res = await fetch(`${API_URL}/users`);
+      } catch (e) {}
+      if (!res || !res.ok) {
+        try {
+          const localUrl = typeof window !== "undefined"
+            ? `${window.location.protocol}//${window.location.hostname || "localhost"}:5000/api/users`
+            : "http://localhost:5000/api/users";
+          if (localUrl !== `${API_URL}/users`) {
+            res = await fetch(localUrl);
+          }
+        } catch (e) {}
+      }
+      if (res && res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.data || []);
         const onlyUsers = list.filter((u: any) => u && u.role !== "admin");
@@ -1418,8 +1463,21 @@ export function Admin() {
   const fetchSupportTickets = async () => {
     try {
       setLoadingSupport(true);
-      const res = await fetch(`${API_URL}/notifications/support`);
-      if (res.ok) {
+      let res: Response | null = null;
+      try {
+        res = await fetch(`${API_URL}/notifications/support`);
+      } catch (e) {}
+      if (!res || !res.ok) {
+        try {
+          const localUrl = typeof window !== "undefined"
+            ? `${window.location.protocol}//${window.location.hostname || "localhost"}:5000/api/notifications/support`
+            : "http://localhost:5000/api/notifications/support";
+          if (localUrl !== `${API_URL}/notifications/support`) {
+            res = await fetch(localUrl);
+          }
+        } catch (e) {}
+      }
+      if (res && res.ok) {
         const json = await res.json();
         const rawList = Array.isArray(json) ? json : (json.data || []);
         if (rawList.length > 0) {
@@ -2021,25 +2079,6 @@ export function Admin() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {/* CUSTOMER SUPPORT QUICK ACCESS BUTTON */}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("support")}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 ${
-                    activeTab === "support"
-                      ? "bg-gold text-primary-foreground border-gold shadow-goldy font-extrabold"
-                      : "border-gold/40 bg-card/90 hover:bg-gold/15 text-gold font-bold"
-                  }`}
-                  title="Customer Support Desk"
-                >
-                  <Headphones className="size-4.5" />
-                  <span className="text-xs uppercase tracking-wider hidden sm:inline">Customer Support</span>
-                  {supportTickets.filter(t => t.status === "Open" || !t.status).length > 0 && (
-                    <span className="flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-black shadow-xs">
-                      {supportTickets.filter(t => t.status === "Open" || !t.status).length}
-                    </span>
-                  )}
-                </button>
 
                 {/* REALTIME ADMIN NOTIFICATION BELL */}
                 <div ref={notifRef} className="relative shrink-0">
@@ -2311,8 +2350,26 @@ export function Admin() {
                             <input
                               type="number"
                               min={0}
-                              value={qty}
-                              onChange={(e) => handleUpdateStock(item.id, Math.max(0, Number(e.target.value)))}
+                              value={qty === 0 ? "" : qty}
+                              onFocus={(e) => {
+                                e.target.select();
+                              }}
+                              onChange={(e) => {
+                                const clean = e.target.value.replace(/^0+(?=\d)/, "");
+                                e.target.value = clean;
+                                const val = clean === "" ? 0 : parseInt(clean, 10);
+                                handleUpdateStock(item.id, isNaN(val) ? 0 : Math.max(0, val));
+                              }}
+                              onBlur={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (isNaN(val) || val <= 0) {
+                                  e.target.value = "";
+                                  handleUpdateStock(item.id, 0);
+                                } else {
+                                  e.target.value = String(val);
+                                  handleUpdateStock(item.id, val);
+                                }
+                              }}
                               className="w-20 rounded-lg border border-gold/50 bg-background py-1.5 px-3 text-center font-display text-sm font-bold text-gold outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 shadow-xs"
                               placeholder="0"
                               title="Stock Quantity"
@@ -2442,7 +2499,7 @@ export function Admin() {
                 </div>
 
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                  {kpis.map((k) => (
+                  {liveKpis.map((k) => (
                     <div key={k.label} className="rounded-xl border border-border bg-card p-6 shadow-sm">
                       <div className="flex items-center justify-between">
                         <k.icon className="size-6 text-gold" />
@@ -2463,7 +2520,7 @@ export function Admin() {
                         <p className="text-xs text-muted-foreground mt-0.5">Order distribution & volume performance</p>
                       </div>
                       <span className="rounded-md bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold border border-gold/30">
-                        1,284 Bookings Total
+                        {orders.length} Bookings Total
                       </span>
                     </div>
 
@@ -2732,20 +2789,7 @@ export function Admin() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("support")}
-                        className="flex items-center gap-2 rounded-sm border border-gold bg-gold text-primary-foreground px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all hover:bg-gold-dark shadow-goldy w-fit cursor-pointer hover:scale-105 active:scale-95"
-                        title="Open Customer Support Desk"
-                      >
-                        <Headphones className="size-3.5" />
-                        <span>Customer Support</span>
-                        {supportTickets.filter(t => t.status === "Open" || !t.status).length > 0 && (
-                          <span className="rounded-full bg-black text-gold px-1.5 py-0.5 text-[9px] font-black">
-                            {supportTickets.filter(t => t.status === "Open" || !t.status).length}
-                          </span>
-                        )}
-                      </button>
+
                       <button
                         onClick={() => fetchOrders(true)}
                         className="flex items-center gap-2 rounded-sm border border-gold/40 bg-gold/10 px-4 py-2 text-xs font-semibold text-gold transition-colors hover:bg-gold hover:text-primary-foreground shadow-sm w-fit cursor-pointer"
@@ -3268,7 +3312,8 @@ export function Admin() {
                         type="number"
                         min="0"
                         value={newItemStock}
-                        onChange={(e) => setNewItemStock(e.target.value)}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setNewItemStock(e.target.value.replace(/^0+(?=\d)/, ""))}
                         placeholder="25"
                         className="mt-1.5 w-full rounded-sm border border-gold/50 bg-background px-4 py-3 text-xs outline-none focus:border-gold font-bold text-foreground"
                       />

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Outlet, useLocation, useNavigate } from "
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { MobileFrameWrapper } from "@/components/MobileFrameWrapper";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { NoInternetOverlay } from "@/components/NoInternetOverlay";
 import { vexaSocket } from "@/lib/socket";
 
@@ -122,13 +123,14 @@ function Layout() {
 
   return (
     <MobileFrameWrapper>
-      <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground">
+      <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground pb-20 md:pb-0">
         <ScrollToTop />
         <Navbar />
         <main className="flex-1">
           <Outlet />
         </main>
         {!hideFooter && <Footer />}
+        <MobileBottomNav />
       </div>
     </MobileFrameWrapper>
   );

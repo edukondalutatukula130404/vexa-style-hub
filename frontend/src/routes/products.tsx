@@ -37,18 +37,9 @@ export function Products() {
   }, [products, active, searchQuery, sortBy]);
 
   return (
-    <section className="mx-auto max-w-7xl px-5 pt-24 pb-16">
-      {/* Back Button */}
-      <div className="mb-6 flex items-center justify-start">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-card/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-gold transition-all duration-300 hover:border-gold hover:bg-gold hover:text-primary-foreground shadow-sm group cursor-pointer"
-        >
-          <ArrowLeft className="size-4 transition-transform duration-300 group-hover:-translate-x-1" />
-          <span>Back</span>
-        </Link>
-      </div>
-      <Reveal className="text-center">
+    <section className="mx-auto max-w-7xl px-4 sm:px-5 pt-18 sm:pt-24 pb-16">
+      {/* Desktop Header (Hidden on Mobile Responsive to match Mobile App) */}
+      <Reveal className="hidden sm:block text-center">
         <p className="text-[10px] uppercase tracking-[0.3em] text-gold">The complete collection</p>
         <h1 className="mt-4 font-display text-4xl sm:text-5xl">Engineered Essentials</h1>
         <div className="hairline mx-auto mt-6 w-40" />
@@ -59,14 +50,14 @@ export function Products() {
       </Reveal>
 
       {/* Control Bar: Search, Category Filters & Sort */}
-      <div className="mt-12 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        {/* Category Filters (Non-scrolling 4-column grid on mobile) */}
-        <div className="grid grid-cols-4 gap-1.5 sm:flex sm:w-auto sm:items-center sm:gap-2">
+      <div className="mt-3 sm:mt-12 flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-center lg:justify-between">
+        {/* Category Filters (Hidden on Mobile Responsive, Visible on sm+ Desktop) */}
+        <div className="hidden sm:flex sm:w-auto sm:items-center sm:gap-2">
           {filters.map((f) => (
             <button
               key={f}
               onClick={() => setActive(f)}
-              className={`w-full rounded-full py-2 px-1 text-[9px] sm:px-5 sm:text-[10px] font-semibold uppercase tracking-wider sm:tracking-[0.2em] transition-all duration-300 text-center ${
+              className={`rounded-full py-2 px-5 text-[10px] font-semibold uppercase tracking-[0.2em] transition-all duration-300 text-center ${
                 active === f
                   ? "bg-gold text-primary-foreground shadow-goldy font-bold"
                   : "border border-border bg-card text-muted-foreground hover:border-gold hover:text-gold"
@@ -90,12 +81,14 @@ export function Products() {
             />
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5 text-xs shrink-0">
-            <SlidersHorizontal className="size-3.5 text-gold shrink-0" />
+          {/* Filter / Sort Symbol Button */}
+          <div className="relative flex size-10 items-center justify-center rounded-lg border border-border bg-card hover:border-gold transition-colors shrink-0 shadow-sm cursor-pointer" title="Sort & Filter Products">
+            <SlidersHorizontal className="size-4 text-gold shrink-0 pointer-events-none" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent text-xs font-semibold text-foreground outline-none cursor-pointer"
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+              title="Sort Products"
             >
               <option value="featured">Sort: Featured</option>
               <option value="price-asc">Price: Low to High</option>
@@ -106,9 +99,9 @@ export function Products() {
         </div>
       </div>
 
-      {/* Products Grid */}
+      {/* Products Grid (2-Column on Mobile matching Flutter App) */}
       {list.length > 0 ? (
-        <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {list.map((p, i) => (
             <Reveal key={p.id} delay={(i % 4) * 90} className="h-full w-full flex flex-col">
               <ProductCard product={p} />

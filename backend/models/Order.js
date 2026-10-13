@@ -46,6 +46,15 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: 'Cash on Delivery'
     },
+    paymentId: {
+      type: String,
+      default: ''
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['Pending', 'Completed', 'Failed', 'Refunded'],
+      default: 'Completed'
+    },
     shippingAddress: {
       type: String,
       default: 'Indiranagar 100ft Road, Bengaluru'

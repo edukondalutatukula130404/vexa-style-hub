@@ -8,8 +8,7 @@ export function Contact() {
   return (
     <section className="mx-auto max-w-5xl px-5 py-16">
       <Reveal className="text-center">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold">Need Help?</p>
-        <h1 className="mt-3 font-display text-4xl sm:text-5xl font-bold">Contact Us</h1>
+        <h1 className="font-display text-4xl sm:text-5xl font-bold">Contact Us</h1>
         <div className="hairline mx-auto mt-4 w-32" />
         <p className="mx-auto mt-4 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
           Have a question about your order, sizing, or custom tees? Send us a message or reach out directly.

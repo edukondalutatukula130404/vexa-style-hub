@@ -83,8 +83,7 @@ export function Faq() {
   return (
     <section className="mx-auto max-w-4xl px-5 py-16">
       <Reveal className="text-center">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-gold font-semibold">Help & Information Center</p>
-        <h1 className="mt-4 font-display text-4xl sm:text-5xl">Frequently Asked Questions</h1>
+        <h1 className="font-display text-4xl sm:text-5xl">Frequently Asked Questions</h1>
         <div className="hairline mx-auto mt-6 w-40" />
         <p className="mx-auto mt-6 max-w-xl text-xs sm:text-sm text-muted-foreground leading-relaxed">
           Everything you need to know about our heavyweight fabric, sizing recommendations,

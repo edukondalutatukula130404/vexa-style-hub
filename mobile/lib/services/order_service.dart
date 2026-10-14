@@ -468,15 +468,27 @@ class OrderService {
     BuildContext? context,
   }) async {
     final orderId = '#VX-${(1000 + _inMemoryOrders.length + DateTime.now().millisecond % 8999)}';
-    String userEmail = (email != null && email.isNotEmpty) ? email : '';
-    if (userEmail.isEmpty) {
+    String userEmail = (email != null && email.isNotEmpty) ? email.trim() : '';
+    String resolvedCustomerName = customerName.trim();
+
+    if (userEmail.isEmpty || resolvedCustomerName.isEmpty || resolvedCustomerName == 'Valued Customer') {
       final user = await AuthService.getUser();
-      userEmail = user?.email ?? 'mobile@vexa.com';
+      if (userEmail.isEmpty) {
+        userEmail = user?.email ?? 'mobile@vexa.com';
+      }
+      if (resolvedCustomerName.isEmpty || resolvedCustomerName == 'Valued Customer') {
+        if (user != null && user.name.trim().isNotEmpty) {
+          resolvedCustomerName = user.name.trim();
+        }
+      }
+    }
+    if (resolvedCustomerName.isEmpty) {
+      resolvedCustomerName = 'Valued Customer';
     }
 
     final newOrder = OrderModel(
       id: orderId,
-      customerName: customerName.isNotEmpty ? customerName : 'Valued Customer',
+      customerName: resolvedCustomerName,
       shippingAddress: shippingAddress.isNotEmpty ? shippingAddress : 'Indiranagar 100ft Road, Bengaluru',
       phone: phone.isNotEmpty ? phone : '+91 98765 43210',
       paymentMethod: paymentMethod,

@@ -1480,14 +1480,19 @@ class _CartScreenState extends State<CartScreen> {
                                       setAsDefault: saveAsDefaultCheckbox,
                                     );
 
+                                    final currentUser = await AuthService.getUser();
                                     await OrderService.createOrder(
-                                      customerName: nameController.text,
+                                      customerName: nameController.text.trim().isNotEmpty
+                                          ? nameController.text.trim()
+                                          : (currentUser?.name ?? 'Valued Customer'),
                                       shippingAddress: '${addressController.text.trim()}${cityController.text.trim().isNotEmpty ? ', ${cityController.text.trim()}' : ''}${stateController.text.trim().isNotEmpty ? ', ${stateController.text.trim()}' : ''}, PIN: ${pincodeController.text.trim()}',
                                       phone: phoneController.text,
                                       paymentMethod: selectedPayment,
                                       totalAmount: _finalTotal,
                                       couponApplied: _appliedCoupon,
                                       items: orderItems,
+                                      email: currentUser?.email,
+                                      context: mounted ? context : null,
                                     );
 
                                     if (!context.mounted) return;

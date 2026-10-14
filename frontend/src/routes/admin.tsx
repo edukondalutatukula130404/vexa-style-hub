@@ -530,6 +530,35 @@ export function Admin() {
   const [usersList, setUsersList] = useState<DbUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedUserDetails, setSelectedUserDetails] = useState<DbUser | null>(null);
+  const usersListRef = useRef<DbUser[]>([]);
+  useEffect(() => {
+    usersListRef.current = usersList;
+  }, [usersList]);
+
+  // Helper to resolve customer name from registered users list or order
+  const getCustomerDisplayName = (ord?: any) => {
+    if (!ord) return "Customer";
+    const cleanEmail = (ord.userEmail || "").toLowerCase().trim();
+    if (cleanEmail) {
+      const list = usersListRef.current.length > 0 ? usersListRef.current : usersList;
+      const matched = list.find(
+        (u) => (u.email || "").toLowerCase().trim() === cleanEmail
+      );
+      if (matched && matched.name && matched.name.trim()) {
+        return matched.name.trim();
+      }
+    }
+    if (
+      ord.userName &&
+      ord.userName.trim() &&
+      ord.userName !== "Customer" &&
+      ord.userName !== "Valued Customer" &&
+      ord.userName !== "VEXA Customer"
+    ) {
+      return ord.userName.trim();
+    }
+    return ord.userName || "Customer";
+  };
 
   // Customer Support State
   type SupportTicket = {
@@ -878,15 +907,17 @@ export function Admin() {
       const matchStatus =
         orderStatusFilter === "All" || ord.status === orderStatusFilter;
       const q = orderSearchQuery.toLowerCase().trim();
+      if (!q) return matchStatus;
+      const resolvedName = getCustomerDisplayName(ord).toLowerCase();
       const matchQuery =
-        !q ||
         (ord._id && ord._id.toLowerCase().includes(q)) ||
         ((ord as any).id && String((ord as any).id).toLowerCase().includes(q)) ||
+        resolvedName.includes(q) ||
         (ord.userName && ord.userName.toLowerCase().includes(q)) ||
         (ord.userEmail && ord.userEmail.toLowerCase().includes(q));
       return matchStatus && matchQuery;
     });
-  }, [orders, orderSearchQuery, orderStatusFilter]);
+  }, [orders, usersList, orderSearchQuery, orderStatusFilter]);
 
   const liveRevenue = useMemo(() => {
     return orders.reduce((sum, o) => {
@@ -1322,7 +1353,7 @@ export function Admin() {
             knownOrderIdsRef.current.add(cleanCode);
 
             const notifId = `notif-order-${cleanCode}`;
-            const customerName = ord.userName || ord.userEmail || "Customer";
+            const customerName = getCustomerDisplayName(ord);
             const amount = Number(ord.totalAmount) || 0;
             const itemsCount = Array.isArray(ord.items) ? ord.items.length : 1;
 
@@ -2687,7 +2718,7 @@ export function Admin() {
                     <div className="grid gap-6 sm:grid-cols-2 text-xs">
                       <div className="rounded-lg border border-border/80 bg-surface/50 p-4 space-y-2">
                         <span className="text-[10px] uppercase tracking-wider text-gold font-bold">Customer Account Details</span>
-                        <p className="font-bold text-foreground text-sm">{selectedOrderDetails.userName || "Customer Name"}</p>
+                        <p className="font-bold text-foreground text-sm">{getCustomerDisplayName(selectedOrderDetails)}</p>
                         <p className="text-muted-foreground">Email: <span className="text-foreground font-semibold">{selectedOrderDetails.userEmail}</span></p>
                         <p className="text-muted-foreground">Account Type: <span className="text-gold font-bold">Verified Buyer</span></p>
                       </div>
@@ -2878,7 +2909,7 @@ export function Admin() {
 
                               </div>
                               <h4 className="font-display text-base font-bold text-foreground mt-1">
-                                Customer: {ord.userName || "Customer"}
+                                Customer: {getCustomerDisplayName(ord)}
                               </h4>
                               <p className="text-xs text-muted-foreground">
                                 Email: <span className="text-gold font-medium">{ord.userEmail}</span> • Date: {new Date(ord.createdAt || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
@@ -3756,7 +3787,16 @@ export function Admin() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {usersList.filter((u) => u && u.role !== "admin").length > 0 ? (
-                        usersList.filter((u) => u && u.role !== "admin").map((u) => (
+                        usersList.filter((u) => u && u.role !== "admin").map((u) => {
+                          const userBookings = orders.filter((o) => {
+                            const oEmail = (o.userEmail || "").toLowerCase().trim();
+                            const uEmail = (u.email || "").toLowerCase().trim();
+                            const oName = (o.userName || "").toLowerCase().trim();
+                            const uName = (u.name || "").toLowerCase().trim();
+                            return (oEmail && uEmail && oEmail === uEmail) || (oName && uName && oName === uName);
+                          });
+
+                          return (
                           <tr
                             key={u._id}
                             onClick={() => setSelectedUserDetails(u)}
@@ -3782,10 +3822,27 @@ export function Admin() {
                               {new Date(u.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                             </td>
                             <td className="p-4 text-right">
-
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-[10px] font-bold text-gold border border-gold/30">
+                                  {userBookings.length} Booking{userBookings.length === 1 ? "" : "s"}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOrderSearchQuery(u.name || u.email);
+                                    setActiveTab("orders");
+                                  }}
+                                  className="rounded border border-gold/40 bg-gold/10 hover:bg-gold px-2 py-0.5 text-[10px] font-bold text-gold hover:text-primary-foreground transition-all cursor-pointer"
+                                  title="View Customer Bookings"
+                                >
+                                  View Bookings
+                                </button>
+                              </div>
                             </td>
                           </tr>
-                        ))
+                        );
+                      })
                       ) : (
                         <tr>
                           <td colSpan={5} className="p-8 text-center text-muted-foreground">
@@ -4520,6 +4577,20 @@ export function Admin() {
                       <div className="rounded-xl border border-dashed border-border/80 p-6 text-center text-muted-foreground text-xs">
                         No customer booking history found for this user account.
                       </div>
+                    )}
+                    {userOrders.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetName = selectedUserDetails.name || selectedUserDetails.email;
+                          setSelectedUserDetails(null);
+                          setOrderSearchQuery(targetName);
+                          setActiveTab("orders");
+                        }}
+                        className="w-full flex items-center justify-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-2.5 text-xs font-bold text-gold hover:bg-gold hover:text-primary-foreground transition-all cursor-pointer shadow-sm mt-3"
+                      >
+                        <Package className="size-4" /> View All ({userOrders.length}) Bookings in Customer Bookings Tab
+                      </button>
                     )}
                   </div>
                 </div>

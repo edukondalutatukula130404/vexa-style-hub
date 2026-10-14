@@ -65,10 +65,28 @@ exports.createOrder = async (req, res, next) => {
     const assignedPaymentId = customPaymentId || (isCOD ? `cod_${Date.now()}` : `pay_${Date.now()}`);
     const assignedPaymentStatus = customPaymentStatus || (isCOD ? 'Pending' : 'Completed');
 
+    // Look up registered user in database to ensure the order is associated with the customer's registered name
+    let resolvedUserName = (userName || '').trim();
+    const registeredUser = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+      ]
+    });
+
+    if (registeredUser && registeredUser.name) {
+      if (!resolvedUserName || resolvedUserName === 'Customer' || resolvedUserName === 'Valued Customer' || resolvedUserName === 'VEXA Customer') {
+        resolvedUserName = registeredUser.name.trim();
+      }
+    }
+    if (!resolvedUserName) {
+      resolvedUserName = 'Customer';
+    }
+
     const order = await Order.create({
       id: orderId,
       userEmail: cleanEmail,
-      userName: userName || 'Customer',
+      userName: resolvedUserName,
       items,
       totalAmount,
       status: 'Order Placed',
@@ -169,10 +187,34 @@ exports.createOrder = async (req, res, next) => {
 exports.getAllOrders = async (req, res, next) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
+
+    // Look up registered users to ensure all customer bookings display under the user's registered name
+    const emails = [...new Set(orders.map(o => (o.userEmail || '').toLowerCase().trim()).filter(Boolean))];
+    const users = await User.find({ email: { $in: emails } }).select('name email');
+
+    const userMap = new Map();
+    users.forEach(u => {
+      if (u.email && u.name) {
+        userMap.set(u.email.toLowerCase().trim(), u.name.trim());
+      }
+    });
+
+    const enrichedOrders = orders.map((ord) => {
+      const obj = ord.toObject ? ord.toObject() : { ...ord };
+      const key = (obj.userEmail || '').toLowerCase().trim();
+      const regName = userMap.get(key);
+      if (regName && (!obj.userName || obj.userName === 'Customer' || obj.userName === 'Valued Customer' || obj.userName === 'VEXA Customer')) {
+        obj.userName = regName;
+        // Asynchronously update in DB so database stays consistently synced
+        Order.updateOne({ _id: ord._id }, { userName: regName }).catch(() => {});
+      }
+      return obj;
+    });
+
     res.status(200).json({
       success: true,
-      count: orders.length,
-      data: orders
+      count: enrichedOrders.length,
+      data: enrichedOrders
     });
   } catch (error) {
     console.warn('Orders fetch note:', error.message);
@@ -195,17 +237,37 @@ exports.getUserOrders = async (req, res, next) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const orders = await Order.find({
+    const userDoc = await User.findOne({
       $or: [
-        { userEmail: cleanEmail },
-        { userEmail: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+        { email: cleanEmail },
+        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
       ]
+    });
+
+    const searchConditions = [
+      { userEmail: cleanEmail },
+      { userEmail: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+    ];
+    if (userDoc && userDoc.name) {
+      searchConditions.push({ userName: userDoc.name });
+    }
+
+    const orders = await Order.find({
+      $or: searchConditions
     }).sort({ createdAt: -1 });
+
+    const enriched = orders.map((ord) => {
+      const obj = ord.toObject ? ord.toObject() : { ...ord };
+      if (userDoc && userDoc.name && (!obj.userName || obj.userName === 'Customer' || obj.userName === 'Valued Customer' || obj.userName === 'VEXA Customer')) {
+        obj.userName = userDoc.name;
+      }
+      return obj;
+    });
 
     res.status(200).json({
       success: true,
-      count: orders.length,
-      data: orders
+      count: enriched.length,
+      data: enriched
     });
   } catch (error) {
     console.warn('User orders fetch note:', error.message);

@@ -98,10 +98,22 @@ class AddressService {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_keyAddresses);
 
+    final user = await AuthService.getUser();
+    final userName = (user != null && user.name.trim().isNotEmpty) ? user.name.trim() : 'Customer';
+    const userPhone = '+91 98765 43210';
+
     if (raw != null && raw.isNotEmpty) {
       try {
         final List<dynamic> decoded = jsonDecode(raw);
-        _cache = decoded.map((m) => AddressModel.fromJson(m as Map<String, dynamic>)).toList();
+        _cache = decoded.map((m) {
+          final model = AddressModel.fromJson(m as Map<String, dynamic>);
+          // If cached address had an old hardcoded placeholder name, update to active user's name
+          if (userName.isNotEmpty && userName != 'Customer' &&
+              (model.name == 'Tatukula Edukondalu' || model.name == 'Tatukulaedukondalu' || model.name.isEmpty)) {
+            return model.copyWith(name: userName);
+          }
+          return model;
+        }).toList();
         if (_cache!.isNotEmpty) {
           return List.unmodifiable(_cache!);
         }
@@ -111,10 +123,6 @@ class AddressService {
     }
 
     // Seed initial default address based on user profile if empty
-    final user = await AuthService.getUser();
-    final userName = (user?.name != null && user!.name.isNotEmpty) ? user.name : 'Tatukula Edukondalu';
-    const userPhone = '+91 98765 43210';
-
     final defaultSeed = [
       AddressModel(
         id: 'addr_default_1',

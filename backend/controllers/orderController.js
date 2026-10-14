@@ -74,10 +74,8 @@ exports.createOrder = async (req, res, next) => {
       ]
     });
 
-    if (registeredUser && registeredUser.name) {
-      if (!resolvedUserName || resolvedUserName === 'Customer' || resolvedUserName === 'Valued Customer' || resolvedUserName === 'VEXA Customer') {
-        resolvedUserName = registeredUser.name.trim();
-      }
+    if (registeredUser && registeredUser.name && registeredUser.name.trim()) {
+      resolvedUserName = registeredUser.name.trim();
     }
     if (!resolvedUserName) {
       resolvedUserName = 'Customer';
@@ -203,10 +201,17 @@ exports.getAllOrders = async (req, res, next) => {
       const obj = ord.toObject ? ord.toObject() : { ...ord };
       const key = (obj.userEmail || '').toLowerCase().trim();
       const regName = userMap.get(key);
-      if (regName && (!obj.userName || obj.userName === 'Customer' || obj.userName === 'Valued Customer' || obj.userName === 'VEXA Customer')) {
-        obj.userName = regName;
-        // Asynchronously update in DB so database stays consistently synced
-        Order.updateOne({ _id: ord._id }, { userName: regName }).catch(() => {});
+      if (regName) {
+        if (obj.userName !== regName) {
+          obj.userName = regName;
+          // Asynchronously update in DB so database stays consistently synced
+          Order.updateOne({ _id: ord._id }, { userName: regName }).catch(() => {});
+        }
+      } else if (!obj.userName || obj.userName === 'Customer' || obj.userName === 'Valued Customer' || obj.userName === 'VEXA Customer') {
+        if (key && key.includes('@')) {
+          const prefix = key.split('@')[0];
+          obj.userName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+        }
       }
       return obj;
     });

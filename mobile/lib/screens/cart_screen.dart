@@ -187,7 +187,12 @@ class _CartScreenState extends State<CartScreen> {
     List<AddressModel> savedAddresses = (await AddressService.getAddresses()).toList();
     AddressModel? selectedAddress = await AddressService.getDefaultAddress();
 
-    final nameController = TextEditingController(text: selectedAddress?.name ?? loggedInUser.name);
+    final initialRecipientName = loggedInUser.name.trim().isNotEmpty
+        ? loggedInUser.name.trim()
+        : ((selectedAddress?.name != null && selectedAddress!.name.trim().isNotEmpty)
+            ? selectedAddress.name.trim()
+            : 'Customer');
+    final nameController = TextEditingController(text: initialRecipientName);
     final addressController = TextEditingController(text: selectedAddress?.street ?? '');
     final cityController = TextEditingController(text: selectedAddress?.city ?? 'Hyderabad');
     final stateController = TextEditingController(text: selectedAddress?.state ?? 'Telangana');
@@ -1424,8 +1429,11 @@ class _CartScreenState extends State<CartScreen> {
                                         ),
                                         setAsDefault: saveAsDefaultCheckbox,
                                       );
+                                      final orderCustomerName = (currentUser?.name != null && currentUser!.name.trim().isNotEmpty)
+                                          ? currentUser.name.trim()
+                                          : (nameController.text.trim().isNotEmpty ? nameController.text.trim() : 'Customer');
                                       await OrderService.createOrder(
-                                        customerName: nameController.text.isNotEmpty ? nameController.text : (currentUser?.name ?? 'Valued Customer'),
+                                        customerName: orderCustomerName,
                                         shippingAddress: '${addressController.text.trim()}${cityController.text.trim().isNotEmpty ? ', ${cityController.text.trim()}' : ''}${stateController.text.trim().isNotEmpty ? ', ${stateController.text.trim()}' : ''}, PIN: ${pincodeController.text.trim()}',
                                         phone: phoneController.text,
                                         paymentMethod: methodLabel,
@@ -1481,10 +1489,11 @@ class _CartScreenState extends State<CartScreen> {
                                     );
 
                                     final currentUser = await AuthService.getUser();
+                                    final orderCustomerName = (currentUser?.name != null && currentUser!.name.trim().isNotEmpty)
+                                        ? currentUser.name.trim()
+                                        : (nameController.text.trim().isNotEmpty ? nameController.text.trim() : 'Customer');
                                     await OrderService.createOrder(
-                                      customerName: nameController.text.trim().isNotEmpty
-                                          ? nameController.text.trim()
-                                          : (currentUser?.name ?? 'Valued Customer'),
+                                      customerName: orderCustomerName,
                                       shippingAddress: '${addressController.text.trim()}${cityController.text.trim().isNotEmpty ? ', ${cityController.text.trim()}' : ''}${stateController.text.trim().isNotEmpty ? ', ${stateController.text.trim()}' : ''}, PIN: ${pincodeController.text.trim()}',
                                       phone: phoneController.text,
                                       paymentMethod: selectedPayment,

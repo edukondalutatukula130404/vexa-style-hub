@@ -548,15 +548,28 @@ export function Admin() {
         return matched.name.trim();
       }
     }
+    const isMismatchedPlaceholder =
+      cleanEmail &&
+      !cleanEmail.includes("tatukula") &&
+      ord.userName &&
+      ord.userName.toLowerCase().includes("tatukula");
+
     if (
       ord.userName &&
       ord.userName.trim() &&
       ord.userName !== "Customer" &&
       ord.userName !== "Valued Customer" &&
-      ord.userName !== "VEXA Customer"
+      ord.userName !== "VEXA Customer" &&
+      !isMismatchedPlaceholder
     ) {
       return ord.userName.trim();
     }
+
+    if (cleanEmail && cleanEmail.includes("@")) {
+      const prefix = cleanEmail.split("@")[0];
+      return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+
     return ord.userName || "Customer";
   };
 

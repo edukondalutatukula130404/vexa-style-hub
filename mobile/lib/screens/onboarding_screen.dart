@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
-import 'home_screen.dart';
+import 'login_screen.dart';
 
 const Color _gold = Color(0xFFB8860B);
 const Color _goldDark = Color(0xFF8B6508);
@@ -72,7 +72,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
 

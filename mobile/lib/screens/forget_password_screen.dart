@@ -59,11 +59,9 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
         _currentStep = 2;
       });
     } else {
-      // Fallback for offline/demo mode so user can proceed
       setState(() {
-        _isSuccessMessage = true;
-        _message = '6-digit OTP code sent! Enter 123456 to reset password.';
-        _currentStep = 2;
+        _isSuccessMessage = false;
+        _message = result['message'] ?? 'Mail not registered';
       });
     }
   }

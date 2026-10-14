@@ -3,6 +3,7 @@ class UserModel {
   final String name;
   final String companyName;
   final String email;
+  final String? phone;
   final String role;
   final String? token;
   final String? avatarUrl;
@@ -12,6 +13,7 @@ class UserModel {
     required this.name,
     this.companyName = 'VEXA Style Hub',
     required this.email,
+    this.phone,
     required this.role,
     this.token,
     this.avatarUrl,
@@ -23,6 +25,7 @@ class UserModel {
       name: json['name'] ?? 'User',
       companyName: json['companyName'] ?? json['company'] ?? 'VEXA Style Hub',
       email: json['email'] ?? '',
+      phone: json['phone'],
       role: json['role'] ?? 'user',
       token: token ?? json['token'],
       avatarUrl: json['avatarUrl'],
@@ -35,6 +38,7 @@ class UserModel {
       'name': name,
       'companyName': companyName,
       'email': email,
+      'phone': phone,
       'role': role,
       'token': token,
       'avatarUrl': avatarUrl,

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Order = require('../models/Order');
 const { broadcast } = require('../config/websocket');
 const { sendFcmNotification } = require('../config/firebase');
+const { sendHelplineEmails } = require('../config/nodemailer');
 
 // @desc    Get user notifications by email
 // @route   GET /api/notifications
@@ -251,6 +252,20 @@ exports.sendSupportMessage = async (req, res, next) => {
     } catch (e) {
       console.warn('Admin push notification note:', e.message);
     }
+
+    // 4. Send Helpline confirmation to user & notification to admin via SMTP
+    // Admin receives ONLY the inquiry message - strictly NO credentials or tokens
+    sendHelplineEmails({
+      ticketId: ticketId || `TKT-${Date.now()}`,
+      customerName: sender,
+      customerEmail: userEmail ? userEmail.toLowerCase().trim() : '',
+      phone: phone || '',
+      category: category || 'Customer Support',
+      message: msgText,
+      associatedOrderId: associatedOrderRef || cleanOrder || ''
+    }).catch((emailErr) => {
+      console.warn('Helpline email delivery note:', emailErr.message);
+    });
 
     res.status(200).json({
       success: true,

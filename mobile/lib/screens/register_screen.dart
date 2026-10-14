@@ -17,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -29,6 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -46,6 +48,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _nameController.text,
       _emailController.text,
       _passwordController.text,
+      phone: _phoneController.text.trim(),
     );
 
     if (!mounted) return;
@@ -188,6 +191,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: const InputDecoration(
                     hintText: 'jane.doe@example.com',
                     prefixIcon: Icon(Icons.email_outlined, color: AppTheme.subtextColor),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Mobile Number
+                Text(
+                  'Mobile Number (Optional)',
+                  style: GoogleFonts.outfit(color: AppTheme.textColor, fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: GoogleFonts.outfit(color: AppTheme.textColor),
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      final clean = value.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+                      if (clean.length < 7 || clean.length > 15) {
+                        return 'Please enter a valid mobile number';
+                      }
+                    }
+                    return null;
+                  },
+                  decoration: const InputDecoration(
+                    hintText: '+91 98765 43210',
+                    prefixIcon: Icon(Icons.phone_outlined, color: AppTheme.subtextColor),
                   ),
                 ),
                 const SizedBox(height: 20),

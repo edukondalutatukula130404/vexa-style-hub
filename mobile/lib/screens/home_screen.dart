@@ -3123,7 +3123,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ],
           ),
         ),
-        bottomNavigationBar: Container(
+        bottomNavigationBar: (_currentTabIndex == 4 && !_isRealUser)
+            ? null
+            : Container(
           decoration: const BoxDecoration(
             color: Colors.transparent,
             boxShadow: [

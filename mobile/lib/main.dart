@@ -11,6 +11,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/terms_screen.dart';
 import 'screens/product_detail_screen.dart';
 import 'services/api_service.dart';
 import 'theme/app_theme.dart';
@@ -73,6 +74,8 @@ class VexaMobileApp extends StatelessWidget {
         '/cart': (context) => const CartScreen(cartItems: []),
         '/profile': (context) => const ProfileScreen(),
         '/no-internet': (context) => const NoInternetScreen(),
+        '/terms': (context) => const TermsScreen(),
+        '/privacy': (context) => const TermsScreen(isPrivacyPolicy: true),
       },
     );
   }

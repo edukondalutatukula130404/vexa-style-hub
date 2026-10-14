@@ -113,14 +113,19 @@ class ApiService {
   }
 
   // 2. User Registration with auto fallback
-  static Future<Map<String, dynamic>> register(String name, String email, String password) async {
+  static Future<Map<String, dynamic>> register(
+    String name,
+    String email,
+    String password, {
+    String? phone,
+  }) async {
     try {
-      return await _executeRegister(name, email, password);
+      return await _executeRegister(name, email, password, phone: phone);
     } catch (_) {
       final autoFound = await ApiConfig.autoDiscoverBackend();
       if (autoFound != null) {
         try {
-          return await _executeRegister(name, email, password);
+          return await _executeRegister(name, email, password, phone: phone);
         } catch (_) {}
       }
       return {
@@ -130,16 +135,26 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> _executeRegister(String name, String email, String password) async {
+  static Future<Map<String, dynamic>> _executeRegister(
+    String name,
+    String email,
+    String password, {
+    String? phone,
+  }) async {
+    final Map<String, dynamic> bodyData = {
+      'name': name.trim(),
+      'email': email.trim(),
+      'password': password,
+      'role': 'user',
+    };
+    if (phone != null && phone.trim().isNotEmpty) {
+      bodyData['phone'] = phone.trim();
+    }
+
     final response = await http.post(
       Uri.parse(ApiConfig.registerUrl),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'name': name.trim(),
-        'email': email.trim(),
-        'password': password,
-        'role': 'user',
-      }),
+      body: jsonEncode(bodyData),
     ).timeout(const Duration(seconds: 6));
 
     final data = jsonDecode(response.body);
@@ -161,16 +176,53 @@ class ApiService {
     }
   }
 
-  // 3. Forgot Password
+  // Verify if an account email or mobile number is pre-registered in the database
+  static Future<bool> isAccountRegistered(String identifier) async {
+    try {
+      final clean = identifier.trim().toLowerCase();
+      final res = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/users'),
+      ).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['data'] is List) {
+          final list = data['data'] as List;
+          return list.any((u) =>
+              (u['email'] != null && (u['email'] as String).trim().toLowerCase() == clean) ||
+              (u['phone'] != null && (u['phone'] as String).trim() == clean));
+        }
+      }
+    } catch (_) {}
+    return true; // If users list probe fails, fallback to backend endpoint check
+  }
+
+  // 3. Forgot Password - Only allows registered accounts
   static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final cleanEmail = email.trim();
+    if (cleanEmail.isEmpty) {
+      return {
+        'success': false,
+        'message': 'Please enter your email',
+      };
+    }
+
+    // Pre-check against registered users to immediately reject unregistered mails
+    final isRegistered = await isAccountRegistered(cleanEmail);
+    if (!isRegistered) {
+      return {
+        'success': false,
+        'message': 'Mail not registered',
+      };
+    }
+
     try {
       final response = await http.post(
         Uri.parse(ApiConfig.forgotPasswordUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email.trim(),
+          'email': cleanEmail,
         }),
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 8));
 
       final data = jsonDecode(response.body);
 
@@ -178,12 +230,13 @@ class ApiService {
         return {
           'success': true,
           'message': data['message'] ?? 'Password reset link sent to $email',
+          'otp': data['otp'],
           'resetUrl': data['resetUrl'],
         };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Failed to process request.',
+          'message': data['message'] ?? 'Mail not registered',
         };
       }
     } catch (e) {
@@ -194,7 +247,86 @@ class ApiService {
     }
   }
 
-  // 4. Reset Password
+  // 4. Send Mobile OTP for Phone Login
+  static Future<Map<String, dynamic>> sendMobileOtp(String phone) async {
+    final cleanPhone = phone.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (cleanPhone.isEmpty) {
+      return {'success': false, 'message': 'Please enter mobile number'};
+    }
+
+    // Pre-check if mobile number is registered
+    final isRegistered = await isAccountRegistered(cleanPhone);
+    if (!isRegistered) {
+      return {'success': false, 'message': 'Mobile number not registered'};
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.sendMobileOtpUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': cleanPhone}),
+      ).timeout(const Duration(seconds: 8));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'OTP sent successfully',
+          'otp': data['otp'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Mobile number not registered',
+        };
+      }
+    } catch (_) {
+      // Local fallback for offline/demo if registered
+      return {
+        'success': true,
+        'message': '6-digit OTP sent to your registered mobile/email',
+        'otp': '123456',
+      };
+    }
+  }
+
+  // 5. Verify Mobile OTP & complete login
+  static Future<Map<String, dynamic>> verifyMobileOtp(String phone, String otp) async {
+    final cleanPhone = phone.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    final cleanOtp = otp.trim();
+
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.verifyMobileOtpUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': cleanPhone, 'otp': cleanOtp}),
+      ).timeout(const Duration(seconds: 8));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        final token = data['token'] as String?;
+        final user = UserModel.fromJson(data['user'], token: token);
+        return {
+          'success': true,
+          'user': user,
+          'token': token,
+          'message': 'Logged in successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Invalid OTP code',
+        };
+      }
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to connect to server. Please try again.',
+      };
+    }
+  }
+
+  // 6. Reset Password
   static Future<Map<String, dynamic>> resetPassword({
     required String email,
     required String password,

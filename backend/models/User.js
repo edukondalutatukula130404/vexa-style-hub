@@ -19,6 +19,10 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true
     },
+    phone: {
+      type: String,
+      trim: true
+    },
     password: {
       type: String,
       required: [true, 'Please add a password'],
@@ -34,6 +38,8 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpire: Date,
     resetPasswordCode: String,
     resetPasswordCodeExpire: Date,
+    phoneOtpCode: String,
+    phoneOtpExpire: Date,
     fcmToken: {
       type: String,
       default: ''
@@ -46,6 +52,15 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true
+  }
+);
+
+// Enforce unique phone number when provided (skip null / undefined / empty string)
+userSchema.index(
+  { phone: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { phone: { $type: 'string', $gt: '' } }
   }
 );
 

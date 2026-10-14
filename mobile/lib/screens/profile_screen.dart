@@ -193,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
 
-    Navigator.pushNamedAndRemoveUntil(context, '/onboarding', (route) => false);
+    Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
   }
 
   void _handleLogout() {

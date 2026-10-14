@@ -306,6 +306,8 @@ class ApiConfig {
   // Auth endpoints
   static String get loginUrl => '$baseUrl/users/login';
   static String get registerUrl => '$baseUrl/users/register';
+  static String get sendMobileOtpUrl => '$baseUrl/users/send-mobile-otp';
+  static String get verifyMobileOtpUrl => '$baseUrl/users/verify-mobile-otp';
   static String get forgotPasswordUrl => '$baseUrl/users/forgot-password';
   static String get resetPasswordUrl => '$baseUrl/users/reset-password';
   static String get usersUrl => '$baseUrl/users';

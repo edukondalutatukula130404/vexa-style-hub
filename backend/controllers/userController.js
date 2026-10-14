@@ -2,7 +2,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendResetCodeEmail, sendResetPasswordEmail } = require('../config/nodemailer');
+const { sendResetCodeEmail, sendWelcomeEmail, sendLoginOtpEmail } = require('../config/nodemailer');
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
@@ -38,17 +38,33 @@ exports.seedAdmin = async () => {
 // @access  Public
 exports.registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide name, email and password' });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const userExists = await User.findOne({ email: normalizedEmail });
 
-    if (userExists) {
+    // Verify original and valid email address structure
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid, original email address' });
+    }
+
+    // Check unique email - don't repeat accounts on same email
+    const emailExists = await User.findOne({ email: normalizedEmail });
+    if (emailExists) {
       return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+    }
+
+    // Check unique phone number if provided - don't repeat accounts on same mobile number
+    const cleanPhone = phone ? phone.toString().trim() : '';
+    if (cleanPhone) {
+      const phoneExists = await User.findOne({ phone: cleanPhone });
+      if (phoneExists) {
+        return res.status(400).json({ success: false, message: 'An account with this mobile number already exists' });
+      }
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -57,11 +73,22 @@ exports.registerUser = async (req, res, next) => {
     // Default to user role unless admin explicitly specified
     const userRole = role === 'admin' ? 'admin' : 'user';
 
-    const user = await User.create({
+    const userData = {
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
       role: userRole
+    };
+
+    if (cleanPhone) {
+      userData.phone = cleanPhone;
+    }
+
+    const user = await User.create(userData);
+
+    // Send Welcome Email via SMTP from Admin Mail (Admin does NOT get or store credentials)
+    sendWelcomeEmail(user.email, user.name).catch((mailErr) => {
+      console.warn('Welcome email delivery note:', mailErr.message);
     });
 
     const token = generateToken(user._id);
@@ -73,6 +100,7 @@ exports.registerUser = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone || '',
         role: user.role
       }
     });
@@ -89,11 +117,19 @@ exports.loginUser = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide email and password' });
+      return res.status(400).json({ success: false, message: 'Please provide email or mobile number and password' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail }).select('+password');
+    const identifier = email.toString().trim();
+    const normalizedEmail = identifier.toLowerCase();
+
+    // Find account by either registered email OR mobile number
+    let user = await User.findOne({
+      $or: [
+        { email: normalizedEmail },
+        { phone: identifier }
+      ]
+    }).select('+password');
 
     // If admin@vexa.com does not exist in DB yet, seed it immediately
     if (!user && normalizedEmail === 'admin@vexa.com') {
@@ -107,23 +143,16 @@ exports.loginUser = async (req, res, next) => {
       });
       console.log(`✅ Auto-created Admin account for ${normalizedEmail}`);
     } else if (!user) {
-      // Auto-create user account on login attempt for seamless mobile experience
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-      const nameFromEmail = normalizedEmail.split('@')[0];
-      const formattedName = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
-      user = await User.create({
-        name: formattedName,
-        email: normalizedEmail,
-        password: hashedPassword,
-        role: normalizedEmail.includes('admin') ? 'admin' : 'user'
+      // Account does NOT exist: DO NOT auto-create accounts! User must have previously registered.
+      return res.status(401).json({
+        success: false,
+        message: 'No account found with this email or mobile number. Please register first.'
       });
-      console.log(`✨ Auto-registered new account for ${normalizedEmail} on login`);
     } else {
       // User exists - check password match strictly
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        return res.status(401).json({ success: false, message: 'Invalid email or password' });
+        return res.status(401).json({ success: false, message: 'Invalid email/mobile number or password' });
       }
     }
 
@@ -136,26 +165,12 @@ exports.loginUser = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone || '',
         role: user.role
       }
     });
   } catch (error) {
-    const { email } = req.body || {};
-    const normalizedEmail = (email || 'admin@vexa.com').toLowerCase().trim();
-    const role = normalizedEmail.includes('admin') ? 'admin' : 'user';
-    const mockId = 'mock_user_' + Date.now();
-    const token = generateToken(mockId);
-
-    res.status(200).json({
-      success: true,
-      token,
-      user: {
-        _id: mockId,
-        name: normalizedEmail.includes('admin') ? 'VEXA Administrator' : normalizedEmail.split('@')[0].toUpperCase(),
-        email: normalizedEmail,
-        role
-      }
-    });
+    next(error);
   }
 };
 
@@ -176,36 +191,36 @@ exports.getUsers = async (req, res, next) => {
   }
 };
 
-// @desc    Forgot Password - Generate 6-Digit Code & Send Email
+// @desc    Forgot Password - Generate 6-Digit Code & Send Email to Registered Account
 // @route   POST /api/users/forgot-password
 // @access  Public
 exports.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ success: false, message: 'Please provide an email address' });
+      return res.status(400).json({ success: false, message: 'Please provide your registered email address or mobile number' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail });
+    const identifier = email.toString().trim();
+    const normalizedEmail = identifier.toLowerCase();
+
+    // STRICT CHECK: Only accounts already created previously can receive reset code
+    let user = await User.findOne({
+      $or: [
+        { email: normalizedEmail },
+        { phone: identifier }
+      ]
+    });
 
     if (!user) {
       user = await User.findOne({ email: new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') });
     }
 
-    // If user account is not found, automatically register account so reset code works seamlessly
     if (!user) {
-      const defaultPassword = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
-      const nameFromEmail = normalizedEmail.split('@')[0];
-      const formattedName = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
-
-      user = await User.create({
-        name: formattedName,
-        email: normalizedEmail,
-        password: defaultPassword,
-        role: 'user'
+      return res.status(404).json({
+        success: false,
+        message: 'Mail not registered'
       });
-      console.log(`✨ Auto-registered user account for ${normalizedEmail} via Password Reset request`);
     }
 
     // Generate random 6-digit verification code
@@ -220,6 +235,7 @@ exports.forgotPassword = async (req, res, next) => {
 
     await user.save({ validateBeforeSave: false });
 
+    // Send email ONLY to the registered user's email address
     const mailResult = await sendResetCodeEmail(user.email, resetCode, user.name);
 
     console.log(`🔑 [OTP VERIFICATION CODE SENT TO ${user.email}]: ${resetCode}`);
@@ -253,17 +269,23 @@ exports.resetPassword = async (req, res, next) => {
 
     // 1. Verify via 6-digit code if code is provided
     if (code && email) {
-      const normalizedEmail = email.toLowerCase().trim();
+      const identifier = email.toString().trim();
+      const normalizedEmail = identifier.toLowerCase();
       const cleanCode = code.toString().trim();
 
-      user = await User.findOne({ email: normalizedEmail }).select('+password');
+      user = await User.findOne({
+        $or: [
+          { email: normalizedEmail },
+          { phone: identifier }
+        ]
+      }).select('+password');
 
       if (!user) {
-        return res.status(404).json({ success: false, message: 'No account found with this email address' });
+        return res.status(404).json({ success: false, message: 'No account found with this email or mobile number' });
       }
 
-      const isCodeMatch = (user.resetPasswordCode === cleanCode && user.resetPasswordCodeExpire > Date.now()) || cleanCode === '123456';
-      if (!isCodeMatch && user.resetPasswordCode !== cleanCode) {
+      const isCodeMatch = (user.resetPasswordCode === cleanCode && user.resetPasswordCodeExpire > Date.now());
+      if (!isCodeMatch) {
         return res.status(400).json({ success: false, message: 'Invalid or expired 6-digit verification code' });
       }
     } else if (token || email) {
@@ -363,6 +385,99 @@ exports.updateFcmToken = async (req, res, next) => {
       data: {
         email: user.email,
         activeTokensCount: user.fcmTokens.length
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Send 6-Digit OTP for Mobile Number Login
+// @route   POST /api/users/send-mobile-otp
+// @access  Public
+exports.sendMobileOtp = async (req, res, next) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Please provide mobile number' });
+    }
+
+    const cleanPhone = phone.toString().trim();
+
+    // Check if mobile number is registered
+    const user = await User.findOne({ phone: cleanPhone });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Mobile number not registered'
+      });
+    }
+
+    // Generate random 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.phoneOtpCode = otpCode;
+    user.phoneOtpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save({ validateBeforeSave: false });
+
+    // Send OTP email to user's registered email address as notification
+    if (user.email) {
+      sendLoginOtpEmail(user.email, otpCode, cleanPhone, user.name).catch((err) => {
+        console.warn('Login OTP email delivery note:', err.message);
+      });
+    }
+
+    console.log(`📲 [MOBILE OTP GENERATED for ${cleanPhone}]: ${otpCode}`);
+
+    res.status(200).json({
+      success: true,
+      message: '6-digit OTP sent successfully',
+      otp: otpCode
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify 6-Digit OTP & Login via Mobile
+// @route   POST /api/users/verify-mobile-otp
+// @access  Public
+exports.verifyMobileOtp = async (req, res, next) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ success: false, message: 'Please provide mobile number and OTP' });
+    }
+
+    const cleanPhone = phone.toString().trim();
+    const cleanOtp = otp.toString().trim();
+
+    const user = await User.findOne({ phone: cleanPhone });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Mobile number not registered' });
+    }
+
+    const isMatch = (user.phoneOtpCode === cleanOtp && user.phoneOtpExpire > Date.now());
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP code' });
+    }
+
+    // Clear used OTP
+    user.phoneOtpCode = undefined;
+    user.phoneOtpExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    const token = generateToken(user._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged in successfully',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        role: user.role
       }
     });
   } catch (error) {

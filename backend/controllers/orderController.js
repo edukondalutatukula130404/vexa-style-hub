@@ -5,6 +5,7 @@ const Notification = require('../models/Notification');
 const mongoose = require('mongoose');
 const { broadcast } = require('../config/websocket');
 const { sendFcmNotification } = require('../config/firebase');
+const { sendOrderConfirmationEmail, sendOrderStatusEmail } = require('../config/nodemailer');
 
 const NOTIFICATION_MAP = {
   'Order Placed': {
@@ -169,6 +170,11 @@ exports.createOrder = async (req, res, next) => {
     } catch (notifErr) {
       console.warn('Initial order notification log notice:', notifErr.message);
     }
+
+    // Send Order Confirmation & Invoice email via SMTP from Admin Mail
+    sendOrderConfirmationEmail(order).catch((mailErr) => {
+      console.warn('Order confirmation email delivery note:', mailErr.message);
+    });
 
     res.status(201).json({
       success: true,
@@ -574,6 +580,11 @@ exports.updateOrderStatus = async (req, res, next) => {
         console.warn('Admin cancel notification error:', adminErr.message);
       }
     }
+
+    // Send Order Status Update tracking email via SMTP from Admin Mail
+    sendOrderStatusEmail(order, newStatus, cancelReason || order.cancelReason || '').catch((mailErr) => {
+      console.warn('Order status email delivery note:', mailErr.message);
+    });
 
     return res.status(200).json({
       success: true,

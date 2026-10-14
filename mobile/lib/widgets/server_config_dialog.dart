@@ -199,7 +199,17 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
               runSpacing: 8,
               children: [
                 ActionChip(
-                  avatar: const Icon(Icons.wifi_rounded, size: 15, color: AppTheme.accentColor),
+                  avatar: const Icon(Icons.cloud_done_rounded, size: 15, color: AppTheme.accentColor),
+                  label: const Text('Live Production (Cloud)'),
+                  backgroundColor: AppTheme.surfaceColor,
+                  labelStyle: GoogleFonts.outfit(fontSize: 11, color: Colors.white),
+                  onPressed: () {
+                    _controller.text = ApiConfig.productionUrl;
+                    _runConnectionCheck(_controller.text);
+                  },
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.wifi_rounded, size: 15, color: Colors.white70),
                   label: const Text('Wi-Fi Network'),
                   backgroundColor: AppTheme.surfaceColor,
                   labelStyle: GoogleFonts.outfit(fontSize: 11, color: Colors.white),

@@ -7,8 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
   /// PRODUCTION TOGGLE FLAG:
-  /// true  => Live Production Server (https://clothing.speshway.site/api) - Works on ANY network (4G, 5G, Cellular Data, Wi-Fi worldwide)
-  /// false => Local Development Server (http://192.168.1.6:5000/api or localhost / emulator)
+  /// true  => Run on ANY server / Live Production (https://clothing.speshway.site/api or any custom cloud server)
+  ///          Works across any cellular data (4G/5G) and any Wi-Fi network worldwide.
+  /// false => Run ONLY in local development (http://192.168.1.6:5000/api, emulator 10.0.2.2, localhost)
   static const bool isProduction = true;
 
   static const String productionUrl = 'https://clothing.speshway.site/api';
@@ -21,7 +22,7 @@ class ApiConfig {
 
   /// Reactive notifier to broadcast server URL updates to all UI components
   static final ValueNotifier<String> baseUrlNotifier = ValueNotifier<String>(
-    localWifiUrl,
+    isProduction ? productionUrl : localWifiUrl,
   );
 
   /// API State Simulator for testing UI states (normal, slow, empty, error, offline)
@@ -36,15 +37,26 @@ class ApiConfig {
   }
 
   static List<String> get defaultCandidates {
+    if (isProduction) {
+      final list = <String>[
+        productionUrl,
+        cloudTunnelUrl,
+      ];
+      if (_overrideBaseUrl.isNotEmpty) {
+        list.insert(0, _overrideBaseUrl);
+      }
+      return list.toSet().toList();
+    }
+
+    // Local development candidates
     final list = <String>[
-      cloudTunnelUrl,
       localWifiUrl,
-      productionUrl,
       'http://localhost:5000/api',
       _defaultAndroidUrl,
+      cloudTunnelUrl,
     ];
 
-    // Expand discovery across local LAN subnets (192.168.1.x, 192.168.0.x, 192.168.29.x, 192.168.43.x)
+    // Expand discovery across local LAN subnets (192.168.1.x, 192.168.0.x, etc.)
     for (final i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 20, 25, 30, 31, 50, 100, 101, 102]) {
       list.add('http://192.168.1.$i:5000/api');
     }
@@ -59,7 +71,7 @@ class ApiConfig {
   /// Cleans and normalizes any server input string into a valid API URL endpoint
   static String normalizeUrl(String input) {
     var raw = input.trim();
-    if (raw.isEmpty) return productionUrl;
+    if (raw.isEmpty) return isProduction ? productionUrl : localWifiUrl;
 
     // Strip trailing slashes
     raw = raw.replaceAll(RegExp(r'/*$'), '');
@@ -92,14 +104,10 @@ class ApiConfig {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString('custom_api_url') ?? '';
 
-      // Reset invalid emulator override or stale unreachable hosts
+      // Reset invalid emulator override on physical Android
       if (saved.contains('10.0.2.2') &&
           !kIsWeb &&
           defaultTargetPlatform == TargetPlatform.android) {
-        await prefs.remove('custom_api_url');
-        _overrideBaseUrl = '';
-      } else if (saved.contains('clothing.speshway.site') ||
-          saved.contains('192.168.1.31')) {
         await prefs.remove('custom_api_url');
         _overrideBaseUrl = '';
       } else if (saved.isNotEmpty) {
@@ -127,7 +135,7 @@ class ApiConfig {
     if (_discoveredBaseUrl.isNotEmpty) {
       return _discoveredBaseUrl;
     }
-    return localWifiUrl;
+    return isProduction ? productionUrl : localWifiUrl;
   }
 
   static void _notifyUrlChanged() {
@@ -144,6 +152,7 @@ class ApiConfig {
 
   static Future<void> resetToAuto() async {
     _overrideBaseUrl = '';
+    _discoveredBaseUrl = '';
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('custom_api_url');
     await autoDiscoverBackend();
@@ -153,7 +162,7 @@ class ApiConfig {
   /// Pings a target server URL to test reachability and response latency in milliseconds
   static Future<Map<String, dynamic>> testServerConnection(
     String rawUrl, {
-    int timeoutMs = 2000,
+    int timeoutMs = 2500,
   }) async {
     final targetUrl = normalizeUrl(rawUrl);
     final stopwatch = Stopwatch()..start();
@@ -185,26 +194,53 @@ class ApiConfig {
   }
 
   static Future<String?> autoDiscoverBackend() async {
-    // 1. Test override if explicitly set by user
+    // 1. Test override if explicitly set by user (allows custom server in both prod and dev)
     if (_overrideBaseUrl.isNotEmpty) {
-      final testResult = await testServerConnection(_overrideBaseUrl, timeoutMs: 1800);
+      final testResult = await testServerConnection(_overrideBaseUrl, timeoutMs: 2500);
       if (testResult['success'] == true) {
         _notifyUrlChanged();
         return _overrideBaseUrl;
-      } else {
-        // Clear dead override so discovery can fallback to live candidate
-        _overrideBaseUrl = '';
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('custom_api_url');
       }
     }
 
-    // 2. High-priority fast probe on primary endpoints in sequence
-    // (local wifi first, then active cloud tunnel for 5G, then production)
+    // ─────────────────────────────────────────────────────────────
+    // PRODUCTION MODE (isProduction == true):
+    // Run on any server / live production endpoint worldwide.
+    // ─────────────────────────────────────────────────────────────
+    if (isProduction) {
+      // Primary check: production cloud endpoint
+      final res = await testServerConnection(productionUrl, timeoutMs: 2500);
+      if (res['success'] == true) {
+        _discoveredBaseUrl = productionUrl;
+        _overrideBaseUrl = '';
+        _notifyUrlChanged();
+        return productionUrl;
+      }
+
+      // Secondary check: cloud tunnel
+      final tunnelRes = await testServerConnection(cloudTunnelUrl, timeoutMs: 2500);
+      if (tunnelRes['success'] == true) {
+        _discoveredBaseUrl = cloudTunnelUrl;
+        _overrideBaseUrl = '';
+        _notifyUrlChanged();
+        return cloudTunnelUrl;
+      }
+
+      // Production fallback: default to productionUrl so it runs anywhere
+      _discoveredBaseUrl = productionUrl;
+      _notifyUrlChanged();
+      return _discoveredBaseUrl;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // LOCAL DEVELOPMENT MODE (isProduction == false):
+    // Run ONLY in local environment (local WiFi, emulator, localhost)
+    // ─────────────────────────────────────────────────────────────
     final primaryEndpoints = [
       localWifiUrl,
+      'http://localhost:5000/api',
+      _defaultAndroidUrl,
       cloudTunnelUrl,
-      productionUrl,
     ];
 
     for (final endpoint in primaryEndpoints) {
@@ -217,7 +253,7 @@ class ApiConfig {
       }
     }
 
-    // 3. Fallback: probe remaining subnet candidates in parallel
+    // Fallback: probe remaining subnet candidates in parallel
     final otherCandidates = defaultCandidates
         .where((c) => !primaryEndpoints.contains(c))
         .toList();
@@ -226,7 +262,7 @@ class ApiConfig {
     int pending = otherCandidates.length;
 
     if (pending == 0) {
-      _discoveredBaseUrl = cloudTunnelUrl;
+      _discoveredBaseUrl = localWifiUrl;
       _notifyUrlChanged();
       return _discoveredBaseUrl;
     }
@@ -261,7 +297,7 @@ class ApiConfig {
       return found;
     }
 
-    // 4. Fallback if no local subnet responded: use local wifi
+    // Local fallback: use local wifi
     _discoveredBaseUrl = localWifiUrl;
     _notifyUrlChanged();
     return _discoveredBaseUrl;

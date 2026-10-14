@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -460,9 +459,7 @@ class NotificationService {
       debugPrint('Error triggering local notification banner: $e');
     }
 
-    if (context != null && context.mounted) {
-      showInAppBanner(context, title: title, body: body, icon: icon, color: color, orderId: payloadOrderId ?? 'OPEN_ORDER');
-    }
+    // In-app floating popup banner disabled per user preference
   }
 
   /// Send a test push notification to verify push notifications on mobile
@@ -508,7 +505,7 @@ class NotificationService {
     notifyListeners();
   }
 
-  /// Display a floating pop-up snackbar banner on the screen
+  /// Display a floating pop-up snackbar banner on the screen (disabled per user preference)
   static void showInAppBanner(
     BuildContext context, {
     required String title,
@@ -517,66 +514,7 @@ class NotificationService {
     Color color = const Color(0xFFB8860B),
     String? orderId,
   }) {
-    final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
-    if (scaffoldMessenger == null) return;
-
-    scaffoldMessenger.hideCurrentSnackBar();
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        elevation: 10,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: const Color(0xFF0F172A),
-        duration: const Duration(seconds: 4),
-        content: InkWell(
-          onTap: () {
-            scaffoldMessenger.hideCurrentSnackBar();
-            onNotificationTap.add(orderId ?? 'OPEN_ORDER');
-          },
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withAlpha(40),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: color.withAlpha(100)),
-                ),
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.outfit(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        color: const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Disabled in-app floating banner popup
+    return;
   }
 }

@@ -825,28 +825,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               centerTitle: false,
               titleSpacing: 0,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'PROFILE & SETTINGS',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.cinzel(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                      letterSpacing: 1.5,
-                      color: _textDark,
-                    ),
-                  ),
-                  Text(
-                    'Manage account & preferences',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(fontSize: 10.5, color: _subtext),
-                  ),
-                ],
+              title: Text(
+                'PROFILE & SETTINGS',
+                style: GoogleFonts.cinzel(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  letterSpacing: 1.2,
+                  color: _textDark,
+                ),
               ),
             )
           : null,
@@ -4552,6 +4538,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── 5. MY ORDERS FULL SCREEN VIEW ──────────────────────────────────────
   void _showMyOrdersModal() {
+    final ordersFuture = OrderService.getOrders(email: _currentUser?.email);
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -4571,7 +4558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             centerTitle: false,
           ),
           body: FutureBuilder<List<OrderModel>>(
-            future: OrderService.getOrders(email: _currentUser?.email),
+            future: ordersFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(

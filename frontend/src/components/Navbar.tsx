@@ -4,6 +4,7 @@ import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronLeft, Chevron
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
+import { useNotifications } from "@/lib/notifications";
 
 const baseLinks = [
   { to: "/", label: "Home" },
@@ -24,18 +25,19 @@ export function Navbar() {
     const searchParams = new URLSearchParams(location.search);
     const tab = searchParams.get("tab");
 
-    if (pathname === "/products") return "All Products";
-    if (pathname.startsWith("/product/")) return "Product Details";
-    if (pathname === "/cart") return "Shopping Bag";
+    if (pathname === "/notifications") return "NOTIFICATIONS";
+    if (pathname === "/products") return "ALL PRODUCTS";
+    if (pathname.startsWith("/product/")) return "PRODUCT DETAILS";
+    if (pathname === "/cart") return "SHOPPING BAG";
     if (pathname === "/dashboard") {
-      if (tab === "orders") return "My Orders";
-      if (tab === "wishlist") return "My Wishlist";
-      if (tab === "cart") return "Shopping Bag";
-      if (tab === "profile") return "My Profile";
-      if (tab === "addresses") return "Saved Addresses";
-      if (tab === "wallet") return "VEXA Wallet";
-      if (tab === "support") return "Customer Support";
-      return "My Profile";
+      if (tab === "orders") return "MY ORDERS";
+      if (tab === "wishlist") return "MY WISHLIST";
+      if (tab === "cart") return "SHOPPING BAG";
+      if (tab === "profile") return "PROFILE & SETTINGS";
+      if (tab === "addresses") return "SAVED ADDRESSES";
+      if (tab === "wallet") return "VEXA WALLET";
+      if (tab === "support") return "CUSTOMER SUPPORT";
+      return "PROFILE & SETTINGS";
     }
     if (pathname === "/about") return "About Us";
     if (pathname === "/contact") return "Contact Us";
@@ -52,11 +54,16 @@ export function Navbar() {
   const { isLoggedIn, isAdmin, logout } = useAuth();
   const { cartItems } = useCart();
   const { wishlistItems } = useWishlist();
+  const { unreadCount, markAllAsRead } = useNotifications();
   const totalCartCount = (cartItems || []).reduce((acc, item) => acc + (item?.quantity || 1), 0);
   const wishlistCount = (wishlistItems || []).length;
 
   const handleBack = () => {
-    if (window.history.length > 1) {
+    if (location.pathname === "/dashboard" || location.pathname === "/cart") {
+      navigate("/");
+      return;
+    }
+    if (window.history.state && typeof window.history.state.idx === "number" && window.history.state.idx > 0) {
       navigate(-1);
     } else {
       navigate("/");
@@ -96,8 +103,8 @@ export function Navbar() {
     };
   }, [open]);
 
-  // Hide header navigation on admin portal and on login page (for native mobile experience)
-  if (location.pathname.startsWith("/admin") || location.pathname === "/login") {
+  // Hide header navigation on admin portal
+  if (location.pathname.startsWith("/admin")) {
     return null;
   }
 
@@ -106,31 +113,33 @@ export function Navbar() {
   return (
     <>
       <header
-        className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 transform ${
+        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 transform ${
           visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
         } ${
           scrolled
-            ? "border-b border-border bg-background/90 backdrop-blur-xl py-2.5 sm:py-3 shadow-sm"
+            ? "border-b border-[#EADBBE]/60 bg-white/90 backdrop-blur-xl py-3 shadow-sm"
+            : location.pathname === "/login"
+            ? "bg-[#FAF8F5] py-4 sm:py-5"
             : "py-3.5 sm:py-5"
         }`}
       >
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Header Back Button Symbol (Visible on all non-home pages) */}
-            {!isHomePage && (
+            {/* Header Back Button Symbol (Visible on non-home pages only on mobile < sm, never on /login) */}
+            {!isHomePage && location.pathname !== "/login" && (
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex size-8.5 sm:size-8.5 items-center justify-center rounded-full text-foreground hover:bg-muted/50 transition-all duration-200 cursor-pointer active:scale-90 shrink-0 -ml-1 sm:ml-0 sm:border sm:border-gold/40 sm:bg-card/90 sm:text-gold sm:hover:bg-gold sm:hover:text-primary-foreground"
+                className="flex sm:hidden size-8.5 items-center justify-center rounded-full text-foreground hover:bg-muted/50 transition-all duration-200 cursor-pointer active:scale-90 shrink-0 -ml-1"
                 title="Go Back"
                 aria-label="Go Back"
               >
-                <ChevronLeft className="size-6 text-foreground sm:size-4.5 sm:text-inherit" strokeWidth={2.4} />
+                <ChevronLeft className="size-6 text-foreground" strokeWidth={2.4} />
               </button>
             )}
 
-            {/* Brand Logo on Home Screen, or Dynamic Screen Title on other screens for Mobile */}
-            {isHomePage ? (
+            {/* Brand Logo on Home Screen, /login, or on Desktop */}
+            {isHomePage || location.pathname === "/login" ? (
               <Link to="/" className="group flex items-center gap-2 sm:gap-3 leading-none shrink-0">
                 <div className="flex size-8 sm:size-9 items-center justify-center rounded-[10px] bg-white border border-border/60 shadow-xs transition-transform duration-300 group-hover:scale-105 shrink-0 overflow-hidden p-0.5">
                   <img
@@ -153,22 +162,11 @@ export function Navbar() {
             ) : (
               <>
                 {/* Mobile View: Dynamic Screen Title (Hidden on desktop) */}
-                {location.pathname === "/dashboard" && (!new URLSearchParams(location.search).get("tab") || new URLSearchParams(location.search).get("tab") === "profile") ? (
-                  <div className="flex flex-col justify-center sm:hidden min-w-0">
-                    <span className="font-display text-[15px] font-black tracking-[0.08em] text-foreground leading-tight uppercase truncate">
-                      PROFILE &amp; SETTINGS
-                    </span>
-                    <span className="text-[10.5px] text-muted-foreground font-medium leading-tight mt-0.5 truncate">
-                      Manage account &amp; preferences
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center sm:hidden">
-                    <span className="text-[18px] font-bold tracking-tight text-foreground leading-none ml-0.5">
-                      {screenTitle}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center sm:hidden">
+                  <span className="font-display text-[17px] font-bold tracking-[0.12em] text-foreground leading-none ml-0.5 uppercase">
+                    {screenTitle}
+                  </span>
+                </div>
 
                 {/* Desktop View: Brand Logo */}
                 <Link to="/" className="group hidden sm:flex items-center gap-2 sm:gap-3 leading-none shrink-0">
@@ -218,16 +216,45 @@ export function Navbar() {
             {isHomePage && (
               <div className="relative flex items-center sm:hidden mr-1">
                 <Link
-                  to="/dashboard?tab=support"
+                  to="/notifications"
                   className="flex size-10 items-center justify-center rounded-full border border-border bg-white dark:bg-[#1E293B] text-[#0F172A] dark:text-foreground shadow-sm active:scale-90 transition-transform"
                   title="Notifications"
                 >
                   <Bell className="size-5" />
                 </Link>
-                <span className="absolute -top-1 -right-1 flex min-w-4.5 h-4.5 px-1 items-center justify-center rounded-full bg-[#E5BF4E] text-[#0F172A] text-[9.5px] font-black border-2 border-white dark:border-[#0F172A] shadow-xs font-mono">
-                  57
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex min-w-4.5 h-4.5 px-1 items-center justify-center rounded-full bg-[#E5BF4E] text-[#0F172A] text-[9.5px] font-black border-2 border-white dark:border-[#0F172A] shadow-xs font-mono">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </div>
+            )}
+
+            {/* Mobile /notifications top bar quick Read All action */}
+            {location.pathname === "/notifications" && unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={() => markAllAsRead()}
+                className="flex items-center gap-1 rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-bold text-gold border border-gold/30 sm:hidden active:scale-95 transition-all"
+              >
+                Read All
+              </button>
+            )}
+
+            {/* Notifications Symbol / Icon (Desktop / Tablet) */}
+            {isLoggedIn && (
+              <Link
+                to="/notifications"
+                className="relative hidden sm:flex items-center justify-center p-2 text-gold hover:text-gold/80 transition-all cursor-pointer active:scale-95"
+                title="Notifications"
+              >
+                <Bell className="size-5 sm:size-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex min-w-4.5 h-4.5 px-1 items-center justify-center rounded-full bg-[#E5BF4E] text-[#0F172A] text-[10px] font-extrabold shadow border border-background font-mono">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </Link>
             )}
 
             {/* Wishlist Symbol / Icon (Desktop / Tablet) */}
@@ -274,7 +301,7 @@ export function Navbar() {
             ) : (
               <Link
                 to="/login"
-                className="btn-gold hover:btn-gold-hover inline-flex items-center gap-1.5 rounded-sm px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-all shadow-goldy cursor-pointer active:scale-95 ml-1"
+                className="inline-flex items-center gap-1.5 rounded bg-[#965B0A] hover:bg-[#834E06] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-white transition-all shadow-sm cursor-pointer active:scale-95 ml-1"
                 title="Login to Account"
               >
                 <User className="size-3.5" />

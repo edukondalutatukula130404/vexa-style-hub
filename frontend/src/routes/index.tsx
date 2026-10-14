@@ -6,11 +6,10 @@ import {
   ChevronRight,
   Search,
   X,
-  LayoutGrid,
-  Palette,
-  Lock,
-  Truck,
-  ShoppingBag,
+  Shirt,
+  Sparkles,
+  Wind,
+  ShieldCheck,
 } from "lucide-react";
 import heroImg from "@/assets/hero.jpg";
 import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
@@ -20,6 +19,13 @@ import { products as defaultProducts, SIZES, useProducts } from "@/lib/products"
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { useAuth } from "@/lib/auth";
+
+const features = [
+  { icon: Shirt, title: "Premium Cotton Fabric", text: "240 GSM combed long-staple cotton." },
+  { icon: Sparkles, title: "Oversized Modern Fit", text: "Drop shoulder, sculpted drape." },
+  { icon: Wind, title: "Soft & Breathable", text: "Bio-washed for all-day comfort." },
+  { icon: ShieldCheck, title: "Wrinkle Resistant", text: "Holds its shape wash after wash." },
+];
 
 
 
@@ -390,20 +396,6 @@ export function Home() {
           </div>
         </div>
 
-        {/* Showcase Banner Dots Indicator (Hidden on Mobile to match screenshot) */}
-        <div className="hidden md:flex items-center justify-center gap-2 pt-4">
-          {activePromoBanners.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setBannerIndex(i)}
-              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                bannerIndex === i ? "w-6 bg-gold shadow-sm" : "w-2 bg-border hover:bg-gold/50"
-              }`}
-              aria-label={`Slide ${i + 1}`}
-            />
-          ))}
-        </div>
       </section>
 
       {/* 2. NEW ARRIVALS */}
@@ -484,89 +476,37 @@ export function Home() {
 
 
 
-      {/* 5. HOW TO BOOK YOUR VEXA TEE (Exact 1:1 Mobile Responsive Match with Flutter App) */}
-      <section className="mx-auto max-w-xl px-4 pt-6 pb-20 sm:pb-24">
-        <div className="rounded-[24px] border-[1.5px] border-[#E5C158]/70 bg-gradient-to-br from-[#FFFDF5] to-[#FFF4D8] dark:from-[#1E293B]/90 dark:to-[#0F172A]/90 p-5 sm:p-6 shadow-[0_6px_18px_rgba(184,134,11,0.12)]">
-          {/* Title Header */}
-          <div className="text-left">
-            <h2 className="font-display text-[16.5px] sm:text-[18px] font-black tracking-[0.05em] text-[#0F172A] dark:text-foreground uppercase">
-              HOW TO BOOK YOUR VEXA TEE
-            </h2>
-            <p className="mt-1 text-[13px] text-slate-500 dark:text-muted-foreground leading-snug">
-              4 easy steps from catalog selection to custom doorstep delivery.
-            </p>
-          </div>
+      {/* 5. ENGINEERED EXCELLENCE (Crafted to the Last Stitch) */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-5 py-12 md:py-16 border-t border-border/30">
+        <Reveal className="text-center">
+          <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-[#9A7220] dark:text-gold font-bold">
+            ENGINEERED EXCELLENCE
+          </p>
+          <h2 className="mt-1.5 font-display text-2xl sm:text-4xl font-extrabold uppercase tracking-wide text-foreground">
+            CRAFTED TO THE <span className="text-[#9A7220] dark:text-gold-gradient">LAST STITCH</span>
+          </h2>
+          <div className="hairline mx-auto mt-3.5 w-36 bg-gradient-to-r from-transparent via-[#9A7220]/60 to-transparent h-[1.5px]" />
+        </Reveal>
 
-          {/* 4 Step Cards */}
-          <div className="mt-5 space-y-3.5">
-            {[
-              {
-                stepNum: "01",
-                tag: "STEP 01",
-                title: "Browse Luxury Catalog Drops",
-                subtitle: "Explore 240 GSM luxury catalog drops and handpicked oversized streetwear silhouettes.",
-                icon: LayoutGrid,
-              },
-              {
-                stepNum: "02",
-                tag: "STEP 02",
-                title: "Choose Fit & Colorway",
-                subtitle: "Select long-staple combed cotton colorways, drop-shoulder fits, and preferred sizes.",
-                icon: Palette,
-              },
-              {
-                stepNum: "03",
-                tag: "STEP 03",
-                title: "Instant Secure Checkout",
-                subtitle: "Complete order seamlessly using Razorpay, UPI, NetBanking, Credit Cards, or COD.",
-                icon: Lock,
-              },
-              {
-                stepNum: "04",
-                tag: "STEP 04",
-                title: "Doorstep Luxury Delivery",
-                subtitle: "Track your shipment live from VEXA master tailors to your doorstep with luxury packaging.",
-                icon: Truck,
-              },
-            ].map((item, idx) => {
-              const StepIcon = item.icon;
-              return (
-                <div
-                  key={idx}
-                  className="rounded-[16px] border border-[#E5C158]/50 bg-white dark:bg-[#0F172A] p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-start gap-3.5 transition-all duration-200 hover:border-[#D4AF37]"
-                >
-                  {/* Icon Badge Circle */}
-                  <div className="size-11 rounded-full bg-[#FFF4D1] dark:bg-amber-950/40 border-[1.2px] border-[#D4AF37]/60 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                    <StepIcon className="size-5 text-[#A67C00] dark:text-gold" strokeWidth={2.2} />
+        <div className="mt-8 sm:mt-10 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4 items-stretch">
+          {features.map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <Reveal key={f.title} delay={i * 90} className="h-full w-full flex flex-col">
+                <div className="group flex h-full w-full flex-col items-center justify-center rounded-2xl border border-[#EADBBE]/80 bg-white dark:bg-card p-5 sm:p-8 text-center shadow-[0_10px_30px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-[#9A7220] hover:shadow-[0_15px_35px_rgba(154,114,32,0.12)]">
+                  <div className="mx-auto flex size-12 sm:size-14 items-center justify-center rounded-2xl border border-[#EADBBE]/80 bg-[#FAF8F5] text-[#9A7220] shadow-xs transition-transform group-hover:scale-110">
+                    <Icon className="size-6 sm:size-7 text-[#9A7220]" strokeWidth={1.8} />
                   </div>
-
-                  {/* Title & Description Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[#E5BF4E]/20 text-[#A67C00] dark:text-gold text-[9.5px] font-black tracking-[0.08em] uppercase">
-                      {item.tag}
-                    </div>
-                    <h3 className="mt-1 font-bold text-[14.5px] text-[#0F172A] dark:text-foreground leading-tight">
-                      {item.title}
-                    </h3>
-                    <p className="mt-1 text-[12px] text-slate-500 dark:text-muted-foreground leading-[1.38]">
-                      {item.subtitle}
-                    </p>
-                  </div>
+                  <h3 className="mt-4 sm:mt-6 font-display text-xs sm:text-base font-bold text-foreground uppercase tracking-wider">
+                    {f.title}
+                  </h3>
+                  <p className="mt-2 text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                    {f.text}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Radiant VEXA Gold Action CTA Button */}
-          <Link
-            to="/products"
-            className="mt-4 flex h-[50px] w-full items-center justify-center gap-2 rounded-[24px] border border-white/80 bg-gradient-to-b from-[#FBE89C] via-[#F2D370] to-[#E5BF4E] text-[#0F172A] shadow-[0_4px_12px_rgba(242,211,112,0.4)] transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-          >
-            <ShoppingBag className="size-5 text-[#0F172A]" strokeWidth={2.2} />
-            <span className="font-display text-[13.5px] font-black tracking-[0.09em] uppercase text-[#0F172A]">
-              EXPLORE CATALOG NOW
-            </span>
-          </Link>
+              </Reveal>
+            );
+          })}
         </div>
       </section>
     </div>

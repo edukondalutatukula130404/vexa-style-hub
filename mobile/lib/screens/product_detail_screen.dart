@@ -973,45 +973,94 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  double _getSizePrice(String size) {
+  double _getColorPriceOffset(String color) {
+    switch (color.toLowerCase().trim()) {
+      case 'default':
+      case 'original':
+      case 'pastel lavender':
+      case 'lavender':
+      case 'lavender lilac':
+        return 0.0;
+      case 'emerald green':
+      case 'green':
+        return 50.0;
+      case 'jet black':
+      case 'black':
+        return 100.0;
+      case 'vintage rust':
+      case 'rust':
+      case 'brown':
+        return 150.0;
+      case 'ivory white':
+      case 'white':
+        return 30.0;
+      case 'military olive':
+      case 'olive':
+        return 80.0;
+      case 'midnight navy':
+      case 'navy':
+      case 'blue':
+        return 120.0;
+      case 'desert sand':
+      case 'sand':
+      case 'beige':
+        return 60.0;
+      case 'charcoal grey':
+      case 'charcoal':
+      case 'grey':
+      case 'gray':
+        return 90.0;
+      case 'luxury cream & gold':
+      case 'cream & gold':
+      case 'cream':
+      case 'gold':
+        return 200.0;
+      default:
+        final hash = color.toLowerCase().codeUnits.fold<int>(0, (a, b) => a + b);
+        return ((hash % 5) * 40).toDouble();
+    }
+  }
+
+  double _getSizePriceOffset(String size) {
+    switch (size.toUpperCase().trim()) {
+      case 'S':
+        return -50.0;
+      case 'M':
+        return 0.0;
+      case 'L':
+        return 100.0;
+      case 'XL':
+        return 200.0;
+      case 'XXL':
+        return 300.0;
+      default:
+        return 0.0;
+    }
+  }
+
+  double _getCalculatedPrice({String? color, String? size}) {
+    final targetColor = color ?? _selectedColor;
+    final targetSize = size ?? _selectedSize;
     final basePrice = widget.item.price;
-    switch (size.toUpperCase()) {
-      case 'S':
-        return (basePrice - 50).clamp(1.0, double.infinity);
-      case 'M':
-        return basePrice;
-      case 'L':
-        return basePrice + 100;
-      case 'XL':
-        return basePrice + 200;
-      case 'XXL':
-        return basePrice + 300;
-      default:
-        return basePrice;
-    }
+    final colorOffset = _getColorPriceOffset(targetColor);
+    final sizeOffset = _getSizePriceOffset(targetSize);
+    return (basePrice + colorOffset + sizeOffset).clamp(1.0, double.infinity);
   }
 
-  double? _getSizeOldPrice(String size) {
+  double? _getCalculatedOldPrice({String? color, String? size}) {
     if (widget.item.oldPrice == null) return null;
+    final targetColor = color ?? _selectedColor;
+    final targetSize = size ?? _selectedSize;
     final baseOldPrice = widget.item.oldPrice!;
-    switch (size.toUpperCase()) {
-      case 'S':
-        return (baseOldPrice - 50).clamp(1.0, double.infinity);
-      case 'M':
-        return baseOldPrice;
-      case 'L':
-        return baseOldPrice + 100;
-      case 'XL':
-        return baseOldPrice + 200;
-      case 'XXL':
-        return baseOldPrice + 300;
-      default:
-        return baseOldPrice;
-    }
+    final colorOffset = _getColorPriceOffset(targetColor);
+    final sizeOffset = _getSizePriceOffset(targetSize);
+    return (baseOldPrice + colorOffset + sizeOffset).clamp(1.0, double.infinity);
   }
 
-  double get _currentPrice => _getSizePrice(_selectedSize);
-  double? get _currentOldPrice => _getSizeOldPrice(_selectedSize);
+
+
+  double get _currentPrice => _getCalculatedPrice(color: _selectedColor, size: _selectedSize);
+  double? get _currentOldPrice => _getCalculatedOldPrice(color: _selectedColor, size: _selectedSize);
 
   int get _currentDiscountPercent {
     final curPrice = _currentPrice;

@@ -24,6 +24,8 @@ import { About } from "@/routes/about";
 import { Contact } from "@/routes/contact";
 import { Faq } from "@/routes/faq";
 import { ResetPassword } from "@/routes/reset-password";
+import { NotificationsPage } from "@/routes/notifications";
+import { addNotificationItem } from "@/lib/notifications";
 
 function ProductQueryRedirect() {
   const navigate = useNavigate();
@@ -83,6 +85,13 @@ function Layout() {
         description: body,
       });
       triggerWebTestPushNotification(title, body, toastId);
+      addNotificationItem({
+        title,
+        message: body,
+        type: isSupportMsg ? "support" : "system",
+        ticketId: payload?.data?.ticketId,
+        orderId: payload?.data?.orderId,
+      });
     });
 
     // Listen to live WebSocket broadcast events for system push notifications
@@ -93,12 +102,24 @@ function Layout() {
         const body = data?.body || data?.message || "Notification from Admin";
         toast.info(title, { description: body });
         triggerWebTestPushNotification(title, body);
+        addNotificationItem({
+          title,
+          message: body,
+          type: "admin",
+        });
       } else if (type === "ORDER_CREATED" || type === "ORDER_PLACED") {
         const orderId = data?._id || data?.id || "#VX-ORDER";
         const title = "Order Confirmed! 📦";
         const body = `Order ${orderId} placed successfully.`;
         toast.success(title, { description: body });
         triggerWebTestPushNotification(title, body);
+        addNotificationItem({
+          title,
+          message: body,
+          type: "order_status_update",
+          orderId,
+          actionUrl: "/dashboard?tab=orders",
+        });
       } else if (type === "ORDER_CANCELLED") {
         const rawId = data?.orderId || data?.id || data?._id || "ORDER";
         const cleanCode = String(rawId).replace(/^#+/, "").trim();
@@ -108,6 +129,13 @@ function Layout() {
         const title = `❌ Order was cancelled #${shortCode}`;
         const body = `Order #${shortCode} was cancelled by ${customerName}${reason}`;
         toast.error(title, { description: body, duration: 8000 });
+        addNotificationItem({
+          title,
+          message: body,
+          type: "order_status_update",
+          orderId: shortCode,
+          actionUrl: "/dashboard?tab=orders",
+        });
       }
     });
 
@@ -123,7 +151,7 @@ function Layout() {
 
   return (
     <MobileFrameWrapper>
-      <div className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground pb-20 md:pb-0">
+      <div className={`flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-gold selection:text-primary-foreground ${location.pathname === "/login" ? "" : "pb-20 md:pb-0"}`}>
         <ScrollToTop />
         <Navbar />
         <main className="flex-1">
@@ -175,6 +203,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/cart" element={<CartRedirect />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/about" element={<About />} />

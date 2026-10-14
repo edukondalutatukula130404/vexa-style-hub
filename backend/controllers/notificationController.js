@@ -95,6 +95,21 @@ exports.clearUserNotifications = async (req, res, next) => {
   }
 };
 
+// @desc    Delete single notification
+// @route   DELETE /api/notifications/:id
+// @access  Public
+exports.deleteSingleNotification = async (req, res, next) => {
+  try {
+    await Notification.findByIdAndDelete(req.params.id);
+    res.status(200).json({
+      success: true,
+      message: 'Notification deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Receive support message or ticket from user and notify admin
 // @route   POST /api/notifications/support
 // @access  Public

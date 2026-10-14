@@ -17,8 +17,8 @@ export function MobileBottomNav() {
   const { cartItems } = useCart();
   const { isLoggedIn } = useAuth();
 
-  // Hide on admin routes completely
-  if (location.pathname.startsWith("/admin")) {
+  // Hide on admin, login, and notifications routes
+  if (location.pathname.startsWith("/admin") || location.pathname === "/login" || location.pathname === "/notifications") {
     return null;
   }
 

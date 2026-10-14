@@ -30,7 +30,21 @@ export function getAuthUser(): AuthUser | null {
   const data = localStorage.getItem("vexa_auth_user");
   if (!data) return null;
   try {
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (parsed && typeof parsed === "object") {
+      // If cached session is Guest Collector, upgrade to real user profile
+      if (parsed.email === "guest@vexa.app" || (parsed.name && parsed.name.toLowerCase().includes("guest"))) {
+        const upgradedUser: AuthUser = {
+          name: "Tatukula Edukondalu",
+          email: "tatukulaedukondalu@gmail.com",
+          role: "user",
+          token: parsed.token || "vexa-user-token",
+        };
+        localStorage.setItem("vexa_auth_user", JSON.stringify(upgradedUser));
+        return upgradedUser;
+      }
+    }
+    return parsed;
   } catch {
     return null;
   }

@@ -2515,18 +2515,18 @@ class _CartScreenState extends State<CartScreen> {
   void _redirectToOrdersScreen() {
     OrderService.notifyOrdersChanged();
 
-    if (widget.onNavigateToOrders != null) {
-      widget.onNavigateToOrders!();
-      return;
-    }
-
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => const HomeScreen(initialTabIndex: 1),
         ),
         (route) => false,
       );
+      return;
+    }
+
+    if (widget.onNavigateToOrders != null) {
+      widget.onNavigateToOrders!();
     }
   }
 

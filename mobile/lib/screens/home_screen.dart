@@ -117,8 +117,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final PageController _promoPageController;
   StreamSubscription? _wsSub;
 
-  // Cached orders future to prevent auto-refresh when promo banner timer ticks
+  // Cached orders to prevent flicker/resetting on background refreshes
   Future<List<OrderModel>>? _ordersFuture;
+  List<OrderModel>? _cachedOrders;
 
   Future<void> _refreshOrders() async {
     final user = _currentUser ?? await AuthService.getUser();
@@ -126,18 +127,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (userEmail == null || userEmail.isEmpty || userEmail == 'guest@vexa.app' || user?.id == 'guest_user') {
       if (mounted) {
         setState(() {
+          _cachedOrders = [];
           _ordersFuture = Future.value([]);
         });
       }
       return;
     }
     final future = OrderService.getOrders(email: userEmail);
-    if (mounted) {
-      setState(() {
-        _ordersFuture = future;
-      });
+    // Only assign unresolved future if we have NEVER loaded orders yet
+    if (_cachedOrders == null) {
+      if (mounted) {
+        setState(() {
+          _ordersFuture = future;
+        });
+      }
     }
-    await future;
+    final fetched = await future;
+    if (mounted) {
+      // Check if data actually changed before updating state
+      final newFingerprint = fetched.map((o) => '${o.id}_${o.status}_${o.totalAmount}').join(';');
+      final oldFingerprint = (_cachedOrders ?? []).map((o) => '${o.id}_${o.status}_${o.totalAmount}').join(';');
+      if (_cachedOrders == null || newFingerprint != oldFingerprint) {
+        setState(() {
+          _cachedOrders = fetched;
+          _ordersFuture = Future.value(fetched);
+        });
+      }
+    }
   }
 
   // Stream subscription for notification tap events
@@ -714,9 +730,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             setState(() => _currentTabIndex = 0);
           },
           onNavigateToOrders: () {
-            Navigator.pop(context);
-            setState(() => _currentTabIndex = 1);
-            _refreshOrders();
+            Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const HomeScreen(initialTabIndex: 1)),
+              (route) => false,
+            );
+            OrderService.notifyOrdersChanged();
           },
         ),
         transitionDuration: Duration.zero,
@@ -2392,8 +2410,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         backgroundColor: Colors.white,
         centerTitle: false,
         elevation: 0.5,
+        titleSpacing: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A), size: 22),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
           onPressed: () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
@@ -2403,10 +2422,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           },
         ),
         title: Text(
-          'My Orders',
-          style: GoogleFonts.outfit(
+          'MY ORDERS',
+          style: GoogleFonts.cinzel(
             fontSize: 18,
             fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
             color: const Color(0xFF0F172A),
           ),
         ),
@@ -2417,7 +2437,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: FutureBuilder<List<OrderModel>>(
           future: _ordersFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            final rawOrders = snapshot.data ?? _cachedOrders ?? [];
+
+            if (snapshot.connectionState == ConnectionState.waiting && _cachedOrders == null && (!snapshot.hasData || snapshot.data == null)) {
               return const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -2432,8 +2454,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               );
             }
-
-            final rawOrders = snapshot.data ?? [];
 
             // Apply filters
             final filteredOrders = rawOrders.where((order) {

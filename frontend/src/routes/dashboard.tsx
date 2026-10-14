@@ -57,6 +57,7 @@ import { useCart, addToCart, removeFromCart, updateCartQuantity, clearCart } fro
 import { useWishlist, removeFromWishlist, clearWishlist } from "@/lib/wishlist";
 import { vexaSocket } from "@/lib/socket";
 import { Footer } from "@/components/Footer";
+import { toast } from "sonner";
 
 type OrderItem = {
   _id: string;
@@ -408,8 +409,14 @@ export function UserDashboard() {
   }, [myOrders, selectedMobileOrderFilter, orderSearchQuery]);
 
   // Profile Form & Avatar State
-  const [profileName, setProfileName] = useState(user?.name || "Tatukula Edukondalu");
-  const [profileEmail, setProfileEmail] = useState(user?.email || "tatukulaedukondalu@gmail.com");
+  const [profileName, setProfileName] = useState(() => {
+    const raw = user?.name || "Tatukula Edukondalu";
+    return raw.toLowerCase().includes("guest") ? "Tatukula Edukondalu" : raw;
+  });
+  const [profileEmail, setProfileEmail] = useState(() => {
+    const raw = user?.email || "tatukulaedukondalu@gmail.com";
+    return raw === "guest@vexa.app" || raw.toLowerCase().includes("guest") ? "tatukulaedukondalu@gmail.com" : raw;
+  });
   const [profileMobile, setProfileMobile] = useState("9876543210");
   const [profileSavedMsg, setProfileSavedMsg] = useState("");
   const [profilePic, setProfilePic] = useState<string>(() => {
@@ -419,14 +426,60 @@ export function UserDashboard() {
     return "";
   });
 
+  // Dynamic user profile resolution (never fallback to Guest Collector for authenticated view)
+  const resolvedDisplayName = useMemo(() => {
+    const raw = (user?.name || profileName || "").trim();
+    if (!raw || raw.toLowerCase().includes("guest") || raw.toLowerCase() === "collector") {
+      return "TATUKULA EDUKONDALU";
+    }
+    return raw.toUpperCase();
+  }, [user, profileName]);
+
+  const resolvedDisplayEmail = useMemo(() => {
+    const raw = (user?.email || profileEmail || "").trim();
+    if (!raw || raw.toLowerCase() === "guest@vexa.app" || raw.toLowerCase().includes("guest")) {
+      return "tatukulaedukondalu@gmail.com";
+    }
+    return raw;
+  }, [user, profileEmail]);
+
+  const resolvedAvatarInitial = useMemo(() => {
+    return resolvedDisplayName ? resolvedDisplayName[0].toUpperCase() : "T";
+  }, [resolvedDisplayName]);
+
+  // Keep profile state synced with authenticated user changes
+  useEffect(() => {
+    if (user?.name && !user.name.toLowerCase().includes("guest") && user.name.toLowerCase() !== "collector") {
+      setProfileName(user.name);
+      setEditProfileName(user.name);
+    } else {
+      setProfileName("Tatukula Edukondalu");
+      setEditProfileName("Tatukula Edukondalu");
+    }
+
+    if (user?.email && user.email !== "guest@vexa.app" && !user.email.toLowerCase().includes("guest")) {
+      setProfileEmail(user.email);
+      setEditProfileEmail(user.email);
+    } else {
+      setProfileEmail("tatukulaedukondalu@gmail.com");
+      setEditProfileEmail("tatukulaedukondalu@gmail.com");
+    }
+  }, [user]);
+
   // Mobile Profile Modals State (Matches Flutter Profile Screen 1:1)
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showBrandStoryModal, setShowBrandStoryModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
-  const [editProfileName, setEditProfileName] = useState(user?.name || "Tatukula Edukondalu");
-  const [editProfileEmail, setEditProfileEmail] = useState(user?.email || "tatukulaedukondalu@gmail.com");
+  const [editProfileName, setEditProfileName] = useState(() => {
+    const raw = user?.name || "Tatukula Edukondalu";
+    return raw.toLowerCase().includes("guest") ? "Tatukula Edukondalu" : raw;
+  });
+  const [editProfileEmail, setEditProfileEmail] = useState(() => {
+    const raw = user?.email || "tatukulaedukondalu@gmail.com";
+    return raw === "guest@vexa.app" || raw.toLowerCase().includes("guest") ? "tatukulaedukondalu@gmail.com" : raw;
+  });
   const [editProfileMobile, setEditProfileMobile] = useState("9876543210");
 
   // Profile Extended Preferences State
@@ -1164,16 +1217,17 @@ export function UserDashboard() {
           clearCart();
         }
 
-        // 3. Reset Checkout Flow State to ORDER SUCCESSFUL PAGE
+        // 3. Reset Checkout Flow State and redirect to My Orders
         setSelectedProduct(null);
         setIsCartCheckout(false);
-        setCartCheckoutStep("success");
+        setCartCheckoutStep("address");
         setCheckoutStep(1);
         setOrderSubmitting(false);
+        setActiveTab("orders");
 
-        // 4. Keep user on Order Successful Page screen
+        // 4. Update URL to My Orders tab
         if (typeof window !== "undefined") {
-          window.history.pushState({}, "", "/dashboard?tab=cart");
+          window.history.pushState({}, "", "/dashboard?tab=orders");
         }
 
         // 5. Post to backend asynchronously in background with id and _id
@@ -1571,10 +1625,10 @@ export function UserDashboard() {
                     <div className="relative shrink-0">
                       <div className="size-[62px] rounded-full bg-[#FAF5E6] dark:bg-gold/15 border-2 border-gold flex items-center justify-center shadow-xs overflow-hidden">
                         {profilePic ? (
-                          <img src={profilePic} alt={profileName} className="size-full object-cover" />
+                          <img src={profilePic} alt={resolvedDisplayName} className="size-full object-cover" />
                         ) : (
                           <span className="font-display text-2xl font-bold text-[#8C6D23] dark:text-gold">
-                            {(profileName || "T")[0].toUpperCase()}
+                            {resolvedAvatarInitial}
                           </span>
                         )}
                       </div>
@@ -1587,10 +1641,10 @@ export function UserDashboard() {
                     {/* User Info Column */}
                     <div className="flex-1 min-w-0">
                       <h2 className="font-display text-[17px] font-bold tracking-[0.05em] text-foreground uppercase truncate leading-tight">
-                        {profileName || "TATUKULA EDUKONDALU"}
+                        {resolvedDisplayName}
                       </h2>
                       <p className="text-[12px] text-muted-foreground truncate leading-tight mt-1 font-normal">
-                        {profileEmail || "tatukulaedukondalu@gmail.com"}
+                        {resolvedDisplayEmail}
                       </p>
                     </div>
                   </div>
@@ -1803,12 +1857,12 @@ export function UserDashboard() {
                       {profilePic ? (
                         <img
                           src={profilePic}
-                          alt={profileName}
+                          alt={resolvedDisplayName}
                           className="size-20 rounded-full object-cover border-2 border-gold shadow-md"
                         />
                       ) : (
                         <div className="flex size-20 items-center justify-center rounded-full border-2 border-gold bg-gold/15 font-display text-3xl font-extrabold text-gold shadow-md">
-                          {(profileName || user?.name || "U")[0].toUpperCase()}
+                          {resolvedAvatarInitial}
                         </div>
                       )}
                       <label
@@ -1829,8 +1883,8 @@ export function UserDashboard() {
 
                     {/* Profile Text & Action Buttons */}
                     <div className="flex-1 text-center sm:text-left space-y-1 overflow-hidden">
-                      <h3 className="font-display text-xl font-bold text-foreground truncate">{profileName}</h3>
-                      <p className="text-xs text-muted-foreground truncate">{profileEmail}</p>
+                      <h3 className="font-display text-xl font-bold text-foreground truncate">{resolvedDisplayName}</h3>
+                      <p className="text-xs text-muted-foreground truncate">{resolvedDisplayEmail}</p>
 
                       {/* Edit & Delete Profile Pic Controls */}
                       <div className="flex items-center justify-center sm:justify-start gap-2 pt-3">
@@ -2004,6 +2058,11 @@ export function UserDashboard() {
                           setProfileName(editProfileName);
                           setProfileEmail(editProfileEmail);
                           setProfileMobile(editProfileMobile);
+                          setLoggedIn({
+                            name: editProfileName,
+                            email: editProfileEmail,
+                            role: user?.role || "user",
+                          });
                           setShowEditProfileModal(false);
                           setProfileSavedMsg("Profile updated successfully!");
                           setTimeout(() => setProfileSavedMsg(""), 3500);
@@ -3630,7 +3689,7 @@ export function UserDashboard() {
             {/* MY WISHLIST TAB (Full CRUD: View Saved Items, Move to Cart, Delete Item, Clear All) */}
             {activeTab === "wishlist" && (
               <div className="space-y-6 pt-3 sm:pt-0">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
+                <div className="hidden sm:flex sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
                   <div className="flex items-center gap-3">
                     <h2 className="font-display text-2xl font-bold text-foreground">My Wishlist</h2>
                     <span className="rounded-full bg-gold/15 border border-gold/40 px-3 py-0.5 text-xs font-bold text-gold">

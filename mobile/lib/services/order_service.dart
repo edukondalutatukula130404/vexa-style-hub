@@ -210,14 +210,16 @@ class OrderService {
   static final Map<String, String> _cancelledOrderReasons = {};
   static final Set<String> _paidOrderIds = {};
 
+  static String _lastOrdersFingerprint = '';
+
   static void notifyOrdersChanged() {
     ordersChangeNotifier.value++;
   }
 
-  /// Periodic auto-polling keeps delivery status continuously synchronized with admin changes
+  /// Periodic background sync - only notifies listeners when orders data actually changes
   static void startAutoPoll({String? email}) {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 8), (_) async {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 45), (_) async {
       try {
         String? targetEmail = email;
         if (targetEmail == null || targetEmail.isEmpty) {
@@ -228,8 +230,12 @@ class OrderService {
           return;
         }
         final orders = await getOrders(email: targetEmail);
-        if (orders.isNotEmpty) {
+        final currentFingerprint = orders.map((o) => '${o.id}_${o.status}_${o.totalAmount}').join(';');
+        if (_lastOrdersFingerprint.isNotEmpty && currentFingerprint != _lastOrdersFingerprint) {
+          _lastOrdersFingerprint = currentFingerprint;
           notifyOrdersChanged();
+        } else if (_lastOrdersFingerprint.isEmpty) {
+          _lastOrdersFingerprint = currentFingerprint;
         }
       } catch (_) {}
     });
@@ -245,6 +251,7 @@ class OrderService {
     _inMemoryOrders.clear();
     _cancelledOrderReasons.clear();
     _paidOrderIds.clear();
+    _lastOrdersFingerprint = '';
     notifyOrdersChanged();
   }
 
@@ -493,7 +500,7 @@ class OrderService {
       color: const Color(0xFF10B981),
       type: 'ORDER_PLACED',
       data: {'orderId': orderId, '_id': orderId, 'id': orderId},
-      context: (context != null && context.mounted) ? context : null,
+      context: null,
     );
 
     notifyOrdersChanged();

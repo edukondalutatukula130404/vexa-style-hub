@@ -5,6 +5,7 @@ const {
   markNotificationRead,
   markAllNotificationsRead,
   clearUserNotifications,
+  deleteSingleNotification,
   sendSupportMessage,
   getSupportTickets,
   updateSupportTicketStatus,
@@ -18,6 +19,7 @@ router.post('/support', sendSupportMessage);
 router.put('/support/:id', updateSupportTicketStatus);
 router.put('/read-all', markAllNotificationsRead);
 router.put('/:id/read', markNotificationRead);
+router.delete('/:id', deleteSingleNotification);
 router.delete('/', clearUserNotifications);
 
 module.exports = router;

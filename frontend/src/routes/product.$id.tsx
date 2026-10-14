@@ -472,10 +472,91 @@ export function ProductDetailPage() {
     );
   }
 
-  const discountOff = Math.round((1 - product.price / product.oldPrice) * 100);
+  const getColorPriceOffset = (colorName: string) => {
+    switch ((colorName || "").toLowerCase().trim()) {
+      case "default":
+      case "original":
+      case "pastel lavender":
+      case "lavender":
+      case "lavender lilac":
+        return 0;
+      case "emerald green":
+      case "green":
+        return 50;
+      case "jet black":
+      case "black":
+        return 100;
+      case "vintage rust":
+      case "rust":
+      case "brown":
+        return 150;
+      case "ivory white":
+      case "white":
+        return 30;
+      case "military olive":
+      case "olive":
+        return 80;
+      case "midnight navy":
+      case "navy":
+      case "blue":
+        return 120;
+      case "desert sand":
+      case "sand":
+      case "beige":
+        return 60;
+      case "charcoal grey":
+      case "charcoal":
+      case "grey":
+      case "gray":
+        return 90;
+      case "luxury cream & gold":
+      case "cream & gold":
+      case "gold":
+        return 200;
+      default:
+        return 0;
+    }
+  };
+
+  const getSizePriceOffset = (size: string) => {
+    switch ((size || "").toUpperCase().trim()) {
+      case "S":
+        return -50;
+      case "M":
+        return 0;
+      case "L":
+        return 100;
+      case "XL":
+        return 200;
+      case "XXL":
+        return 300;
+      default:
+        return 0;
+    }
+  };
+
+  const currentPrice = useMemo(() => {
+    if (!product) return 0;
+    const colorOffset = getColorPriceOffset(selectedColor?.name || "");
+    const sizeOffset = getSizePriceOffset(selectedSize || "M");
+    return Math.max(1, product.price + colorOffset + sizeOffset);
+  }, [product, selectedColor, selectedSize]);
+
+  const currentOldPrice = useMemo(() => {
+    if (!product || !product.oldPrice) return 0;
+    const colorOffset = getColorPriceOffset(selectedColor?.name || "");
+    const sizeOffset = getSizePriceOffset(selectedSize || "M");
+    return Math.max(1, product.oldPrice + colorOffset + sizeOffset);
+  }, [product, selectedColor, selectedSize]);
+
+  const discountOff = Math.round(
+    (1 - currentPrice / (currentOldPrice || product.oldPrice || currentPrice)) * 100
+  );
 
   const getProductWithColor = () => ({
     ...product,
+    price: currentPrice,
+    oldPrice: currentOldPrice,
     color: selectedColor.name,
     image: selectedImage,
   });
@@ -646,22 +727,22 @@ export function ProductDetailPage() {
               <div className="space-y-1.5 pt-3">
                 <div className="flex flex-wrap items-baseline gap-3 sm:gap-4">
                   <span className="font-display text-3xl sm:text-4xl font-extrabold text-gold">
-                    ₹{(product.price * quantity).toLocaleString("en-IN")}
+                    ₹{(currentPrice * quantity).toLocaleString("en-IN")}
                   </span>
-                  {product.oldPrice > product.price && (
+                  {currentOldPrice > currentPrice && (
                     <span className="text-base sm:text-lg text-muted-foreground/75 line-through">
-                      ₹{(product.oldPrice * quantity).toLocaleString("en-IN")}
+                      ₹{(currentOldPrice * quantity).toLocaleString("en-IN")}
                     </span>
                   )}
-                  {product.oldPrice > product.price && (
+                  {currentOldPrice > currentPrice && (
                     <span className="rounded-full bg-gold/15 border border-gold/40 px-3 py-1 text-[10px] font-bold text-gold shadow-xs">
-                      Save ₹{((product.oldPrice - product.price) * quantity).toLocaleString("en-IN")} ({discountOff}%)
+                      Save ₹{((currentOldPrice - currentPrice) * quantity).toLocaleString("en-IN")} ({discountOff}%)
                     </span>
                   )}
                 </div>
                 {quantity > 1 && (
                   <p className="text-[11px] text-gold/80 font-bold tracking-wide">
-                    ₹{product.price.toLocaleString("en-IN")} per piece × {quantity} items
+                    ₹{currentPrice.toLocaleString("en-IN")} per piece × {quantity} items
                   </p>
                 )}
               </div>
@@ -1282,9 +1363,9 @@ export function ProductDetailPage() {
         <div className="flex flex-col justify-center min-w-0">
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Price</span>
           <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-base font-bold text-gold">₹{product.price.toLocaleString("en-IN")}</span>
-            {product.oldPrice > product.price && (
-              <span className="text-[10px] text-muted-foreground line-through">₹{product.oldPrice.toLocaleString("en-IN")}</span>
+            <span className="font-display text-base font-bold text-gold">₹{currentPrice.toLocaleString("en-IN")}</span>
+            {currentOldPrice > currentPrice && (
+              <span className="text-[10px] text-muted-foreground line-through">₹{currentOldPrice.toLocaleString("en-IN")}</span>
             )}
           </div>
         </div>

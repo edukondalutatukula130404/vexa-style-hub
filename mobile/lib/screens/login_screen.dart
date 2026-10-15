@@ -19,10 +19,14 @@ enum LoginStep {
   identifier, // Step 1: Input "Phone number or email"
   password,   // Step 2A: Email entered -> Input Password -> Login
   otp,        // Step 2B: Mobile entered -> Input 6-Digit OTP -> Login
+  register,   // Step 2C: Unregistered Number or Email -> Create Profile
 }
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final VoidCallback? onBack;
+  final VoidCallback? onLoginSuccess;
+  final VoidCallback? onGuest;
+  const LoginScreen({super.key, this.onBack, this.onLoginSuccess, this.onGuest});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -35,12 +39,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
 
+  // Registration profile controllers
+  final _nameController = TextEditingController();
+  final _regEmailController = TextEditingController();
+  final _regPhoneController = TextEditingController();
+  final _regPasswordController = TextEditingController();
+
   LoginStep _currentStep = LoginStep.identifier;
 
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _agreeToTerms = false;
   String? _errorMessage;
+  String? _receivedOtp;
 
   int _resendCountdown = 0;
   Timer? _resendTimer;
@@ -64,6 +75,10 @@ class _LoginScreenState extends State<LoginScreen> {
     _identifierController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
+    _nameController.dispose();
+    _regEmailController.dispose();
+    _regPhoneController.dispose();
+    _regPasswordController.dispose();
     super.dispose();
   }
 
@@ -131,8 +146,12 @@ class _LoginScreenState extends State<LoginScreen> {
     return raw;
   }
 
-  // ── STEP 1: VERIFY IDENTIFIER & ADVANCE TO PASSWORD OR OTP ────────────────
+  // ── STEP 1: VERIFY IDENTIFIER & ADVANCE TO PASSWORD, OTP, OR REGISTER ─────
   Future<void> _handleIdentifierContinue() async {
+    if (!_agreeToTerms) {
+      _showTermsNotice();
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
 
@@ -144,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (_isEmailInput(input)) {
-      // Input is Email -> Check if registered -> Advance to Password Screen
+      // Input is Email -> Check if registered -> Advance to Password or Profile setup
       final email = input.toLowerCase();
       final isRegistered = await ApiService.isAccountRegistered(email);
 
@@ -154,8 +173,14 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (!isRegistered) {
+        // Not registered -> advance to registration step prefilling email
+        _nameController.clear();
+        _regEmailController.text = email;
+        _regPhoneController.clear();
+        _regPasswordController.clear();
         setState(() {
-          _errorMessage = 'Mail not registered. Please enter a registered email.';
+          _currentStep = LoginStep.register;
+          _errorMessage = null;
         });
         return;
       }
@@ -165,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = null;
       });
     } else {
-      // Input is Mobile Number -> Check if registered -> Send OTP -> Advance to OTP Screen
+      // Input is Mobile Number -> Check if registered -> Advance to OTP or Profile setup
       final phone = _cleanPhoneNumber(input);
       final isRegistered = await ApiService.isAccountRegistered(phone);
 
@@ -173,12 +198,17 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Mobile number not registered';
+          _nameController.clear();
+          _regEmailController.clear();
+          _regPhoneController.text = phone;
+          _regPasswordController.clear();
+          _currentStep = LoginStep.register;
+          _errorMessage = null;
         });
         return;
       }
 
-      // Request 6-digit OTP
+      // Registered -> Request 6-digit OTP
       final result = await ApiService.sendMobileOtp(phone);
 
       if (!mounted) return;
@@ -187,25 +217,21 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (result['success'] == true) {
-        final otpCode = result['otp'];
-        if (otpCode != null) {
-          _otpController.text = otpCode.toString();
-        }
+        _otpController.clear();
+        _receivedOtp = result['otp']?.toString();
         _startResendTimer();
         setState(() {
           _currentStep = LoginStep.otp;
           _errorMessage = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? '6-digit OTP sent to your registered mobile/email'),
-            backgroundColor: AppTheme.successColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+
+        // Trigger real-time system notification in mobile notification tray
+        if (_receivedOtp != null && _receivedOtp!.isNotEmpty) {
+          NotificationService.showLocalOtpNotification(_receivedOtp!, phone: phone);
+        }
       } else {
         setState(() {
-          _errorMessage = result['message'] ?? 'Mobile number not registered';
+          _errorMessage = result['message'] ?? 'Unable to send OTP. Please try again.';
         });
       }
     }
@@ -277,11 +303,53 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // ── STEP 2C: REGISTER NEW ACCOUNT & LOGIN ────────────────────────────────
+  Future<void> _handleRegisterAndLogin() async {
+    if (!_agreeToTerms) {
+      _showTermsNotice();
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final name = _nameController.text.trim();
+    final email = _regEmailController.text.trim().toLowerCase();
+    final phone = _cleanPhoneNumber(_regPhoneController.text);
+    final password = _regPasswordController.text;
+
+    final result = await ApiService.register(
+      name,
+      email,
+      password,
+      phone: phone.isNotEmpty ? phone : null,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (result['success'] == true) {
+      final user = result['user'];
+      final token = result['token'] ?? 'mock_token';
+      await _completeLoginSuccess(user, token);
+    } else {
+      setState(() {
+        _errorMessage = result['message'] ?? 'Registration failed. Please check details.';
+      });
+    }
+  }
+
   void _showTermsNotice() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Please agree to the Terms & Conditions and Privacy Policy to continue.',
+          'Please accept the Terms & Conditions and Privacy Policy to continue.',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: const Color(0xFFEF4444),
@@ -304,7 +372,11 @@ class _LoginScreenState extends State<LoginScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-    Navigator.pushReplacementNamed(context, '/home');
+    if (widget.onLoginSuccess != null) {
+      widget.onLoginSuccess!();
+    } else {
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+    }
   }
 
   Future<void> _handleGuestAccess() async {
@@ -317,8 +389,38 @@ class _LoginScreenState extends State<LoginScreen> {
     OrderService.clearLocalSession();
     NotificationService.clearAll();
     await AuthService.saveSession(guestUser, 'guest_token');
+    await AuthService.setOnboardingSeen();
+
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/home');
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.person_outline_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Browsing as Guest Collector!',
+              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ],
+        ),
+        backgroundColor: _goldDark,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(milliseconds: 1500),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+
+    if (widget.onGuest != null) {
+      widget.onGuest!();
+    } else if (widget.onBack != null) {
+      widget.onBack!();
+    } else {
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+    }
   }
 
   bool _onBackPressed() {
@@ -326,6 +428,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _currentStep = LoginStep.identifier;
         _errorMessage = null;
+        _receivedOtp = null;
       });
       return false;
     }
@@ -402,32 +505,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
 
-                              // Top Left Back Button
-                              Positioned(
-                                top: topPadding + 12,
-                                left: 20,
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () {
-                                      if (!_onBackPressed()) return;
-                                      if (Navigator.canPop(context)) {
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                                    borderRadius: BorderRadius.circular(24),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withAlpha(35),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white.withAlpha(200), width: 1.2),
-                                      ),
-                                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
-                                    ),
-                                  ),
-                                ),
-                              ),
+
 
                               // Top Right Guest Pill Button
                               Positioned(
@@ -505,7 +583,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
-                                      'Welcome Back',
+                                      _currentStep == LoginStep.register ? 'Create Account' : 'Welcome Back',
                                       style: GoogleFonts.outfit(
                                         color: Colors.white,
                                         fontSize: 28,
@@ -600,31 +678,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   duration: const Duration(milliseconds: 250),
                                   child: _buildCurrentStepContent(),
                                 ),
-
-                                const SizedBox(height: 22),
-
-                                // Register Link
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      "Don't have an account? ",
-                                      style: GoogleFonts.outfit(color: const Color(0xFF64748B), fontSize: 13.5),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => Navigator.pushNamed(context, '/register'),
-                                      child: Text(
-                                        'Register',
-                                        style: GoogleFonts.outfit(
-                                          color: _goldDark,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 10),
                               ],
                             ),
                           ),
@@ -649,6 +703,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return _buildStep2Password();
       case LoginStep.otp:
         return _buildStep2Otp();
+      case LoginStep.register:
+        return _buildStepRegister();
     }
   }
 
@@ -669,7 +725,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Enter your registered phone number or email to continue.',
+          'Enter your phone number or email to continue.',
           style: GoogleFonts.outfit(
             fontSize: 13,
             color: const Color(0xFF64748B),
@@ -694,7 +750,7 @@ class _LoginScreenState extends State<LoginScreen> {
           style: GoogleFonts.outfit(color: const Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Please enter your registered email or phone number';
+              return 'Please enter your phone number or email';
             }
             return null;
           },
@@ -703,7 +759,11 @@ class _LoginScreenState extends State<LoginScreen> {
             prefixIcon: const Icon(Icons.alternate_email_rounded, color: Color(0xFF64748B), size: 20),
           ),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 16),
+
+        // Terms and conditions acceptance option
+        _buildTermsRow(),
+        const SizedBox(height: 20),
 
         // Continue Button
         SizedBox(
@@ -763,6 +823,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _currentStep = LoginStep.identifier;
+                    _errorMessage = null;
+                  });
+                },
+                child: Text(
+                  'Change',
+                  style: GoogleFonts.outfit(
+                    color: _goldDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -793,7 +869,7 @@ class _LoginScreenState extends State<LoginScreen> {
             prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF64748B), size: 20),
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: const Color(0xFF64748B),
                 size: 20,
               ),
@@ -866,7 +942,16 @@ class _LoginScreenState extends State<LoginScreen> {
             color: _goldDark,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
+        Text(
+          'Enter the 6-digit code sent to +91 $phone.',
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            color: const Color(0xFF64748B),
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 14),
 
         // Selected Phone Pill
         Container(
@@ -887,6 +972,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _currentStep = LoginStep.identifier;
+                    _errorMessage = null;
+                    _receivedOtp = null;
+                  });
+                },
+                child: Text(
+                  'Change',
+                  style: GoogleFonts.outfit(
+                    color: _goldDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
                   ),
                 ),
               ),
@@ -974,6 +1076,263 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // ── STEP 2C: NEW USER PROFILE SETUP & REGISTRATION ────────────────────────
+  Widget _buildStepRegister() {
+    final hasPrefilledPhone = _regPhoneController.text.isNotEmpty;
+    final identifierText = hasPrefilledPhone
+        ? '+91 ${_regPhoneController.text}'
+        : _regEmailController.text;
+
+    return Column(
+      key: const ValueKey('step_register'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'CREATE YOUR ACCOUNT',
+              style: GoogleFonts.outfit(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: _goldDark,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _currentStep = LoginStep.identifier;
+                  _errorMessage = null;
+                });
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.arrow_back_rounded, size: 14, color: _goldDark),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Change',
+                    style: GoogleFonts.outfit(
+                      color: _goldDark,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Enter your details to finish setting up your account.',
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            color: const Color(0xFF64748B),
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Prefilled Identifier Pill
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                hasPrefilledPhone ? Icons.phone_android_rounded : Icons.mark_email_read_rounded,
+                size: 18,
+                color: _goldDark,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  identifierText,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _goldDark.withAlpha(25),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'NEW',
+                  style: GoogleFonts.outfit(
+                    color: _goldDark,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Full Name Field
+        Text(
+          'Full Name',
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _nameController,
+          keyboardType: TextInputType.name,
+          textCapitalization: TextCapitalization.words,
+          style: GoogleFonts.outfit(color: const Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter your full name';
+            }
+            if (value.trim().length < 2) {
+              return 'Name must be at least 2 characters';
+            }
+            return null;
+          },
+          decoration: _inputDecoration(
+            hintText: 'Jane Doe',
+            prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF64748B), size: 20),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Email Address Field
+        Text(
+          'Email Address',
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _regEmailController,
+          keyboardType: TextInputType.emailAddress,
+          style: GoogleFonts.outfit(color: const Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter your email address';
+            }
+            if (!value.contains('@') || !value.contains('.')) {
+              return 'Please enter a valid email address';
+            }
+            return null;
+          },
+          decoration: _inputDecoration(
+            hintText: 'jane.doe@example.com',
+            prefixIcon: const Icon(Icons.alternate_email_rounded, color: Color(0xFF64748B), size: 20),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Mobile Number Field
+        Text(
+          'Mobile Number',
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _regPhoneController,
+          keyboardType: TextInputType.phone,
+          style: GoogleFonts.outfit(color: const Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter your mobile number';
+            }
+            final clean = _cleanPhoneNumber(value);
+            if (clean.length < 10) {
+              return 'Please enter a valid 10-digit mobile number';
+            }
+            return null;
+          },
+          decoration: _inputDecoration(
+            hintText: '98765 43210',
+            prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFF64748B), size: 20),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Password Field
+        Text(
+          'Password',
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _regPasswordController,
+          obscureText: _obscurePassword,
+          style: GoogleFonts.outfit(color: const Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please create a password';
+            }
+            if (value.length < 6) {
+              return 'Password must be at least 6 characters';
+            }
+            return null;
+          },
+          decoration: _inputDecoration(
+            hintText: '••••••••',
+            prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF64748B), size: 20),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: const Color(0xFF64748B),
+                size: 20,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+
+        // Continue Button
+        SizedBox(
+          width: double.infinity,
+          child: VexaButton(
+            text: 'Continue',
+            isLoading: _isLoading,
+            isDisabled: _isLoading,
+            onPressed: _handleRegisterAndLogin,
+            backgroundColor: _goldDark,
+            borderRadius: 14,
+            height: 52,
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── TERMS & CONDITIONS CHECKBOX ROW ───────────────────────────────────────
   Widget _buildTermsRow() {
     return Padding(
@@ -1015,7 +1374,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Expanded(
             child: Text.rich(
               TextSpan(
-                text: 'I agree to the ',
+                text: 'I accept ',
                 style: GoogleFonts.outfit(
                   fontSize: 12.5,
                   color: const Color(0xFF334155),

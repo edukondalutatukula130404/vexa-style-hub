@@ -88,11 +88,11 @@ class InvoicePdfService {
     streamContent.writeln('/F2 10 Tf');
     streamContent.writeln('0.2 0.25 0.33 rg');
     streamContent.writeln('1 0 0 1 45 627 Tm');
-    streamContent.writeln('(${_pdfEscape("Customer Name : ${order.customerName}")}) Tj');
+    streamContent.writeln('(${_pdfEscape("Customer Name : ${order.displayCustomerName}")}) Tj');
     streamContent.writeln('1 0 0 1 45 611 Tm');
-    streamContent.writeln('(${_pdfEscape("Address       : ${order.shippingAddress}")}) Tj');
+    streamContent.writeln('(${_pdfEscape("Address       : ${order.shippingAddress.isNotEmpty ? order.shippingAddress : order.displayShippingAddress}")}) Tj');
     streamContent.writeln('1 0 0 1 45 595 Tm');
-    streamContent.writeln('(${_pdfEscape("Phone Number  : ${order.phone}")}) Tj');
+    streamContent.writeln('(${_pdfEscape("Phone Number  : ${order.displayPhone}")}) Tj');
     streamContent.writeln('ET');
 
     // 5. Items Table Header

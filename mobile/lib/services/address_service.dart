@@ -32,6 +32,37 @@ class AddressModel {
     return pincode.isNotEmpty ? '$joined, Pincode: $pincode' : joined;
   }
 
+  /// Clean, concise header display text (e.g., 'Home • Jubilee Hills, 500033')
+  String get shortDisplay {
+    String area = '';
+    final streetParts = street.split(',');
+    for (var p in streetParts) {
+      final trimmed = p.trim();
+      final lower = trimmed.toLowerCase();
+      if (trimmed.isNotEmpty &&
+          !lower.startsWith('flat') &&
+          !lower.startsWith('house') &&
+          !lower.startsWith('plot') &&
+          !lower.startsWith('floor') &&
+          !lower.startsWith('door') &&
+          !lower.startsWith('road') &&
+          !lower.startsWith('no.')) {
+        area = trimmed;
+        break;
+      }
+    }
+    if (area.isEmpty && streetParts.isNotEmpty) {
+      area = streetParts.first.trim();
+    }
+    final loc = area.isNotEmpty ? area : city;
+    final pin = pincode.trim().isNotEmpty ? pincode.trim() : '';
+
+    if (type.isNotEmpty) {
+      return pin.isNotEmpty ? '$type • $loc, $pin' : '$type • $loc';
+    }
+    return pin.isNotEmpty ? '$loc, $pin' : loc;
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'type': type,
@@ -100,17 +131,25 @@ class AddressService {
 
     final user = await AuthService.getUser();
     final userName = (user != null && user.name.trim().isNotEmpty) ? user.name.trim() : 'Customer';
-    const userPhone = '+91 98765 43210';
+    final userPhone = (user != null && user.phone != null && user.phone!.trim().isNotEmpty && user.phone != '+91 98765 43210')
+        ? user.phone!.trim()
+        : '';
+    final defaultPhone = userPhone.isNotEmpty ? userPhone : '+91 98765 43210';
 
     if (raw != null && raw.isNotEmpty) {
       try {
         final List<dynamic> decoded = jsonDecode(raw);
         _cache = decoded.map((m) {
-          final model = AddressModel.fromJson(m as Map<String, dynamic>);
+          var model = AddressModel.fromJson(m as Map<String, dynamic>);
           // If cached address had an old hardcoded placeholder name, update to active user's name
           if (userName.isNotEmpty && userName != 'Customer' &&
               (model.name == 'Tatukula Edukondalu' || model.name == 'Tatukulaedukondalu' || model.name.isEmpty)) {
-            return model.copyWith(name: userName);
+            model = model.copyWith(name: userName);
+          }
+          // If cached address had placeholder phone and user has real phone, update to user's real phone
+          if (userPhone.isNotEmpty &&
+              (model.phone == '+91 98765 43210' || model.phone.trim().isEmpty)) {
+            model = model.copyWith(phone: userPhone);
           }
           return model;
         }).toList();
@@ -128,7 +167,7 @@ class AddressService {
         id: 'addr_default_1',
         type: 'Home',
         name: userName,
-        phone: userPhone,
+        phone: defaultPhone,
         street: 'Flat 402, Luxury Heights, Jubilee Hills Road No. 36',
         city: 'Hyderabad',
         state: 'Telangana',
@@ -139,7 +178,7 @@ class AddressService {
         id: 'addr_default_2',
         type: 'Work',
         name: userName,
-        phone: userPhone,
+        phone: defaultPhone,
         street: 'Floor 5, Cyber Towers, HITEC City, Phase 2',
         city: 'Hyderabad',
         state: 'Telangana',
@@ -165,7 +204,7 @@ class AddressService {
     final list = (await getAddresses()).toList();
     final index = list.indexWhere((a) => a.id == address.id);
 
-    final shouldBeDefault = setAsDefault || list.isEmpty || (index != -1 && list[index].isDefault);
+    final shouldBeDefault = setAsDefault || list.isEmpty;
 
     List<AddressModel> updatedList = [];
     for (var a in list) {

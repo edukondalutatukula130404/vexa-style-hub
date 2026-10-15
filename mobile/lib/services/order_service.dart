@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import 'auth_service.dart';
+import 'address_service.dart';
 import 'notification_service.dart';
 import 'websocket_service.dart';
 import 'wallet_service.dart';
@@ -54,9 +55,9 @@ class OrderItem {
 
 class OrderModel {
   final String id;
-  final String customerName;
-  final String shippingAddress;
-  final String phone;
+  String customerName;
+  String shippingAddress;
+  String phone;
   String paymentMethod;
   final double totalAmount;
   final String couponApplied;
@@ -164,6 +165,39 @@ class OrderModel {
     return true;
   }
 
+  String get displayCustomerName {
+    final n = customerName.trim();
+    if (n.isNotEmpty && n != 'Tatukulaedukondalu' && n != 'Customer') {
+      return n;
+    }
+    if (OrderService.activeUserName != null && OrderService.activeUserName!.trim().isNotEmpty) {
+      return OrderService.activeUserName!.trim();
+    }
+    return n.isNotEmpty ? n : 'Customer';
+  }
+
+  String get displayPhone {
+    final p = phone.trim();
+    if (p.isNotEmpty && p != '+91 98765 43210' && p != '9876543210' && p != '+919876543210') {
+      return p;
+    }
+    if (OrderService.activeUserPhone != null && OrderService.activeUserPhone!.trim().isNotEmpty) {
+      return OrderService.activeUserPhone!.trim();
+    }
+    return p.isNotEmpty ? p : '+91 98765 43210';
+  }
+
+  String get displayShippingAddress {
+    final s = shippingAddress.trim();
+    if (s.isNotEmpty && s != 'Indiranagar 100ft Road, Bengaluru' && s != '100ft Road, Indiranagar, Bengaluru') {
+      return s;
+    }
+    if (OrderService.activeUserAddress != null && OrderService.activeUserAddress!.trim().isNotEmpty) {
+      return OrderService.activeUserAddress!.trim();
+    }
+    return s.isNotEmpty ? s : 'Indiranagar 100ft Road, Bengaluru';
+  }
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     List<OrderItem> itemsList = [];
     if (json['items'] is List) {
@@ -185,11 +219,20 @@ class OrderModel {
                 : '#VX-${json['_id'].toString().substring(0, json['_id'].toString().length > 6 ? 6 : json['_id'].toString().length).toUpperCase()}')
             : '#VX-1001');
 
+    String parsedPhone = (json['phone'] ?? '').toString().trim();
+    if (parsedPhone.isEmpty || parsedPhone == '+91 98765 43210' || parsedPhone == '9876543210' || parsedPhone == '+919876543210') {
+      if (OrderService.activeUserPhone != null && OrderService.activeUserPhone!.isNotEmpty) {
+        parsedPhone = OrderService.activeUserPhone!;
+      } else {
+        parsedPhone = '+91 98765 43210';
+      }
+    }
+
     return OrderModel(
       id: parsedId,
       customerName: json['userName'] ?? json['customer'] ?? 'Valued Customer',
       shippingAddress: json['shippingAddress'] ?? json['address'] ?? 'Indiranagar 100ft Road, Bengaluru',
-      phone: json['phone'] ?? '+91 98765 43210',
+      phone: parsedPhone,
       paymentMethod: json['paymentMethod'] ?? 'Razorpay UPI',
       totalAmount: (json['totalAmount'] is num) ? (json['totalAmount'] as num).toDouble() : 0.0,
       couponApplied: json['couponApplied'] ?? '',
@@ -202,6 +245,15 @@ class OrderModel {
 }
 
 class OrderService {
+  /// Active user's name for invoice sync
+  static String? activeUserName;
+
+  /// Active user's real contact phone number for invoice and notification sync
+  static String? activeUserPhone;
+
+  /// Active user's selected delivery address for invoice sync
+  static String? activeUserAddress;
+
   /// Notifier triggered whenever orders are created, updated, or cancelled
   static final ValueNotifier<int> ordersChangeNotifier = ValueNotifier<int>(0);
   static Timer? _pollingTimer;
@@ -341,6 +393,62 @@ class OrderService {
     notifyOrdersChanged();
   }
 
+  /// Update shipping address and contact for an order locally in memory and sync to backend API
+  static Future<void> updateOrderAddress(
+    String orderId,
+    String newAddress, {
+    String? newCustomerName,
+    String? newPhone,
+    BuildContext? context,
+  }) async {
+    final cleanId = orderId.replaceAll('#', '').toLowerCase().trim();
+    activeUserAddress = newAddress.trim();
+    if (newCustomerName != null && newCustomerName.trim().isNotEmpty) {
+      activeUserName = newCustomerName.trim();
+    }
+    if (newPhone != null && newPhone.trim().isNotEmpty && newPhone != '+91 98765 43210') {
+      activeUserPhone = newPhone.trim();
+    }
+
+    // 1. Update in in-memory session list
+    for (var order in _inMemoryOrders) {
+      final cleanOrd = order.id.replaceAll('#', '').toLowerCase().trim();
+      if (order.id == orderId ||
+          cleanOrd == cleanId ||
+          (cleanId.length >= 4 && cleanOrd.contains(cleanId)) ||
+          (cleanOrd.length >= 4 && cleanId.contains(cleanOrd)) ||
+          cleanOrd.endsWith(cleanId) ||
+          cleanId.endsWith(cleanOrd)) {
+        order.shippingAddress = newAddress;
+        if (newCustomerName != null && newCustomerName.trim().isNotEmpty) {
+          order.customerName = newCustomerName.trim();
+        }
+        if (newPhone != null && newPhone.trim().isNotEmpty) {
+          order.phone = newPhone.trim();
+        }
+      }
+    }
+
+    notifyOrdersChanged();
+
+    // 2. Call backend PUT /api/orders/:id/address
+    try {
+      final cleanCode = orderId.replaceAll('#', '').trim();
+      await http.put(
+        Uri.parse('${ApiConfig.baseUrl}/orders/$cleanCode/address'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'orderId': orderId,
+          'shippingAddress': newAddress,
+          if (newCustomerName != null && newCustomerName.trim().isNotEmpty) 'userName': newCustomerName.trim(),
+          if (newPhone != null && newPhone.trim().isNotEmpty) 'phone': newPhone.trim(),
+        }),
+      ).timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('Backend address update note: $e');
+    }
+  }
+
   // Active in-memory session orders placed on this device (no fake duplicate dummy orders)
   static final List<OrderModel> _inMemoryOrders = [];
 
@@ -357,9 +465,23 @@ class OrderService {
     try {
       String userEmail = (email != null && email.isNotEmpty) ? email.trim() : '';
 
-      if (userEmail.isEmpty) {
-        final user = await AuthService.getUser();
-        userEmail = (user?.email ?? '').trim();
+      final user = await AuthService.getUser();
+      userEmail = (user?.email ?? '').trim();
+
+      final defaultAddr = await AddressService.getDefaultAddress();
+      if (defaultAddr != null && defaultAddr.fullAddressText.trim().isNotEmpty) {
+        activeUserAddress = defaultAddr.fullAddressText.trim();
+        if (defaultAddr.name.trim().isNotEmpty) {
+          activeUserName = defaultAddr.name.trim();
+        }
+      }
+      if (user?.name != null && user!.name.trim().isNotEmpty) {
+        activeUserName = user.name.trim();
+      }
+      if (user?.phone != null && user!.phone!.trim().isNotEmpty && user.phone != '+91 98765 43210') {
+        activeUserPhone = user.phone!.trim();
+      } else if (defaultAddr?.phone != null && defaultAddr!.phone.trim().isNotEmpty && defaultAddr.phone != '+91 98765 43210') {
+        activeUserPhone = defaultAddr.phone.trim();
       }
 
       // If user is not logged in or is guest, NEVER fetch admin or seeded dummy orders!
@@ -486,11 +608,18 @@ class OrderService {
       resolvedCustomerName = 'Valued Customer';
     }
 
+    String resolvedPhone = phone.trim();
+    if (resolvedPhone.isNotEmpty && resolvedPhone != '+91 98765 43210') {
+      activeUserPhone = resolvedPhone;
+    } else if (activeUserPhone != null && activeUserPhone!.isNotEmpty) {
+      resolvedPhone = activeUserPhone!;
+    }
+
     final newOrder = OrderModel(
       id: orderId,
       customerName: resolvedCustomerName,
       shippingAddress: shippingAddress.isNotEmpty ? shippingAddress : 'Indiranagar 100ft Road, Bengaluru',
-      phone: phone.isNotEmpty ? phone : '+91 98765 43210',
+      phone: resolvedPhone.isNotEmpty ? resolvedPhone : '+91 98765 43210',
       paymentMethod: paymentMethod,
       totalAmount: totalAmount,
       couponApplied: couponApplied,
@@ -524,7 +653,7 @@ class OrderService {
       'userEmail': userEmail,
       'userName': newOrder.customerName,
       'shippingAddress': newOrder.shippingAddress,
-      'phone': phone,
+      'phone': resolvedPhone.isNotEmpty ? resolvedPhone : phone,
       'paymentMethod': paymentMethod,
       'totalAmount': totalAmount,
       'couponApplied': couponApplied,

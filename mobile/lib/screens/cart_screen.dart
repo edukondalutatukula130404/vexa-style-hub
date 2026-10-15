@@ -196,7 +196,15 @@ class _CartScreenState extends State<CartScreen> {
     final addressController = TextEditingController(text: selectedAddress?.street ?? '');
     final cityController = TextEditingController(text: selectedAddress?.city ?? 'Hyderabad');
     final stateController = TextEditingController(text: selectedAddress?.state ?? 'Telangana');
-    final phoneController = TextEditingController(text: selectedAddress?.phone ?? '+91 98765 43210');
+    String initialPhone = '';
+    if (loggedInUser.phone != null && loggedInUser.phone!.trim().isNotEmpty && loggedInUser.phone != '+91 98765 43210') {
+      initialPhone = loggedInUser.phone!.trim();
+    } else if (selectedAddress?.phone != null && selectedAddress!.phone.trim().isNotEmpty && selectedAddress.phone != '+91 98765 43210') {
+      initialPhone = selectedAddress.phone.trim();
+    } else if (OrderService.activeUserPhone != null && OrderService.activeUserPhone!.trim().isNotEmpty && OrderService.activeUserPhone != '+91 98765 43210') {
+      initialPhone = OrderService.activeUserPhone!.trim();
+    }
+    final phoneController = TextEditingController(text: initialPhone.isNotEmpty ? initialPhone : (selectedAddress?.phone ?? '+91 98765 43210'));
     final pincodeController = TextEditingController(text: selectedAddress?.pincode ?? '');
     String selectedTag = selectedAddress?.type ?? 'Home';
     bool saveAsDefaultCheckbox = selectedAddress?.isDefault ?? true;
@@ -407,9 +415,12 @@ class _CartScreenState extends State<CartScreen> {
                                 ...savedAddresses.map((addr) {
                                   final isSelected = addr.id == selectedAddress?.id;
                                   return GestureDetector(
-                                    onTap: () {
+                                    onTap: () async {
+                                      await AddressService.setDefaultAddress(addr.id);
+                                      final reloaded = (await AddressService.getAddresses()).toList();
                                       setModalState(() {
-                                        selectedAddress = addr;
+                                        savedAddresses = reloaded;
+                                        selectedAddress = addr.copyWith(isDefault: true);
                                         nameController.text = addr.name;
                                         addressController.text = addr.street;
                                         cityController.text = addr.city;
@@ -417,7 +428,7 @@ class _CartScreenState extends State<CartScreen> {
                                         phoneController.text = addr.phone;
                                         pincodeController.text = addr.pincode;
                                         selectedTag = addr.type;
-                                        saveAsDefaultCheckbox = addr.isDefault;
+                                        saveAsDefaultCheckbox = true;
                                         isSelectingOtherAddress = false;
                                       });
                                     },
@@ -572,7 +583,9 @@ class _CartScreenState extends State<CartScreen> {
                                         isSelectingOtherAddress = false;
                                         isEditingAddress = true;
                                         nameController.text = loggedInUser.name;
-                                        phoneController.text = selectedAddress?.phone ?? '+91 98765 43210';
+                                        phoneController.text = (loggedInUser.phone != null && loggedInUser.phone!.trim().isNotEmpty && loggedInUser.phone != '+91 98765 43210')
+                                            ? loggedInUser.phone!.trim()
+                                            : (OrderService.activeUserPhone ?? (selectedAddress?.phone ?? '+91 98765 43210'));
                                         addressController.clear();
                                         cityController.text = 'Hyderabad';
                                         stateController.text = 'Telangana';
@@ -1415,7 +1428,7 @@ class _CartScreenState extends State<CartScreen> {
                                       )).toList();
 
                                       final currentUser = await AuthService.getUser();
-                                      AddressService.saveAddress(
+                                      await AddressService.saveAddress(
                                         AddressModel(
                                           id: selectedAddress?.id ?? 'addr_${DateTime.now().millisecondsSinceEpoch}',
                                           type: selectedTag,
@@ -1473,7 +1486,7 @@ class _CartScreenState extends State<CartScreen> {
                                       image: c.item.image,
                                     )).toList();
 
-                                    AddressService.saveAddress(
+                                    await AddressService.saveAddress(
                                       AddressModel(
                                         id: selectedAddress?.id ?? 'addr_${DateTime.now().millisecondsSinceEpoch}',
                                         type: selectedTag,

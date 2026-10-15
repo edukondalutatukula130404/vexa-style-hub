@@ -9,6 +9,7 @@ import 'customer_support_screen.dart';
 import 'home_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
 import '../services/invoice_pdf_service.dart';
+import '../services/address_service.dart';
 
 const Color _gold = Color(0xFFB8860B);
 const Color _goldDark = Color(0xFF8B6508);
@@ -205,6 +206,502 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<String?> _saveInvoiceFileToDisk(String invoiceNo, OrderModel order) async {
     return InvoicePdfService.saveInvoiceToDisk(invoiceNo, order);
+  }
+
+  void _showAddEditAddressDialog({
+    required BuildContext parentCtx,
+    required OrderModel order,
+    AddressModel? existing,
+    required VoidCallback onAddressUpdated,
+  }) async {
+    final isEditing = existing != null;
+    final user = await AuthService.getUser();
+    final defaultName = user?.name.isNotEmpty == true
+        ? user!.name
+        : (OrderService.activeUserName?.isNotEmpty == true ? OrderService.activeUserName! : 'Customer');
+
+    final nameController = TextEditingController(text: existing?.name.isNotEmpty == true ? existing!.name : defaultName);
+    String initialPhone = '';
+    if (existing?.phone != null && existing!.phone.trim().isNotEmpty && existing.phone != '+91 98765 43210') {
+      initialPhone = existing.phone.trim();
+    } else if (user?.phone != null && user!.phone!.trim().isNotEmpty && user.phone != '+91 98765 43210') {
+      initialPhone = user.phone!.trim();
+    } else if (OrderService.activeUserPhone != null && OrderService.activeUserPhone!.trim().isNotEmpty && OrderService.activeUserPhone != '+91 98765 43210') {
+      initialPhone = OrderService.activeUserPhone!.trim();
+    }
+    final phoneController = TextEditingController(text: initialPhone.isNotEmpty ? initialPhone : (existing?.phone ?? '+91 98765 43210'));
+    final streetController = TextEditingController(text: existing?.street ?? '');
+    final cityController = TextEditingController(text: existing?.city ?? 'Hyderabad');
+    final stateController = TextEditingController(text: existing?.state ?? 'Telangana');
+    final pincodeController = TextEditingController(text: existing?.pincode ?? '500033');
+    String selectedType = existing?.type ?? 'Home';
+
+    if (!parentCtx.mounted) return;
+
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: parentCtx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (editCtx) {
+        return StatefulBuilder(
+          builder: (editCtx, setEditState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(editCtx).viewInsets.bottom + 20),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isEditing ? 'EDIT ADDRESS & NAME' : 'ADD NEW ADDRESS',
+                            style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20, color: _subtext),
+                            onPressed: () => Navigator.pop(editCtx),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Full Name Field (Explicitly editable!)
+                      TextFormField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          labelText: 'Full Name',
+                          hintText: 'Enter recipient name',
+                          labelStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                          prefixIcon: const Icon(Icons.person_outline_rounded, size: 18, color: _goldDark),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Please enter name' : null,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Contact Phone Field
+                      TextFormField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number',
+                          hintText: '10-digit mobile number',
+                          labelStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                          prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: _goldDark),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Please enter phone' : null,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Street / Flat / Area
+                      TextFormField(
+                        controller: streetController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Flat, House No, Building, Street, Area',
+                          labelStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                          prefixIcon: const Icon(Icons.home_outlined, size: 18, color: _goldDark),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Please enter address' : null,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // City and Pincode
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: cityController,
+                              decoration: InputDecoration(
+                                labelText: 'City',
+                                labelStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                prefixIcon: const Icon(Icons.location_city_outlined, size: 18, color: _goldDark),
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                              ),
+                              validator: (v) => v == null || v.trim().isEmpty ? 'Enter city' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: pincodeController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Pincode',
+                                labelStyle: GoogleFonts.outfit(fontSize: 13, color: _subtext),
+                                prefixIcon: const Icon(Icons.pin_drop_outlined, size: 18, color: _goldDark),
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _goldDark, width: 1.5)),
+                              ),
+                              validator: (v) => v == null || v.trim().isEmpty ? 'Enter pincode' : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Address Type Chips
+                      Row(
+                        children: ['Home', 'Work', 'Other'].map((t) {
+                          final isSel = selectedType == t;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(t),
+                              selected: isSel,
+                              selectedColor: _gold.withAlpha(30),
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              labelStyle: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                                color: isSel ? _goldDark : _subtext,
+                              ),
+                              side: BorderSide(color: isSel ? _goldDark : const Color(0xFFE2E8F0)),
+                              onSelected: (_) => setEditState(() => selectedType = t),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Save Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          onPressed: () async {
+                            if (!formKey.currentState!.validate()) return;
+                            final newAddressModel = AddressModel(
+                              id: isEditing ? existing.id : 'addr_${DateTime.now().millisecondsSinceEpoch}',
+                              type: selectedType,
+                              name: nameController.text.trim(),
+                              phone: phoneController.text.trim(),
+                              street: streetController.text.trim(),
+                              city: cityController.text.trim(),
+                              state: stateController.text.trim(),
+                              pincode: pincodeController.text.trim(),
+                              isDefault: true,
+                            );
+
+                            await AddressService.saveAddress(newAddressModel, setAsDefault: true);
+                            final fullText = newAddressModel.fullAddressText;
+                            final newName = newAddressModel.name;
+                            final newPhone = newAddressModel.phone;
+
+                            await OrderService.updateOrderAddress(
+                              order.id,
+                              fullText,
+                              newCustomerName: newName,
+                              newPhone: newPhone,
+                              context: parentCtx.mounted ? parentCtx : null,
+                            );
+
+                            if (mounted) {
+                              setState(() {
+                                _currentOrder.shippingAddress = fullText;
+                                _currentOrder.customerName = newName;
+                                if (newPhone.isNotEmpty && newPhone != '+91 98765 43210') {
+                                  _currentOrder.phone = newPhone;
+                                }
+                              });
+                            }
+
+                            onAddressUpdated();
+                            if (editCtx.mounted) Navigator.pop(editCtx);
+
+                            if (parentCtx.mounted) {
+                              ScaffoldMessenger.of(parentCtx).showSnackBar(
+                                SnackBar(
+                                  content: Text('Address & recipient name updated for Order #${order.id}!'),
+                                  backgroundColor: const Color(0xFF10B981),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                          child: Text(
+                            isEditing ? 'Save & Apply to Order' : 'Add & Apply to Order',
+                            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openOrderAddressSheet(BuildContext context, OrderModel order) async {
+    final addresses = await AddressService.getAddresses();
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return FutureBuilder<List<AddressModel>>(
+              future: AddressService.getAddresses(),
+              initialData: addresses,
+              builder: (ctx, snapshot) {
+                final currentList = snapshot.data ?? addresses;
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(sheetCtx).viewInsets.bottom + 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'DELIVERY & BILLING ADDRESS',
+                                style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1),
+                              ),
+                              Text(
+                                'Select or edit address & recipient name for Order #${order.id}',
+                                style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20, color: _subtext),
+                            onPressed: () => Navigator.pop(sheetCtx),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: currentList.length,
+                          separatorBuilder: (_, i) => const SizedBox(height: 10),
+                          itemBuilder: (_, index) {
+                            final addr = currentList[index];
+                            final fullText = addr.fullAddressText;
+                            final isCurrent = order.shippingAddress.trim().toLowerCase() == fullText.trim().toLowerCase() ||
+                                (order.shippingAddress.trim().isNotEmpty && fullText.contains(order.shippingAddress.trim()));
+
+                            return InkWell(
+                              onTap: () async {
+                                Navigator.pop(sheetCtx);
+                                await OrderService.updateOrderAddress(
+                                  order.id,
+                                  fullText,
+                                  newCustomerName: addr.name,
+                                  newPhone: addr.phone,
+                                  context: context,
+                                );
+                                if (mounted) {
+                                  setState(() {
+                                    _currentOrder.shippingAddress = fullText;
+                                    _currentOrder.customerName = addr.name;
+                                    if (addr.phone.trim().isNotEmpty && addr.phone != '+91 98765 43210') {
+                                      _currentOrder.phone = addr.phone.trim();
+                                    }
+                                  });
+                                }
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Order delivery & invoice address updated to ${addr.name}!'),
+                                      backgroundColor: const Color(0xFF10B981),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isCurrent ? _gold.withAlpha(20) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isCurrent ? _goldDark : const Color(0xFFE2E8F0),
+                                    width: isCurrent ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      isCurrent ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                                      color: isCurrent ? _goldDark : _subtext,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  addr.name,
+                                                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: _textDark),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                decoration: BoxDecoration(
+                                                  color: _goldDark.withAlpha(20),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  addr.type.toUpperCase(),
+                                                  style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _goldDark),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            fullText,
+                                            style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                                          ),
+                                          if (addr.phone.isNotEmpty) ...[
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              'Contact: ${addr.phone}',
+                                              style: GoogleFonts.outfit(fontSize: 11, color: _textDark, fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Edit name & address',
+                                      icon: const Icon(Icons.edit_outlined, size: 18, color: _goldDark),
+                                      onPressed: () {
+                                        _showAddEditAddressDialog(
+                                          parentCtx: context,
+                                          order: order,
+                                          existing: addr,
+                                          onAddressUpdated: () {
+                                            setSheetState(() {});
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: _goldDark),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: _goldDark,
+                          ),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: Text(
+                            'Add New Address & Recipient',
+                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () {
+                            _showAddEditAddressDialog(
+                              parentCtx: context,
+                              order: order,
+                              onAddressUpdated: () {
+                                setSheetState(() {});
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showInvoiceModal(BuildContext context, OrderModel order, {bool autoStartDownload = false}) {
@@ -406,27 +903,40 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
+                                    flex: 11,
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text('BILLED TO:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 1)),
                                         const SizedBox(height: 4),
-                                        Text(order.customerName, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                                        Text(order.shippingAddress, style: GoogleFonts.outfit(fontSize: 11, color: _subtext, height: 1.3)),
-                                        Text('Contact: ${order.phone}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark)),
+                                        Text(order.displayCustomerName, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                                        Text(
+                                          order.shippingAddress.isNotEmpty ? order.shippingAddress : order.displayShippingAddress,
+                                          style: GoogleFonts.outfit(fontSize: 11, color: _subtext, height: 1.3),
+                                        ),
+                                        Text('Contact: ${order.displayPhone}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark)),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text('INVOICE DETAILS:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 1)),
-                                      const SizedBox(height: 4),
-                                      Text('Date: ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark)),
-                                      Text('Order ID: ${order.id}', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _goldDark)),
-                                      Text('Payment: ${order.paymentMethod}', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-                                    ],
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    flex: 9,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text('INVOICE DETAILS:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 1)),
+                                        const SizedBox(height: 4),
+                                        Text('Date: ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark), textAlign: TextAlign.right),
+                                        Text('Order ID: ${order.id}', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _goldDark), textAlign: TextAlign.right),
+                                        Text(
+                                          'Payment: ${order.paymentMethod}',
+                                          style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
+                                          textAlign: TextAlign.right,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1126,42 +1636,49 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           // 2. SHIPPING ADDRESS BLOCK
           Text('SHIPPING ADDRESS', style: GoogleFonts.cinzel(fontSize: 12, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1.2)),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-              boxShadow: [BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: _gold.withAlpha(20), shape: BoxShape.circle),
-                  child: const Icon(Icons.location_on_rounded, color: _goldDark, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_currentOrder.customerName, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark)),
-                      const SizedBox(height: 3),
-                      Text(_currentOrder.shippingAddress, style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.35)),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_outlined, size: 13, color: _goldDark),
-                          const SizedBox(width: 5),
-                          Text(_currentOrder.phone, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
-                        ],
-                      ),
-                    ],
+          GestureDetector(
+            onTap: () => _openOrderAddressSheet(context, _currentOrder),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _border),
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 8, offset: const Offset(0, 2))],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: _gold.withAlpha(20), shape: BoxShape.circle),
+                    child: const Icon(Icons.location_on_rounded, color: _goldDark, size: 20),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_currentOrder.displayCustomerName, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark)),
+                        const SizedBox(height: 3),
+                        Text(
+                          _currentOrder.shippingAddress.isNotEmpty ? _currentOrder.shippingAddress : _currentOrder.displayShippingAddress,
+                          style: GoogleFonts.outfit(fontSize: 12, color: _subtext, height: 1.35),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.phone_outlined, size: 13, color: _goldDark),
+                            const SizedBox(width: 5),
+                            Text(_currentOrder.displayPhone, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: _subtext, size: 20),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -1443,7 +1960,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         context: context,
                         amount: _currentOrder.totalAmount,
                         customerName: _currentOrder.customerName,
-                        customerPhone: _currentOrder.phone,
+                        customerPhone: _currentOrder.displayPhone,
                         onPaymentSuccess: (methodLabel) {
                           setState(() {
                             _currentOrder.paymentMethod = methodLabel;

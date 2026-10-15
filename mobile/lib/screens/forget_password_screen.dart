@@ -310,7 +310,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                       prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.subtextColor),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                           color: AppTheme.subtextColor,
                         ),
                         onPressed: () {
@@ -345,7 +345,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                       prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.subtextColor),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                           color: AppTheme.subtextColor,
                         ),
                         onPressed: () {

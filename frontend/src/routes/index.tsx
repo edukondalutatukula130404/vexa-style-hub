@@ -10,11 +10,17 @@ import {
   Sparkles,
   Wind,
   ShieldCheck,
+  LayoutGrid,
+  Palette,
+  Lock,
+  Truck,
+  ShoppingBag,
 } from "lucide-react";
 import heroImg from "@/assets/hero.jpg";
 import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
 import promoBanner1 from "@/assets/promo_banner_1.png";
 import promoBanner2 from "@/assets/promo_banner_2.png";
+import greetingBannerBg from "@/assets/greeting_banner_bg.png";
 import { products as defaultProducts, SIZES, useProducts } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
@@ -134,7 +140,7 @@ export function Home() {
   const cleanDisplayName = useMemo(() => {
     let name = user?.name?.trim();
     if (!name || name.toLowerCase() === "collector" || name.toLowerCase().includes("guest")) {
-      return "TATUKULA EDUKONDALU";
+      return "CHARAN";
     }
     return name.toUpperCase();
   }, [user]);
@@ -271,15 +277,35 @@ export function Home() {
 
   return (
     <div className="home-page-root no-scrollbar w-full overflow-x-hidden pt-16 sm:pt-20 md:pt-28">
-      {/* 0. MOBILE GREETING HEADER (Matches Flutter Mobile App 1:1) */}
-      <div className="block md:hidden px-4 pt-2 pb-2">
-        <div className="w-full rounded-2xl border border-[#E5C158]/70 bg-gradient-to-br from-[#FFFDF2] to-[#FFF4D1] dark:from-[#1E1B15] dark:to-[#17140E] px-5 py-4.5 shadow-sm">
-          <span className="block font-display text-[13px] font-black uppercase tracking-[0.16em] text-[#B8860B] leading-none mb-2">
-            {greeting}
-          </span>
-          <h2 className="font-display text-lg xs:text-xl font-bold uppercase tracking-[0.05em] text-[#0F172A] dark:text-foreground leading-tight">
-            {cleanDisplayName}
-          </h2>
+      {/* 0. MOBILE GREETING HEADER (Mobile responsive only) */}
+      <div className="block md:hidden px-3.5 xs:px-4 pt-2 pb-2">
+        <div className="relative w-full overflow-hidden rounded-[18px] sm:rounded-[22px] border border-[#E5C158]/70 bg-[#FFFDF7] shadow-sm aspect-[978/280]">
+          {/* Background template with arch, sparkles & clothes rack */}
+          <img
+            src={greetingBannerBg}
+            alt="VEXA Luxury Fashion Greeting"
+            className="absolute inset-0 h-full w-full object-fill pointer-events-none select-none"
+          />
+
+          {/* Dynamic User Greeting Text Overlay on the Left */}
+          <div className="relative z-10 flex h-full w-full items-center pl-[5%] pr-[38%] py-[4%]">
+            <div className="flex flex-col justify-center min-w-0 max-w-full">
+              {/* Time of day Greeting */}
+              <span className="font-sans text-[9px] xs:text-[11px] sm:text-[12px] font-bold uppercase tracking-[0.18em] text-[#B8860B] leading-none mb-1">
+                {greeting}
+              </span>
+
+              {/* Dynamic Logged-In User Name in Luxury Serif Style */}
+              <h2 className="font-display font-extrabold text-[16px] xs:text-[21px] sm:text-[25px] tracking-[0.05em] text-[#08192E] leading-tight truncate">
+                {cleanDisplayName}
+              </h2>
+
+              {/* Fashion quote subtitle */}
+              <p className="font-sans text-[7.5px] xs:text-[9.5px] sm:text-[11px] font-medium leading-[1.28] text-[#4A607A] line-clamp-2 mt-1">
+                Fashion is a way of expressing yourself. Explore and make it yours.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -471,13 +497,105 @@ export function Home() {
         </div>
       </section>
 
+      {/* 5. HOW TO BOOK YOUR VEXA TEE (Mobile responsive only) */}
+      <section className="block md:hidden px-4 pt-6 pb-24 border-t border-border/30">
+        <div className="w-full rounded-[24px] border border-[#E5C158]/80 bg-gradient-to-br from-[#FFFDF5] to-[#FFF4D8] dark:from-[#1E1B15] dark:to-[#17140E] p-5 shadow-[0_6px_20px_rgba(184,134,11,0.12)]">
+          {/* Header Title */}
+          <h2 className="font-display text-[16px] font-black uppercase tracking-[0.05em] text-[#0F172A] dark:text-foreground leading-tight">
+            HOW TO BOOK YOUR VEXA TEE
+          </h2>
+          <p className="mt-1 font-sans text-[12.5px] text-[#64748B] dark:text-muted-foreground leading-snug">
+            4 easy steps from catalog selection to custom doorstep delivery.
+          </p>
 
+          {/* 4 Step Cards */}
+          <div className="mt-4 space-y-3">
+            {/* Step 1 */}
+            <div className="flex items-start gap-3 rounded-2xl border border-[#E5C158]/40 bg-white dark:bg-[#14120E] p-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-[#FFF4D1] dark:bg-[#2C2412] text-[#8B6508] dark:text-[#E5C158]">
+                <LayoutGrid className="size-4.5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="inline-block rounded bg-[#D4AF37]/15 px-1.5 py-0.5 font-sans text-[9px] font-black tracking-wider text-[#8B6508] dark:text-[#E5C158]">
+                  STEP 01
+                </span>
+                <h3 className="mt-0.5 font-sans text-[13.5px] font-bold text-[#0F172A] dark:text-foreground leading-snug">
+                  Browse Luxury Catalog Drops
+                </h3>
+                <p className="mt-0.5 font-sans text-[11.5px] text-[#64748B] dark:text-muted-foreground leading-relaxed">
+                  Explore 240 GSM luxury catalog drops and handpicked oversized streetwear silhouettes.
+                </p>
+              </div>
+            </div>
 
+            {/* Step 2 */}
+            <div className="flex items-start gap-3 rounded-2xl border border-[#E5C158]/40 bg-white dark:bg-[#14120E] p-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-[#FFF4D1] dark:bg-[#2C2412] text-[#8B6508] dark:text-[#E5C158]">
+                <Palette className="size-4.5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="inline-block rounded bg-[#D4AF37]/15 px-1.5 py-0.5 font-sans text-[9px] font-black tracking-wider text-[#8B6508] dark:text-[#E5C158]">
+                  STEP 02
+                </span>
+                <h3 className="mt-0.5 font-sans text-[13.5px] font-bold text-[#0F172A] dark:text-foreground leading-snug">
+                  Choose Fit & Colorway
+                </h3>
+                <p className="mt-0.5 font-sans text-[11.5px] text-[#64748B] dark:text-muted-foreground leading-relaxed">
+                  Select long-staple combed cotton colorways, drop-shoulder fits, and preferred sizes.
+                </p>
+              </div>
+            </div>
 
+            {/* Step 3 */}
+            <div className="flex items-start gap-3 rounded-2xl border border-[#E5C158]/40 bg-white dark:bg-[#14120E] p-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-[#FFF4D1] dark:bg-[#2C2412] text-[#8B6508] dark:text-[#E5C158]">
+                <Lock className="size-4.5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="inline-block rounded bg-[#D4AF37]/15 px-1.5 py-0.5 font-sans text-[9px] font-black tracking-wider text-[#8B6508] dark:text-[#E5C158]">
+                  STEP 03
+                </span>
+                <h3 className="mt-0.5 font-sans text-[13.5px] font-bold text-[#0F172A] dark:text-foreground leading-snug">
+                  Instant Secure Checkout
+                </h3>
+                <p className="mt-0.5 font-sans text-[11.5px] text-[#64748B] dark:text-muted-foreground leading-relaxed">
+                  Complete order seamlessly using Razorpay, UPI, NetBanking, Credit Cards, or COD.
+                </p>
+              </div>
+            </div>
 
+            {/* Step 4 */}
+            <div className="flex items-start gap-3 rounded-2xl border border-[#E5C158]/40 bg-white dark:bg-[#14120E] p-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-[#FFF4D1] dark:bg-[#2C2412] text-[#8B6508] dark:text-[#E5C158]">
+                <Truck className="size-4.5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="inline-block rounded bg-[#D4AF37]/15 px-1.5 py-0.5 font-sans text-[9px] font-black tracking-wider text-[#8B6508] dark:text-[#E5C158]">
+                  STEP 04
+                </span>
+                <h3 className="mt-0.5 font-sans text-[13.5px] font-bold text-[#0F172A] dark:text-foreground leading-snug">
+                  Doorstep Luxury Delivery
+                </h3>
+                <p className="mt-0.5 font-sans text-[11.5px] text-[#64748B] dark:text-muted-foreground leading-relaxed">
+                  Track your shipment live from VEXA master tailors to your doorstep with luxury packaging.
+                </p>
+              </div>
+            </div>
+          </div>
 
-      {/* 5. ENGINEERED EXCELLENCE (Crafted to the Last Stitch) */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-5 py-12 md:py-16 border-t border-border/30">
+          {/* Action CTA Button */}
+          <Link
+            to="/products"
+            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-white/80 bg-gradient-to-b from-[#FBE89C] via-[#F2D370] to-[#E5BF4E] font-sans text-[13px] font-black uppercase tracking-wider text-[#0F172A] shadow-[0_4px_14px_rgba(242,211,112,0.45)] active:scale-[0.98] transition-transform"
+          >
+            <ShoppingBag className="size-4" />
+            <span>EXPLORE CATALOG NOW</span>
+          </Link>
+        </div>
+      </section>
+
+      {/* 5. ENGINEERED EXCELLENCE (Crafted to the Last Stitch) - Hidden on mobile responsive only */}
+      <section className="hidden md:block mx-auto max-w-7xl px-4 sm:px-5 py-12 md:py-16 border-t border-border/30">
         <Reveal className="text-center">
           <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-[#9A7220] dark:text-gold font-bold">
             ENGINEERED EXCELLENCE

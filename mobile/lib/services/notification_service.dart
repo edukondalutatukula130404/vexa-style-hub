@@ -517,4 +517,55 @@ class NotificationService {
     // Disabled in-app floating banner popup
     return;
   }
+
+  /// Trigger a real-time Android system notification for OTP in the device notification bar
+  static Future<void> showLocalOtpNotification(String otp, {String? phone}) async {
+    try {
+      final androidLocalPlugin = localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidLocalPlugin != null) {
+        await androidLocalPlugin.requestNotificationsPermission();
+      }
+
+      const channel = AndroidNotificationChannel(
+        'vexa_otp_channel',
+        'Security & Verification',
+        description: 'Real-time security and OTP codes for VEXA.',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+      await androidLocalPlugin?.createNotificationChannel(channel);
+
+      await localNotifications.show(
+        id: 999999,
+        title: '📲 VEXA Security Verification',
+        body: '$otp is your VEXA Mobile OTP verification code. Valid for 10 minutes.',
+        payload: otp,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            channel.id,
+            channel.name,
+            channelDescription: channel.description,
+            icon: '@mipmap/ic_launcher',
+            importance: Importance.max,
+            priority: Priority.max,
+            playSound: true,
+            enableVibration: true,
+            ticker: 'VEXA OTP Code',
+            styleInformation: BigTextStyleInformation(
+              'Your 6-digit login verification code is <b>$otp</b>.<br/>Valid for 10 minutes. Do not share this OTP with anyone.',
+              htmlFormatBigText: true,
+              contentTitle: '<b>📲 VEXA Security Verification</b>',
+              htmlFormatContentTitle: true,
+              summaryText: 'Security Code',
+            ),
+          ),
+        ),
+      );
+      debugPrint('🔔 [NotificationService] Real-time system notification delivered for OTP: $otp');
+    } catch (e) {
+      debugPrint('Error showing local OTP notification: $e');
+    }
+  }
 }

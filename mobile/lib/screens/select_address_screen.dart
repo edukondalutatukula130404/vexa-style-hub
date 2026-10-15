@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/address_service.dart';
 import '../services/auth_service.dart';
+import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 
 class SelectAddressScreen extends StatefulWidget {
@@ -56,7 +57,7 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
   }
 
   Future<void> _confirmSelection(AddressModel address) async {
-    await AddressService.saveAddress(address, setAsDefault: true);
+    await AddressService.setDefaultAddress(address.id);
     if (mounted) {
       Navigator.pop(context, address);
     }
@@ -68,7 +69,15 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
     final defaultName = user?.name.isNotEmpty == true ? user!.name : 'Tatukulaedukondalu';
 
     final nameController = TextEditingController(text: existing?.name ?? defaultName);
-    final phoneController = TextEditingController(text: existing?.phone ?? '+91 98765 43210');
+    String initialPhone = '';
+    if (existing?.phone != null && existing!.phone.trim().isNotEmpty && existing.phone != '+91 98765 43210') {
+      initialPhone = existing.phone.trim();
+    } else if (user?.phone != null && user!.phone!.trim().isNotEmpty && user.phone != '+91 98765 43210') {
+      initialPhone = user.phone!.trim();
+    } else if (OrderService.activeUserPhone != null && OrderService.activeUserPhone!.trim().isNotEmpty && OrderService.activeUserPhone != '+91 98765 43210') {
+      initialPhone = OrderService.activeUserPhone!.trim();
+    }
+    final phoneController = TextEditingController(text: initialPhone.isNotEmpty ? initialPhone : (existing?.phone ?? '+91 98765 43210'));
     final streetController = TextEditingController(text: existing?.street ?? '');
     final cityController = TextEditingController(text: existing?.city ?? 'Hyderabad');
     final stateController = TextEditingController(text: existing?.state ?? 'Telangana');
@@ -286,6 +295,10 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
                             isDefault: isDefault,
                           );
 
+                          final savedPhone = phoneController.text.trim();
+                          if (savedPhone.isNotEmpty && savedPhone != '+91 98765 43210') {
+                            OrderService.activeUserPhone = savedPhone;
+                          }
                           await AddressService.saveAddress(newAddress, setAsDefault: isDefault);
                           if (modalCtx.mounted) {
                             Navigator.pop(modalCtx);

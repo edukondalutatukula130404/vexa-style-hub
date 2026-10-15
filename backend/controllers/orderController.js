@@ -46,6 +46,7 @@ exports.createOrder = async (req, res, next) => {
     const {
       userEmail,
       userName,
+      phone,
       items,
       totalAmount,
       paymentMethod,
@@ -82,6 +83,11 @@ exports.createOrder = async (req, res, next) => {
       resolvedUserName = 'Customer';
     }
 
+    let resolvedPhone = (phone || '').toString().trim();
+    if ((!resolvedPhone || resolvedPhone === '+91 98765 43210') && registeredUser && registeredUser.phone) {
+      resolvedPhone = registeredUser.phone.trim();
+    }
+
     const order = await Order.create({
       id: orderId,
       userEmail: cleanEmail,
@@ -92,7 +98,8 @@ exports.createOrder = async (req, res, next) => {
       paymentMethod: paymentMethod || 'Cash on Delivery',
       paymentId: assignedPaymentId,
       paymentStatus: assignedPaymentStatus,
-      shippingAddress: shippingAddress || 'Indiranagar 100ft Road, Bengaluru'
+      shippingAddress: shippingAddress || 'Indiranagar 100ft Road, Bengaluru',
+      phone: resolvedPhone || '+91 98765 43210'
     });
 
     // Automatically store / sync Payment document in MongoDB
@@ -271,6 +278,9 @@ exports.getUserOrders = async (req, res, next) => {
       const obj = ord.toObject ? ord.toObject() : { ...ord };
       if (userDoc && userDoc.name && (!obj.userName || obj.userName === 'Customer' || obj.userName === 'Valued Customer' || obj.userName === 'VEXA Customer')) {
         obj.userName = userDoc.name;
+      }
+      if (userDoc && userDoc.phone && (!obj.phone || obj.phone === '+91 98765 43210' || obj.phone.trim() === '')) {
+        obj.phone = userDoc.phone.trim();
       }
       return obj;
     });
@@ -626,5 +636,61 @@ exports.deleteOrder = async (req, res, next) => {
       success: true,
       message: 'Order deleted successfully'
     });
+  }
+};
+
+// @desc    Update order shipping address & contact
+// @route   PUT /api/orders/:id/address
+// @access  Public
+exports.updateOrderAddress = async (req, res, next) => {
+  try {
+    const { shippingAddress, phone, userName, orderId } = req.body;
+    const targetId = (req.params.id && String(req.params.id).trim() !== 'address')
+      ? String(req.params.id).trim()
+      : String(orderId || req.body.id || req.body._id || '').trim();
+    const cleanCode = targetId.replace(/^#+/, '').trim();
+
+    if (!shippingAddress) {
+      return res.status(400).json({ success: false, message: 'Please provide shippingAddress' });
+    }
+
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(targetId)) {
+      order = await Order.findById(targetId);
+    }
+    if (!order && mongoose.Types.ObjectId.isValid(cleanCode)) {
+      order = await Order.findById(cleanCode);
+    }
+    if (!order && (targetId || cleanCode)) {
+      order = await Order.findOne({
+        $or: [
+          { id: targetId },
+          { id: `#${cleanCode}` },
+          { id: cleanCode },
+          { id: { $regex: new RegExp(cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } }
+        ]
+      });
+    }
+
+    if (order) {
+      order.shippingAddress = shippingAddress;
+      if (phone && phone.trim()) order.phone = phone.trim();
+      if (userName && userName.trim()) order.userName = userName.trim();
+      await order.save();
+
+      try {
+        broadcast('ORDER_UPDATED', order);
+      } catch (_) {}
+
+      return res.status(200).json({ success: true, data: order });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Order address updated',
+      data: { id: targetId, shippingAddress, phone, userName }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

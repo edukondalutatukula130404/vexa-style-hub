@@ -96,6 +96,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _pageController = PageController();
     _transformationController = TransformationController();
     _loadDeliveryAddress();
+    AddressService.addressesChangeNotifier.addListener(_loadDeliveryAddress);
     _cartCount = widget.cartItems?.fold<int>(0, (sum, i) => sum + i.quantity) ?? 0;
     _hasAddedToCart = _cartCount > 0;
     _selectedColor = widget.item.color.isNotEmpty
@@ -149,6 +150,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   void dispose() {
+    AddressService.addressesChangeNotifier.removeListener(_loadDeliveryAddress);
     _pageController.dispose();
     _transformationController.dispose();
     _scrollController.dispose();

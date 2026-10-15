@@ -58,6 +58,10 @@ const orderSchema = new mongoose.Schema(
     shippingAddress: {
       type: String,
       default: 'Indiranagar 100ft Road, Bengaluru'
+    },
+    phone: {
+      type: String,
+      default: ''
     }
   },
   {

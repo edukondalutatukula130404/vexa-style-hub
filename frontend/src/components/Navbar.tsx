@@ -1,10 +1,11 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState, useMemo } from "react";
-import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronLeft, ChevronDown, Heart, ArrowLeft, Bell } from "lucide-react";
+import { Menu, X, ShoppingCart, User, LogOut, ChevronRight, ChevronLeft, ChevronDown, Heart, ArrowLeft, Bell, MapPin } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
 import { useNotifications } from "@/lib/notifications";
+import { DeliveryLocationModal } from "./DeliveryLocationModal";
 
 const baseLinks = [
   { to: "/", label: "Home" },
@@ -51,6 +52,35 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("vexa_delivery_location") || "Hyderabad 500081";
+    }
+    return "Hyderabad 500081";
+  });
+
+  useEffect(() => {
+    const handleLocationChanged = (e: any) => {
+      if (e.detail) {
+        setSelectedLocation(e.detail);
+      } else {
+        const saved = localStorage.getItem("vexa_delivery_location");
+        if (saved) setSelectedLocation(saved);
+      }
+    };
+    window.addEventListener("vexa_location_changed", handleLocationChanged);
+    return () => window.removeEventListener("vexa_location_changed", handleLocationChanged);
+  }, []);
+
+  const handleSelectLocation = (newLoc: string) => {
+    setSelectedLocation(newLoc);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_delivery_location", newLoc);
+      window.dispatchEvent(new CustomEvent("vexa_location_changed", { detail: newLoc }));
+    }
+  };
+
   const { isLoggedIn, isAdmin, logout } = useAuth();
   const { cartItems } = useCart();
   const { wishlistItems } = useWishlist();
@@ -140,8 +170,8 @@ export function Navbar() {
 
             {/* Brand Logo on Home Screen, /login, or on Desktop */}
             {isHomePage || location.pathname === "/login" ? (
-              <Link to="/" className="group flex items-center gap-2 sm:gap-3 leading-none shrink-0">
-                <div className="flex size-8 sm:size-9 items-center justify-center rounded-[10px] bg-white border border-border/60 shadow-xs transition-transform duration-300 group-hover:scale-105 shrink-0 overflow-hidden p-0.5">
+              <div className="flex items-center gap-2 sm:gap-3 leading-none shrink-0">
+                <Link to="/" className="flex size-8 sm:size-9 items-center justify-center rounded-[10px] bg-white border border-border/60 shadow-xs transition-transform duration-300 hover:scale-105 shrink-0 overflow-hidden p-0.5">
                   <img
                     src="/vexa_logo.png"
                     alt="VEXA Logo"
@@ -149,16 +179,45 @@ export function Navbar() {
                     decoding="async"
                     className="size-full rounded-[8px] object-cover"
                   />
-                </div>
+                </Link>
                 <div className="flex flex-col justify-center">
-                  <span className="font-display text-lg sm:text-2xl font-black tracking-[0.32em] sm:tracking-[0.35em] text-gold-gradient leading-none">
+                  <Link to="/" className="font-display text-lg sm:text-2xl font-black tracking-[0.32em] sm:tracking-[0.35em] text-gold-gradient leading-none">
                     V E X A
-                  </span>
-                  <span className="mt-1 text-[7.5px] sm:text-[9px] font-semibold tracking-[0.24em] sm:tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
-                    WEAR CONFIDENCE
-                  </span>
+                  </Link>
+
+                  {/* Location option under brand name on Home Screen */}
+                  {isHomePage ? (
+                    <>
+                      {/* Mobile View: Location Option (Matches Flutter Mobile App) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsLocationModalOpen(true);
+                        }}
+                        className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-800 dark:text-slate-100 hover:text-gold transition-colors text-left group sm:hidden cursor-pointer"
+                        title="Change Delivery Location"
+                      >
+                        <MapPin className="size-3 text-gold shrink-0 fill-gold/20" />
+                        <span className="truncate max-w-[130px] font-semibold text-[11px] text-slate-800 dark:text-slate-200">
+                          {selectedLocation}
+                        </span>
+                        <ChevronDown className="size-3 text-muted-foreground shrink-0 group-hover:text-gold transition-transform" />
+                      </button>
+
+                      {/* Desktop View: Tagline */}
+                      <span className="mt-1 hidden sm:block text-[9px] font-semibold tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
+                        WEAR CONFIDENCE
+                      </span>
+                    </>
+                  ) : (
+                    <span className="mt-1 text-[7.5px] sm:text-[9px] font-semibold tracking-[0.24em] sm:tracking-[0.34em] text-muted-foreground whitespace-nowrap leading-none">
+                      WEAR CONFIDENCE
+                    </span>
+                  )}
                 </div>
-              </Link>
+              </div>
             ) : (
               <>
                 {/* Mobile View: Dynamic Screen Title (Hidden on desktop) */}
@@ -427,6 +486,14 @@ export function Navbar() {
           WEAR CONFIDENCE • WEAR STYLE
         </div>
       </aside>
+
+      {/* Delivery Location Picker Modal */}
+      <DeliveryLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        currentLocation={selectedLocation}
+        onSelectLocation={handleSelectLocation}
+      />
     </>
   );
 }

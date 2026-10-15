@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendResetCodeEmail, sendWelcomeEmail, sendLoginOtpEmail } = require('../config/nodemailer');
+const { sendMobileOtpSms } = require('../config/smsService');
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
@@ -419,7 +420,10 @@ exports.sendMobileOtp = async (req, res, next) => {
     user.phoneOtpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save({ validateBeforeSave: false });
 
-    // Send OTP email to user's registered email address as notification
+    // 1. Send real cellular SMS to the registered mobile number via Fast2SMS
+    await sendMobileOtpSms(cleanPhone, otpCode);
+
+    // 2. Also send backup email notification to user's registered email address
     if (user.email) {
       sendLoginOtpEmail(user.email, otpCode, cleanPhone, user.name).catch((err) => {
         console.warn('Login OTP email delivery note:', err.message);
@@ -428,10 +432,18 @@ exports.sendMobileOtp = async (req, res, next) => {
 
     console.log(`📲 [MOBILE OTP GENERATED for ${cleanPhone}]: ${otpCode}`);
 
+    const maskEmail = (email) => {
+      if (!email || !email.includes('@')) return '';
+      const [userPart, domain] = email.split('@');
+      const visible = userPart.slice(0, 2);
+      return `${visible}***@${domain}`;
+    };
+
     res.status(200).json({
       success: true,
       message: '6-digit OTP sent successfully',
-      otp: otpCode
+      otp: otpCode,
+      maskedEmail: maskEmail(user.email)
     });
   } catch (error) {
     next(error);

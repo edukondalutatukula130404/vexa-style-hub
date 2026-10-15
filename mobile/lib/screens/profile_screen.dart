@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/user_model.dart';
-import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import '../services/notification_service.dart';
@@ -15,6 +14,7 @@ import 'home_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
 import '../services/invoice_pdf_service.dart';
 import '../services/address_service.dart';
+import 'login_screen.dart';
 
 
 // ── Gold & White Luxury Theme Tokens ───────────────────────────────────────
@@ -31,7 +31,8 @@ const Color _errorRed = Color(0xFFEF4444);
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onNavigateToDiscover;
-  const ProfileScreen({super.key, this.onNavigateToDiscover});
+  final ValueChanged<bool>? onUserStateChanged;
+  const ProfileScreen({super.key, this.onNavigateToDiscover, this.onUserStateChanged});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -44,13 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double get _walletBalance => WalletService.balance;
   List<Map<String, dynamic>> get _walletTransactions => WalletService.transactions;
 
-  // Login Form Controllers
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _isLoggingIn = false;
-  String? _loginError;
+
 
   final List<Map<String, dynamic>> _userAddresses = [
     {
@@ -77,12 +72,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     },
   ];
 
-  bool get _isRealUser => _currentUser != null && _currentUser!.id != 'guest_user';
+  bool get _isRealUser =>
+      _currentUser != null &&
+      _currentUser!.id != 'guest_user' &&
+      !_currentUser!.id.startsWith('guest') &&
+      _currentUser!.role != 'guest' &&
+      _currentUser!.email.toLowerCase().trim() != 'guest@vexa.app';
 
   @override
   void initState() {
     super.initState();
     WalletService.addListener(_onWalletUpdated);
+    AddressService.addressesChangeNotifier.addListener(_onAddressesUpdated);
     _loadUser();
   }
 
@@ -90,17 +91,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) setState(() {});
   }
 
+  void _onAddressesUpdated() {
+    _reloadAddresses();
+  }
+
+  Future<void> _reloadAddresses() async {
+    final addrs = await AddressService.getAddresses();
+    if (mounted) {
+      setState(() {
+        _userAddresses.clear();
+        _userAddresses.addAll(addrs.map((a) => a.toJson()));
+      });
+    }
+  }
+
   @override
   void dispose() {
     WalletService.removeListener(_onWalletUpdated);
-    _emailController.dispose();
-    _passwordController.dispose();
+    AddressService.addressesChangeNotifier.removeListener(_onAddressesUpdated);
     super.dispose();
   }
 
   Future<void> _loadUser() async {
     final user = await AuthService.getUser();
     final addrs = await AddressService.getAddresses();
+    if (user?.phone != null && user!.phone!.trim().isNotEmpty && user.phone != '+91 98765 43210') {
+      OrderService.activeUserPhone = user.phone!.trim();
+    } else {
+      for (final a in addrs) {
+        if (a.phone.trim().isNotEmpty && a.phone.trim() != '+91 98765 43210') {
+          OrderService.activeUserPhone = a.phone.trim();
+          break;
+        }
+      }
+    }
     if (mounted) {
       setState(() {
         _currentUser = user;
@@ -108,93 +132,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _userAddresses.clear();
         _userAddresses.addAll(addrs.map((a) => a.toJson()));
       });
+      widget.onUserStateChanged?.call(_isRealUser);
     }
   }
 
-  Future<void> _handleInlineLogin() async {
-    if (!_formKey.currentState!.validate()) return;
-    FocusScope.of(context).unfocus();
 
-    setState(() {
-      _isLoggingIn = true;
-      _loginError = null;
-    });
-
-    final result = await ApiService.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-
-    if (!mounted) return;
-
-    if (result['success'] == true) {
-      final user = result['user'] as UserModel;
-      final token = (result['token'] as String?) ?? 'mock_token';
-      await AuthService.saveSession(user, token);
-      await AuthService.setOnboardingSeen();
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Welcome back, ${user.name}!'),
-          backgroundColor: _successGreen,
-        ),
-      );
-      setState(() {
-        _currentUser = user;
-        _isLoggingIn = false;
-        _emailController.clear();
-        _passwordController.clear();
-      });
-
-      if (widget.onNavigateToDiscover != null) {
-        widget.onNavigateToDiscover!();
-      } else {
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-      }
-    } else {
-      setState(() {
-        _isLoggingIn = false;
-        _loginError = result['message'] ?? 'Sign in failed. Check your credentials.';
-      });
-    }
-  }
-
-  Future<void> _handleGuestAccess() async {
-    final guestUser = UserModel(
-      id: 'guest_user',
-      name: 'Guest Collector',
-      email: 'guest@vexa.app',
-      role: 'guest',
-    );
-    await AuthService.saveSession(guestUser, 'guest_token');
-    if (!mounted) return;
-    setState(() {
-      _currentUser = guestUser;
-    });
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.person_outline_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              'Browsing as Guest Collector!',
-              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-          ],
-        ),
-        backgroundColor: _goldDark,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(milliseconds: 1500),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      ),
-    );
-
-    Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-  }
 
   void _handleLogout() {
     showDialog(
@@ -298,6 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             setState(() {
                               _currentUser = null;
                             });
+                            widget.onUserStateChanged?.call(false);
                           },
                           child: Text(
                             'Log Out',
@@ -450,6 +393,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             setState(() {
                               _currentUser = null;
                             });
+                            widget.onUserStateChanged?.call(false);
                             messenger.showSnackBar(
                               SnackBar(
                                 backgroundColor: const Color(0xFFEF4444),
@@ -805,6 +749,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onUserStateChanged?.call(_isRealUser);
+      }
+    });
+
     return Scaffold(
       backgroundColor: _bgColor,
       appBar: _isRealUser
@@ -847,406 +797,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 )
-              : _buildReferenceLoginForm(),
+              : LoginScreen(
+                  onBack: widget.onNavigateToDiscover,
+                  onGuest: widget.onNavigateToDiscover,
+                  onLoginSuccess: () {
+                    _loadUser();
+                    if (widget.onNavigateToDiscover != null) {
+                      widget.onNavigateToDiscover!();
+                    } else {
+                      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+                    }
+                  },
+                ),
     );
   }
 
-  // ── REFERENCE IMAGE MATCHED LOGIN VIEW (VEXA LUXURY THEME) ────────────────
-  Widget _buildReferenceLoginForm() {
-    final mediaQuery = MediaQuery.of(context);
-    final topPadding = mediaQuery.padding.top;
-
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // ── HERO TOP HEADER REGION ──────────────────────────────────────
-          Container(
-            width: double.infinity,
-            height: 270 + topPadding,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF1A1A1A),
-                  Color(0xFF2E241B),
-                  Color(0xFF5C431F),
-                ],
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Background Luxury Image Overlay
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/images/hero_luxury_tshirt.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const SizedBox(),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          const Color(0xFF0F172A).withAlpha(220),
-                          const Color(0xFF1E293B).withAlpha(180),
-                          const Color(0xFF3D2C1B).withAlpha(160),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-
-                // Top Right Guest Pill Button
-                Positioned(
-                  top: topPadding + 12,
-                  right: 20,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _handleGuestAccess,
-                      borderRadius: BorderRadius.circular(24),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(35),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.white.withAlpha(200), width: 1.2),
-                        ),
-                        child: Text(
-                          'Guest',
-                          style: GoogleFonts.outfit(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Centered Floating Logo Card & Welcome Back Text
-                Align(
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(height: topPadding),
-                      // Floating Brand Card
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(50),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.asset(
-                                'assets/images/vexa_logo.png',
-                                width: 24,
-                                height: 24,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'VEXA STYLE HUB',
-                              style: GoogleFonts.cinzel(
-                                color: _goldDark,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        'Welcome Back',
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── BOTTOM ROUNDED SHEET CONTAINER ──────────────────────────────
-          Transform.translate(
-            offset: const Offset(0, -24),
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top Handle Indicator
-                    Center(
-                      child: Container(
-                        width: 42,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFCBD5E1),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Section Title
-                    Text(
-                      'SIGN IN TO YOUR ACCOUNT',
-                      style: GoogleFonts.outfit(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: _goldDark,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Enter your registered phone number or email to continue.',
-                      style: GoogleFonts.outfit(
-                        fontSize: 13,
-                        color: const Color(0xFF64748B),
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-
-                    // Error Box if any
-                    if (_loginError != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: _errorRed.withAlpha(15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: _errorRed.withAlpha(60)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline_rounded, color: _errorRed, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _loginError!,
-                                style: GoogleFonts.outfit(color: _errorRed, fontSize: 12.5, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Input Field: Email or Phone
-                    Text(
-                      'Phone number or email',
-                      style: GoogleFonts.outfit(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      style: GoogleFonts.outfit(color: const Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter email or phone number';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'name@example.com · 9876...',
-                        hintStyle: GoogleFonts.outfit(color: const Color(0xFF94A3B8), fontSize: 13.5),
-                        prefixIcon: const Icon(Icons.alternate_email_rounded, color: Color(0xFF64748B), size: 20),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                        filled: true,
-                        fillColor: const Color(0xFFF1F5F9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: _goldDark, width: 1.5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Password Field
-                    Text(
-                      'Password',
-                      style: GoogleFonts.outfit(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: GoogleFonts.outfit(color: const Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter password';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: '••••••••',
-                        hintStyle: GoogleFonts.outfit(color: const Color(0xFF94A3B8), fontSize: 14),
-                        prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF64748B), size: 20),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                            color: const Color(0xFF64748B),
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                        filled: true,
-                        fillColor: const Color(0xFFF1F5F9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: _goldDark, width: 1.5),
-                        ),
-                      ),
-                    ),
-
-                    // Forgot Password Link
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => Navigator.pushNamed(context, '/forget'),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          'Forgot Password?',
-                          style: GoogleFonts.outfit(
-                            color: _goldDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-
-                    // Primary Continue Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _goldDark,
-                          elevation: 3,
-                          shadowColor: _goldDark.withAlpha(60),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: _isLoggingIn ? null : _handleInlineLogin,
-                        child: _isLoggingIn
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : Text(
-                                'Continue',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Register Prompt Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: GoogleFonts.outfit(color: const Color(0xFF64748B), fontSize: 13.5),
-                        ),
-                        GestureDetector(
-                          onTap: () => Navigator.pushNamed(context, '/register'),
-                          child: Text(
-                            'Register',
-                            style: GoogleFonts.outfit(
-                              color: _goldDark,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // ── LOGGED-IN PROFILE VIEW CONTENT ────────────────────────────────────────
   Widget _buildLoggedInProfileContent() {
@@ -2067,9 +1632,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 1. Edit Profile Full Screen View
   void _showEditProfileModal() {
+    String initialPhone = '';
+    if (_currentUser?.phone != null && _currentUser!.phone!.trim().isNotEmpty && _currentUser!.phone != '+91 98765 43210') {
+      initialPhone = _currentUser!.phone!.trim();
+    } else if (OrderService.activeUserPhone != null && OrderService.activeUserPhone!.trim().isNotEmpty && OrderService.activeUserPhone != '+91 98765 43210') {
+      initialPhone = OrderService.activeUserPhone!.trim();
+    } else if (_userAddresses.isNotEmpty) {
+      for (final a in _userAddresses) {
+        final p = (a['phone'] ?? '').toString().trim();
+        if (p.isNotEmpty && p != '+91 98765 43210') {
+          initialPhone = p;
+          break;
+        }
+      }
+    }
+
     final nameCtrl = TextEditingController(text: _currentUser?.name ?? '');
     final emailCtrl = TextEditingController(text: _currentUser?.email ?? '');
-    final phoneCtrl = TextEditingController(text: '+91 98765 43210');
+    final phoneCtrl = TextEditingController(text: initialPhone.isNotEmpty ? initialPhone : '+91 98765 43210');
     final cityCtrl = TextEditingController(text: 'Hyderabad, Telangana');
     String selectedAvatar = _currentUser?.avatarUrl ?? '';
 
@@ -2208,14 +1788,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       onPressed: () async {
                         if (nameCtrl.text.trim().isEmpty) return;
+                        final updatedPhone = phoneCtrl.text.trim();
                         final updatedUser = UserModel(
                           id: _currentUser?.id ?? 'user_1',
                           name: nameCtrl.text.trim(),
                           companyName: _currentUser?.companyName ?? 'VEXA Style Hub',
                           email: emailCtrl.text.trim(),
+                          phone: updatedPhone.isNotEmpty ? updatedPhone : null,
                           role: _currentUser?.role ?? 'user',
                           avatarUrl: selectedAvatar,
                         );
+                        if (updatedPhone.isNotEmpty && updatedPhone != '+91 98765 43210') {
+                          OrderService.activeUserPhone = updatedPhone;
+                        }
                         final messenger = ScaffoldMessenger.of(context);
                         await AuthService.saveSession(updatedUser, 'user_token');
                         if (!mounted) return;
@@ -2534,6 +2119,176 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return InvoicePdfService.saveInvoiceToDisk(invoiceNo, order);
   }
 
+  // ignore: unused_element
+  void _openInvoiceAddressPicker(
+    BuildContext context,
+    OrderModel order,
+    void Function(void Function()) setInvoiceState,
+  ) async {
+    final addresses = await AddressService.getAddresses();
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(sheetCtx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SELECT INVOICE ADDRESS',
+                        style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark, letterSpacing: 1),
+                      ),
+                      Text(
+                        'Choose billing address for Order #${order.id}',
+                        style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20, color: _subtext),
+                    onPressed: () => Navigator.pop(sheetCtx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: addresses.length,
+                  separatorBuilder: (_, i) => const SizedBox(height: 10),
+                  itemBuilder: (_, index) {
+                    final addr = addresses[index];
+                    final fullText = addr.fullAddressText;
+                    final isCurrent = order.shippingAddress.trim().toLowerCase() == fullText.trim().toLowerCase() ||
+                        (order.shippingAddress.trim().isNotEmpty && fullText.contains(order.shippingAddress.trim()));
+
+                    return InkWell(
+                      onTap: () async {
+                        Navigator.pop(sheetCtx);
+                        await OrderService.updateOrderAddress(
+                          order.id,
+                          fullText,
+                          newCustomerName: addr.name,
+                          newPhone: addr.phone,
+                          context: context,
+                        );
+                        setInvoiceState(() {
+                          order.shippingAddress = fullText;
+                          order.customerName = addr.name;
+                          if (addr.phone.trim().isNotEmpty && addr.phone != '+91 98765 43210') {
+                            order.phone = addr.phone.trim();
+                          }
+                        });
+                        if (mounted) {
+                          setState(() {});
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Invoice address updated to ${addr.type} address!'),
+                              backgroundColor: const Color(0xFF10B981),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isCurrent ? _gold.withAlpha(20) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isCurrent ? _goldDark : const Color(0xFFE2E8F0),
+                            width: isCurrent ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              isCurrent ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                              color: isCurrent ? _goldDark : _subtext,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        addr.name,
+                                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: _textDark),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: _goldDark.withAlpha(20),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          addr.type.toUpperCase(),
+                                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: _goldDark),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    fullText,
+                                    style: GoogleFonts.outfit(fontSize: 11.5, color: _subtext),
+                                  ),
+                                  if (addr.phone.isNotEmpty) ...[
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'Contact: ${addr.phone}',
+                                      style: GoogleFonts.outfit(fontSize: 11, color: _textDark, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // ── TAX E-INVOICE GENERATOR & PREVIEW SCREEN (100% FULL SCREEN) ──────────
   // ignore: unused_element
   void _showInvoiceModal(BuildContext context, OrderModel order, {bool autoStartDownload = false}) {
@@ -2693,27 +2448,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
+                                    flex: 11,
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text('BILLED TO:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 1)),
                                         const SizedBox(height: 4),
-                                        Text(order.customerName, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
-                                        Text(order.shippingAddress, style: GoogleFonts.outfit(fontSize: 11, color: _subtext, height: 1.3)),
-                                        Text('Contact: ${order.phone}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark)),
+                                        Text(order.displayCustomerName, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+                                        Text(
+                                          order.shippingAddress.isNotEmpty ? order.shippingAddress : order.displayShippingAddress,
+                                          style: GoogleFonts.outfit(fontSize: 11, color: _subtext, height: 1.3),
+                                        ),
+                                        Text('Contact: ${order.displayPhone}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark)),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text('INVOICE DETAILS:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 1)),
-                                      const SizedBox(height: 4),
-                                      Text('Date: ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark)),
-                                      Text('Order ID: ${order.id}', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _goldDark)),
-                                      Text('Payment: ${order.paymentMethod}', style: GoogleFonts.outfit(fontSize: 11, color: _subtext)),
-                                    ],
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    flex: 9,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text('INVOICE DETAILS:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: _subtext, letterSpacing: 1)),
+                                        const SizedBox(height: 4),
+                                        Text('Date: ${order.formattedDate}', style: GoogleFonts.outfit(fontSize: 11, color: _textDark), textAlign: TextAlign.right),
+                                        Text('Order ID: ${order.id}', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: _goldDark), textAlign: TextAlign.right),
+                                        Text(
+                                          'Payment: ${order.paymentMethod}',
+                                          style: GoogleFonts.outfit(fontSize: 11, color: _subtext),
+                                          textAlign: TextAlign.right,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -4128,7 +3896,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(
         builder: (ctx) => StatefulBuilder(
           builder: (modalCtx, setAddressState) {
-            void updateAddresses(Map<String, dynamic> updatedAddress) {
+            void updateAddresses(Map<String, dynamic> updatedAddress) async {
               final index = _userAddresses.indexWhere((a) => a['id'] == updatedAddress['id']);
               setAddressState(() {
                 if (updatedAddress['isDefault'] == true) {
@@ -4142,62 +3910,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _userAddresses.add(updatedAddress);
                 }
               });
-              AddressService.saveAddress(
+              await AddressService.saveAddress(
                 AddressModel.fromJson(updatedAddress),
                 setAsDefault: updatedAddress['isDefault'] == true,
               );
-              if (mounted) setState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        index != -1 ? 'Address updated successfully!' : 'New address added successfully!',
-                        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+              final reloaded = await AddressService.getAddresses();
+              setAddressState(() {
+                _userAddresses.clear();
+                _userAddresses.addAll(reloaded.map((a) => a.toJson()));
+              });
+              if (mounted) {
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          index != -1 ? 'Address updated successfully!' : 'New address added successfully!',
+                          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: _successGreen,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  backgroundColor: _successGreen,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+                );
+              }
             }
 
-            void deleteAddress(String id) {
+            void deleteAddress(String id) async {
               setAddressState(() {
                 _userAddresses.removeWhere((a) => a['id'] == id);
               });
-              AddressService.deleteAddress(id);
-              if (mounted) setState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Address removed', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
-                  backgroundColor: _goldDark,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+              await AddressService.deleteAddress(id);
+              final reloaded = await AddressService.getAddresses();
+              setAddressState(() {
+                _userAddresses.clear();
+                _userAddresses.addAll(reloaded.map((a) => a.toJson()));
+              });
+              if (mounted) {
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Address removed', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+                    backgroundColor: _goldDark,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              }
             }
 
-            void setDefaultAddress(String id) {
+            void setDefaultAddress(String id) async {
               setAddressState(() {
                 for (var a in _userAddresses) {
                   a['isDefault'] = (a['id'] == id);
                 }
               });
-              AddressService.setDefaultAddress(id);
-              if (mounted) setState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Default address updated!', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
-                  backgroundColor: _successGreen,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+              await AddressService.setDefaultAddress(id);
+              final reloaded = await AddressService.getAddresses();
+              setAddressState(() {
+                _userAddresses.clear();
+                _userAddresses.addAll(reloaded.map((a) => a.toJson()));
+              });
+              if (mounted) {
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Default address updated!', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+                    backgroundColor: _successGreen,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              }
             }
 
             return Scaffold(
@@ -4341,7 +4130,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     const Icon(Icons.phone_outlined, size: 14, color: _subtext),
                                     const SizedBox(width: 6),
-                                    Text(addr['phone'] ?? '', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
+                                    Text(
+                                      (addr['phone'] != null && addr['phone'].toString().trim().isNotEmpty && addr['phone'] != '+91 98765 43210')
+                                          ? addr['phone'].toString()
+                                          : (OrderService.activeUserPhone ?? addr['phone'] ?? ''),
+                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark),
+                                    ),
                                   ],
                                 ),
                                 const Divider(height: 24),
@@ -4726,7 +4520,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           context: context,
                                           amount: order.totalAmount,
                                           customerName: order.customerName,
-                                          customerPhone: order.phone,
+                                          customerPhone: order.displayPhone,
                                           onPaymentSuccess: (methodLabel) {
                                             order.paymentMethod = methodLabel;
                                             order.status = 'Confirmed';

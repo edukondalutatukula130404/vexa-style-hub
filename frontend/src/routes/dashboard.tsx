@@ -1,5 +1,5 @@
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   User as UserIcon,
   Package,
@@ -353,6 +353,26 @@ export function UserDashboard() {
   const [selectedMobileOrderFilter, setSelectedMobileOrderFilter] = useState<"All" | "Shipped" | "Delivered" | "Cancelled">("All");
   const [showOrderFilterMenu, setShowOrderFilterMenu] = useState(false);
   const [selectedOrderDetailsModal, setSelectedOrderDetailsModal] = useState<OrderItem | null>(null);
+  const [hideMobileOrderSearch, setHideMobileOrderSearch] = useState(false);
+  const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    if (activeTab !== "orders") return;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      if (currentScrollY > 30 && currentScrollY > lastScrollYRef.current) {
+        setHideMobileOrderSearch(true);
+        setShowOrderFilterMenu(false);
+      } else if (currentScrollY < lastScrollYRef.current - 5 || currentScrollY <= 15) {
+        setHideMobileOrderSearch(false);
+      }
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [activeTab]);
 
   const sortedOrders = useMemo(() => {
     if (!Array.isArray(myOrders)) return [];
@@ -2310,8 +2330,14 @@ export function UserDashboard() {
               <div className="w-full">
                 {/* ── MOBILE VIEW (< sm): 1:1 PIXEL-PERFECT REPLICA OF FLUTTER MY ORDERS SCREEN ── */}
                 <div className="block sm:hidden -mx-4 -mt-4 pb-20">
-                  {/* 1. SEARCH BAR & FILTERS BUTTON (SIDE-BY-SIDE) */}
-                  <div className="px-4 py-3 bg-background sticky top-14 z-20">
+                  {/* 1. SEARCH BAR & FILTERS BUTTON (SIDE-BY-SIDE) - Hides when scrolling in mobile responsive view */}
+                  <div
+                    className={`px-4 bg-background transition-all duration-300 ease-in-out overflow-hidden ${
+                      hideMobileOrderSearch
+                        ? "max-h-0 py-0 opacity-0 pointer-events-none -translate-y-3"
+                        : "max-h-24 py-3 opacity-100 translate-y-0"
+                    }`}
+                  >
                     <div className="flex items-center gap-2.5">
                       {/* Pill Search Input */}
                       <div className="flex-1 h-11 rounded-full border border-slate-200 dark:border-border bg-white dark:bg-card px-3.5 flex items-center gap-2 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">

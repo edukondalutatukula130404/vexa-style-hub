@@ -15,9 +15,9 @@ import 'product_detail_screen.dart';
 import 'all_products_screen.dart';
 import 'products_screen.dart';
 import 'profile_screen.dart';
-import 'login_screen.dart';
-import 'register_screen.dart';
 import 'order_details_screen.dart';
+import '../services/address_service.dart';
+import 'delivery_location_screen.dart';
 import '../widgets/razorpay_gateway_modal.dart';
 
 // ── Gold & White theme tokens ─────────────────────────────────────────────
@@ -165,6 +165,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Middle-Out screen & tab transition controller
   late final AnimationController _tabAnimController;
 
+  // Selected delivery location
+  String _selectedLocation = 'Hyderabad, 500081';
+  AddressModel? _activeAddress;
+
   @override
   void initState() {
     super.initState();
@@ -180,7 +184,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
     OrderService.ordersChangeNotifier.addListener(_refreshOrders);
     OrderService.startAutoPoll();
+    AddressService.addressesChangeNotifier.addListener(_loadActiveAddress);
     _loadUserAndItems();
+    _loadActiveAddress();
 
     // Listen to real-time WebSocket live data events
     _wsSub = VexaWebSocketService().stream.listen((event) {
@@ -374,6 +380,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     ApiConfig.baseUrlNotifier.removeListener(_onServerUrlChanged);
     NotificationService.notificationNotifier.removeListener(_onNotificationsChanged);
     OrderService.ordersChangeNotifier.removeListener(_refreshOrders);
+    AddressService.addressesChangeNotifier.removeListener(_loadActiveAddress);
     _wsSub?.cancel();
     _notifTapSub?.cancel();
     _promoPageController.dispose();
@@ -391,6 +398,70 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isRealUser = false;
   UserModel? _currentUser;
 
+  bool _checkIsRealUser(UserModel? user) {
+    if (user == null) return false;
+    if (user.id == 'guest_user' || user.id.isEmpty || user.id.startsWith('guest')) return false;
+    if (user.role == 'guest') return false;
+    if (user.email.toLowerCase().trim() == 'guest@vexa.app') return false;
+    return true;
+  }
+
+  Future<void> _loadActiveAddress() async {
+    try {
+      final addr = await AddressService.getDefaultAddress();
+      if (mounted) {
+        setState(() {
+          _activeAddress = addr;
+          if (addr != null) {
+            _selectedLocation = addr.shortDisplay;
+          } else {
+            _selectedLocation = 'Hyderabad, 500081';
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _openLocationPickerScreen() async {
+    final result = await Navigator.push<DeliveryLocationResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeliveryLocationScreen(
+          currentLocation: _selectedLocation,
+          activeAddress: _activeAddress,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _selectedLocation = result.displayLocation;
+        if (result.address != null) {
+          _activeAddress = result.address;
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Delivery location updated to ${result.displayLocation}',
+                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: _goldDark,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   void _onNotificationsChanged() {
     if (mounted) setState(() {});
   }
@@ -401,7 +472,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _loadUserAndItems() async {
     final user = await AuthService.getUser();
-    final realUser = user != null && user.id != 'guest_user';
+    final realUser = _checkIsRealUser(user);
     if (mounted) {
       setState(() {
         _currentUser = user;
@@ -709,8 +780,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   // 4. HOW TO BOOK STEPS SECTION
                   SliverToBoxAdapter(child: _buildHowToBookFlowSection()),
 
-                  // 5. JOIN VEXA CTA (Only shown in Guest mode)
-                  if (!_isRealUser) SliverToBoxAdapter(child: _buildJoinCta()),
+
 
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
@@ -789,18 +859,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 style: GoogleFonts.cinzel(
                   fontWeight: FontWeight.w900,
                   letterSpacing: 4.5,
-                  fontSize: 18,
+                  fontSize: 17,
                   color: _gold,
                 ),
               ),
-              const SizedBox(height: 1),
-              Text(
-                'WEAR CONFIDENCE',
-                style: GoogleFonts.outfit(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 2.2,
-                  color: _subtext,
+              const SizedBox(height: 2),
+              InkWell(
+                onTap: _openLocationPickerScreen,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 11.5,
+                        color: _goldDark,
+                      ),
+                      const SizedBox(width: 3),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 175),
+                        child: Text(
+                          _selectedLocation,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 14,
+                        color: Color(0xFF64748B),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -875,6 +973,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
 
 
+
+
   String _getTimeGreeting() {
     final hour = DateTime.now().hour;
     if (hour >= 5 && hour < 12) {
@@ -906,61 +1006,90 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final rawUser = (_currentUser != null && _currentUser!.name.trim().isNotEmpty)
         ? cleanText(_currentUser!.name)
-        : 'Collector';
+        : 'CHARAN';
 
-    final displayName = rawUser.isNotEmpty ? rawUser : 'Collector';
+    final displayName = rawUser.isNotEmpty ? rawUser : 'CHARAN';
     final greeting = _getTimeGreeting();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFFDF2),
-              Color(0xFFFFF4D1),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFE5C158).withAlpha(160),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFB8860B).withAlpha(20),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+      child: AspectRatio(
+        aspectRatio: 978 / 280,
+        child: Stack(
           children: [
-            Text(
-              greeting,
-              style: GoogleFonts.cinzel(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: _goldDark,
-                letterSpacing: 1.6,
-              ),
+            // Background card template with arch, sparkles & clothing rack
+            Image.asset(
+              'assets/images/greeting_banner_bg.png',
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.fill,
             ),
-            const SizedBox(height: 6),
-            Text(
-              displayName.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.cinzel(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: _textDark,
-                letterSpacing: 0.8,
+
+            // Dynamic User Greeting Text Overlay on the Left
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final h = constraints.maxHeight;
+                  final w = constraints.maxWidth;
+
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(w * 0.05, h * 0.08, w * 0.38, h * 0.08),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: w * 0.58),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Time of day Greeting
+                              Text(
+                                greeting,
+                                style: GoogleFonts.outfit(
+                                  fontSize: (h * 0.11).clamp(9.5, 12.0),
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 2.0,
+                                  color: const Color(0xFFB8860B),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+
+                              // Dynamic Logged-In User Name in Luxury Serif Style
+                              Text(
+                                displayName.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.cinzel(
+                                  fontSize: (h * 0.24).clamp(18.0, 24.0),
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.6,
+                                  color: const Color(0xFF08192E),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+
+                              // Fashion quote subtitle
+                              Text(
+                                'Fashion is a way of expressing yourself. Explore and make it yours.',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(
+                                  fontSize: (h * 0.10).clamp(8.5, 11.0),
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.24,
+                                  color: const Color(0xFF4A607A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -2329,72 +2458,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
 
-  // ── 8. JOIN VEXA CTA ────────────────────────────────────────────────────
-  Widget _buildJoinCta() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [_goldDark.withAlpha(40), _gold.withAlpha(15), _goldDark.withAlpha(40)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _gold.withAlpha(80)),
-        ),
-        child: Column(
-          children: [
-            RichText(
-              textAlign: TextAlign.center,
-              text: TextSpan(children: [
-                TextSpan(text: 'Join the ', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark)),
-                TextSpan(text: 'VEXA', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: _gold)),
-                TextSpan(text: ' circle', style: GoogleFonts.cinzel(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark)),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Create an account for early access to limited drops, member pricing and free express shipping.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 12.5, color: _subtext, height: 1.5),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _goldDark,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: () => _navigateToScreen(const RegisterScreen()),
-                    child: Text('Create Account',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _gold),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: () => _navigateToScreen(const LoginScreen()),
-                    child: Text('Sign In',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: _gold, letterSpacing: 0.5)),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   // ══════════════════════════════════════════════════════════════════════════
   // ══════════════════════════════════════════════════════════════════════════
@@ -2810,7 +2874,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         context: context,
                         amount: order.totalAmount,
                         customerName: order.customerName,
-                        customerPhone: order.phone,
+                        customerPhone: order.displayPhone,
                         onPaymentSuccess: (methodLabel) {
                           order.paymentMethod = methodLabel;
                           order.status = 'Confirmed';
@@ -3071,11 +3135,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ProfileScreen(
                     onNavigateToDiscover: () async {
                       final user = await AuthService.getUser();
-                      final realUser = user != null && user.id != 'guest_user';
+                      final realUser = _checkIsRealUser(user);
                       setState(() {
                         _currentTabIndex = 2; // Home tab
                         _isRealUser = realUser;
                       });
+                    },
+                    onUserStateChanged: (isReal) {
+                      if (mounted && _isRealUser != isReal) {
+                        setState(() {
+                          _isRealUser = isReal;
+                        });
+                      }
                     },
                   ),
                 ],
@@ -3219,7 +3290,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return InkWell(
       onTap: () async {
         final user = await AuthService.getUser();
-        final realUser = user != null && user.id != 'guest_user';
+        final realUser = _checkIsRealUser(user);
         if (mounted) {
           setState(() {
             _currentTabIndex = index;

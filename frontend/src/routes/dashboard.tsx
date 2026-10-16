@@ -3122,14 +3122,14 @@ export function UserDashboard() {
               <div className="space-y-6 pt-3 sm:pt-0">
                 {cartCheckoutStep === "cart" && (
                   <>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-3">
-                      <div className="flex items-center gap-3">
+                    <div className={`${cartItems.length > 0 ? "flex" : "hidden sm:flex"} items-center justify-between border-b border-border pb-3 sm:pb-4 gap-3`}>
+                      <div className="hidden sm:flex items-center gap-3">
                         <h2 className="font-display text-2xl font-bold text-foreground">My Cart</h2>
                       </div>
                       {cartItems.length > 0 && (
                         <button
                           onClick={clearCart}
-                          className="text-xs text-muted-foreground hover:text-destructive transition-colors uppercase tracking-wider font-semibold cursor-pointer w-fit"
+                          className="text-xs text-muted-foreground hover:text-destructive transition-colors uppercase tracking-wider font-semibold cursor-pointer ml-auto"
                         >
                           Clear Cart
                         </button>

@@ -234,7 +234,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final stepIdx = _currentStepIndex;
     final isCancelled = _currentOrder.status.toLowerCase().contains('cancel');
 
-    final baseDate = _currentOrder.createdAt;
+    final baseDate = _currentOrder.istDate;
     final waybillNo = 'VX-EXPRESS-${_currentOrder.id.replaceAll('#', '').replaceAll('-', '').toUpperCase()}657034';
     final city = _destinationCity;
 

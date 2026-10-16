@@ -226,12 +226,60 @@ export function Home() {
 
 
 
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
   useEffect(() => {
     const heroTimer = setInterval(() => {
       setHeroIndex((prev) => (prev + 1) % heroBanners.length);
     }, 5000);
     return () => clearInterval(heroTimer);
   }, []);
+
+  // Auto-scroll Promotional Showcase in mobile responsive only (< 768px)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const startMobileTimer = () => {
+      if (timer) clearInterval(timer);
+      if (window.innerWidth < 768) {
+        timer = setInterval(() => {
+          setBannerIndex((prev) => (prev + 1) % activePromoBanners.length);
+        }, 3500);
+      }
+    };
+
+    startMobileTimer();
+
+    const onResize = () => {
+      startMobileTimer();
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => {
+      if (timer) clearInterval(timer);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [activePromoBanners.length, bannerIndex]);
+
+  const handlePromoTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handlePromoTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) {
+        setBannerIndex((prev) => (prev + 1) % activePromoBanners.length);
+      } else {
+        setBannerIndex((prev) => (prev - 1 + activePromoBanners.length) % activePromoBanners.length);
+      }
+    }
+    setTouchStartX(null);
+  };
 
   // Exact 5 New Arrivals items matching Mobile Flutter App 1:1
   const newArrivals = useMemo(() => {
@@ -358,7 +406,11 @@ export function Home() {
           </h2>
         </Reveal>
 
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-[#B8860B]/40 bg-card shadow-xl transition-all hover:border-[#B8860B]">
+        <div 
+          className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-[#B8860B]/40 bg-card shadow-xl transition-all hover:border-[#B8860B]"
+          onTouchStart={handlePromoTouchStart}
+          onTouchEnd={handlePromoTouchEnd}
+        >
           <div className="relative h-[420px] sm:min-h-[480px] lg:min-h-[520px] w-full overflow-hidden flex flex-col md:flex-row items-stretch">
             {/* Background / Right Side Image Container */}
             <div className="absolute inset-0 md:left-auto md:right-0 md:w-1/2 lg:w-[48%] h-full overflow-hidden">
@@ -466,10 +518,10 @@ export function Home() {
 
       {/* 4. FEATURED COLLECTION */}
       <section className="mx-auto max-w-7xl px-4 sm:px-5 py-8 border-t border-border/30">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div>
-            <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-gold font-bold">Explore the catalog</p>
-            <h2 className="mt-0.5 font-display text-2xl sm:text-4xl font-bold text-foreground">Featured Collection</h2>
+        <div className="flex items-center justify-between gap-2.5 sm:gap-4 mb-4">
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] text-gold font-bold truncate">Explore the catalog</p>
+            <h2 className="mt-0.5 font-display text-lg xs:text-xl sm:text-4xl font-bold text-foreground whitespace-nowrap">Featured Collection</h2>
           </div>
           <Link
             to="/products"
@@ -482,12 +534,12 @@ export function Home() {
         {/* Featured Collection Horizontal Scroll */}
         <div
           ref={featuredRef}
-          className="mt-3 flex gap-4 sm:gap-5 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth no-scrollbar"
+          className="mt-3 flex gap-3 sm:gap-5 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth no-scrollbar"
         >
           {filteredProducts.map((p, i) => (
             <div
               key={p.id}
-              className="w-[240px] xs:w-[270px] sm:w-[300px] shrink-0 snap-start flex flex-col h-full"
+              className="w-[180px] xs:w-[190px] sm:w-[260px] md:w-[300px] shrink-0 snap-start flex flex-col h-full"
             >
               <Reveal delay={(i % 4) * 90} className="h-full w-full flex flex-col">
                 <ProductCard product={p} />

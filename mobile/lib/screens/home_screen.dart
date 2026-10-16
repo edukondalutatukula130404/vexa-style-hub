@@ -2731,18 +2731,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Format status header string (e.g., Delivered on Oct 06 / Delivery expected by Oct 09 / Cancelled on Dec 30)
     String headerText;
+    final ist = order.istDate;
     if (isCancelled) {
-      final m = months[order.createdAt.month - 1];
-      final d = order.createdAt.day.toString().padLeft(2, '0');
-      headerText = 'Cancelled on $m $d, ${order.createdAt.year}';
+      final m = months[ist.month - 1];
+      final d = ist.day.toString().padLeft(2, '0');
+      headerText = 'Cancelled on $m $d, ${ist.year}';
     } else if (isDelivered) {
-      final delDate = order.createdAt.add(const Duration(days: 2));
+      final delDate = ist.add(const Duration(days: 2));
       final delTime = delDate.isAfter(DateTime.now()) ? DateTime.now() : delDate;
       final m = months[delTime.month - 1];
       final d = delTime.day.toString().padLeft(2, '0');
       headerText = 'Delivered on $m $d';
     } else {
-      final exp = order.createdAt.add(const Duration(days: 3));
+      final exp = ist.add(const Duration(days: 3));
       final m = months[exp.month - 1];
       final d = exp.day.toString().padLeft(2, '0');
       headerText = 'Delivery expected by $m $d';

@@ -75,10 +75,10 @@ class OrderModel {
     required this.totalAmount,
     this.couponApplied = '',
     required this.status,
-    required this.createdAt,
+    required DateTime createdAt,
     required this.items,
     this.cancelReason,
-  });
+  }) : createdAt = createdAt.toUtc();
 
   Color get statusColor {
     final s = status.toLowerCase();
@@ -103,17 +103,21 @@ class OrderModel {
     return const Color(0xFFD4AF37);
   }
 
+  /// Convert order timestamp to Indian Standard Time (IST: UTC+05:30)
+  DateTime get istDate => createdAt.toUtc().add(const Duration(hours: 5, minutes: 30));
+
   String get formattedDate {
-    final day = createdAt.day.toString().padLeft(2, '0');
+    final ist = istDate;
+    final day = ist.day.toString().padLeft(2, '0');
     final monthNames = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
-    final month = monthNames[createdAt.month - 1];
-    final year = createdAt.year;
-    final hour = createdAt.hour > 12 ? createdAt.hour - 12 : (createdAt.hour == 0 ? 12 : createdAt.hour);
-    final minute = createdAt.minute.toString().padLeft(2, '0');
-    final ampm = createdAt.hour >= 12 ? 'PM' : 'AM';
+    final month = monthNames[ist.month - 1];
+    final year = ist.year;
+    final hour = ist.hour > 12 ? ist.hour - 12 : (ist.hour == 0 ? 12 : ist.hour);
+    final minute = ist.minute.toString().padLeft(2, '0');
+    final ampm = ist.hour >= 12 ? 'PM' : 'AM';
     return '$day $month $year, $hour:$minute $ampm';
   }
 
@@ -206,9 +210,9 @@ class OrderModel {
 
     DateTime parsedDate;
     if (json['createdAt'] != null) {
-      parsedDate = DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now();
+      parsedDate = DateTime.tryParse(json['createdAt'].toString())?.toUtc() ?? DateTime.now().toUtc();
     } else {
-      parsedDate = DateTime.now();
+      parsedDate = DateTime.now().toUtc();
     }
 
     final String parsedId = (json['id'] != null && json['id'].toString().isNotEmpty)
@@ -658,7 +662,7 @@ class OrderService {
       'totalAmount': totalAmount,
       'couponApplied': couponApplied,
       'status': 'Processing',
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
       'items': items.map((i) => i.toJson()).toList(),
     };
 

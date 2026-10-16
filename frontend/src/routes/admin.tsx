@@ -2670,7 +2670,7 @@ export function Admin() {
                           Booking #{String(selectedOrderDetails._id || (selectedOrderDetails as any).id || "ORD").slice(-8).toUpperCase()}
                         </h2>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Placed on: {new Date(selectedOrderDetails.createdAt || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          Placed on: {new Date(selectedOrderDetails.createdAt || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
                         </p>
                       </div>
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/server_config_dialog.dart';
 import '../widgets/vexa_button.dart';
@@ -63,10 +64,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await AuthService.saveSession(user, token);
       await AuthService.setOnboardingSeen();
 
+      final userName = (user?.name ?? 'Valued Customer').toString();
+      final userEmail = (user?.email ?? '').toString();
+      await NotificationService.showLoginSuccessNotification(
+        userName: userName,
+        email: userEmail.isNotEmpty ? userEmail : null,
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Account created! Welcome, ${user.name}!'),
+          content: Text('Account created! Welcome, $userName!'),
           backgroundColor: AppTheme.successColor,
         ),
       );

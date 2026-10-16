@@ -1,15 +1,60 @@
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendResetCodeEmail, sendWelcomeEmail, sendLoginOtpEmail } = require('../config/nodemailer');
 const { sendMobileOtpSms } = require('../config/smsService');
+const { sendFcmNotification } = require('../config/firebase');
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'vexa_secret_jwt_key', {
     expiresIn: '30d'
   });
+};
+
+// Helper to save login notification and trigger push notification
+const sendLoginNotification = async (user, isNewRegistration = false) => {
+  try {
+    const title = isNewRegistration ? 'Welcome to VEXA Style Hub 🎉' : 'Login Successful 🎉';
+    const message = isNewRegistration
+      ? `Welcome ${user.name}! Your VEXA account has been created and you are now signed in.`
+      : `Welcome back, ${user.name}! You successfully signed in to your VEXA account.`;
+
+    // 1. Create DB Notification for user
+    if (user.email) {
+      await Notification.create({
+        userEmail: user.email.toLowerCase().trim(),
+        userId: user._id.toString(),
+        title,
+        message,
+        type: 'LOGIN_SUCCESS',
+        status: 'LOGIN_SUCCESS',
+        read: false
+      });
+    }
+
+    // 2. Send FCM Push Notification if device tokens are available
+    const tokens = Array.isArray(user.fcmTokens) && user.fcmTokens.length > 0
+      ? user.fcmTokens
+      : (user.fcmToken ? [user.fcmToken] : []);
+
+    if (tokens.length > 0) {
+      await sendFcmNotification({
+        tokens,
+        title,
+        body: message,
+        data: {
+          type: 'LOGIN_SUCCESS',
+          status: 'LOGIN_SUCCESS',
+          email: user.email || ''
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Login notification helper note:', err.message);
+  }
 };
 
 // @desc    Seed default Admin user if not present
@@ -94,6 +139,9 @@ exports.registerUser = async (req, res, next) => {
 
     const token = generateToken(user._id);
 
+    // Record login notification & dispatch FCM push notification
+    sendLoginNotification(user, true).catch(() => {});
+
     res.status(201).json({
       success: true,
       token,
@@ -158,6 +206,9 @@ exports.loginUser = async (req, res, next) => {
     }
 
     const token = generateToken(user._id);
+
+    // Record login notification & dispatch FCM push notification
+    sendLoginNotification(user, false).catch(() => {});
 
     res.status(200).json({
       success: true,
@@ -479,6 +530,9 @@ exports.verifyMobileOtp = async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     const token = generateToken(user._id);
+
+    // Record login notification & dispatch FCM push notification
+    sendLoginNotification(user, false).catch(() => {});
 
     res.status(200).json({
       success: true,

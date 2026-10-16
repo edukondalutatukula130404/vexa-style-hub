@@ -884,7 +884,8 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
                   final isResolved = status.toLowerCase() == 'resolved';
                   final query = (t['message'] ?? t['text'] ?? t['query'] ?? '').toString();
                   final reply = (t['reply'] ?? t['adminReply'] ?? '').toString();
-                  final time = t['createdAt'] != null ? DateTime.tryParse(t['createdAt'].toString()) : null;
+                  final rawTime = t['createdAt'] != null ? DateTime.tryParse(t['createdAt'].toString()) : null;
+                  final time = rawTime?.toUtc().add(const Duration(hours: 5, minutes: 30));
                   final timeStr = time != null ? '${time.day}/${time.month}/${time.year}' : 'Recent';
 
                   return Container(

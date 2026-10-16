@@ -46,6 +46,31 @@ export function Login() {
     }
   };
 
+  const triggerLoginNotification = (userName: string) => {
+    try {
+      const stored = localStorage.getItem("vexa_user_notifications");
+      const list = stored ? JSON.parse(stored) : [];
+      const notif = {
+        id: `login_${Date.now()}`,
+        title: "Login Successful 🎉",
+        message: `Welcome back, ${userName}! You have signed in to VEXA Style Hub.`,
+        type: "LOGIN_SUCCESS",
+        read: false,
+        createdAt: new Date().toISOString(),
+        actionUrl: "/dashboard",
+      };
+      localStorage.setItem("vexa_user_notifications", JSON.stringify([notif, ...list]));
+      window.dispatchEvent(new Event("vexa_notifications_updated"));
+
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        new Notification("Login Successful 🎉", {
+          body: `Welcome back, ${userName}! You are now signed in to VEXA Style Hub.`,
+          icon: "/favicon.ico",
+        });
+      }
+    } catch (_) {}
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -55,6 +80,7 @@ export function Login() {
       // Attempt real database login via backend API
       const res = await loginApi(email, password);
       setLoggedIn(res.user, res.token);
+      triggerLoginNotification(res.user?.name || "Customer");
 
       const normalizedEmail = email.toLowerCase().trim();
       const isAdminEmail =
@@ -81,6 +107,7 @@ export function Login() {
           role: "admin",
         };
         setLoggedIn(adminUser, "demo-admin-token");
+        triggerLoginNotification(adminUser.name);
         navigate("/admin");
       } else {
         // Fallback for user login if server is in demo mode
@@ -90,6 +117,7 @@ export function Login() {
           role: "user",
         };
         setLoggedIn(demoUser, "demo-user-token");
+        triggerLoginNotification(demoUser.name);
         if (redirectTarget) {
           window.location.href = redirectTarget;
         } else {

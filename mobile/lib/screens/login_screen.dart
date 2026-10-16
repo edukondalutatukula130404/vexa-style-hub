@@ -364,10 +364,18 @@ class _LoginScreenState extends State<LoginScreen> {
     await AuthService.saveSession(user, token ?? 'mock_token');
     await AuthService.setOnboardingSeen();
 
+    // Trigger immediate notification for successful login (Android status bar + in-app tray)
+    final userName = (user?.name ?? 'Valued Customer').toString();
+    final userEmail = (user?.email ?? '').toString();
+    await NotificationService.showLoginSuccessNotification(
+      userName: userName,
+      email: userEmail.isNotEmpty ? userEmail : null,
+    );
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Welcome back, ${user.name}!'),
+        content: Text('Welcome back, $userName!'),
         backgroundColor: AppTheme.successColor,
         behavior: SnackBarBehavior.floating,
       ),

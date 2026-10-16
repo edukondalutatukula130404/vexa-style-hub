@@ -129,6 +129,7 @@ class NotificationService {
   }
 
   static IconData _getIconForStatus(String status) {
+    if (status == 'LOGIN_SUCCESS' || status == 'login_success' || status == 'login') return Icons.verified_user_rounded;
     if (status == 'Resolved' || status == 'support_reply') return Icons.support_agent_rounded;
     if (status == 'Shipped' || status == 'Out for Delivery') return Icons.local_shipping_rounded;
     if (status == 'Delivered') return Icons.check_circle_rounded;
@@ -138,6 +139,7 @@ class NotificationService {
   }
 
   static Color _getColorForStatus(String status) {
+    if (status == 'LOGIN_SUCCESS' || status == 'login_success' || status == 'login') return const Color(0xFF10B981);
     if (status == 'Resolved' || status == 'support_reply') return const Color(0xFF10B981);
     if (status == 'Delivered') return const Color(0xFF10B981);
     if (status == 'Cancelled') return const Color(0xFFEF4444);
@@ -566,6 +568,87 @@ class NotificationService {
       debugPrint('🔔 [NotificationService] Real-time system notification delivered for OTP: $otp');
     } catch (e) {
       debugPrint('Error showing local OTP notification: $e');
+    }
+  }
+
+  /// Trigger a real-time Android system notification and in-app notification when login is successful
+  static Future<void> showLoginSuccessNotification({
+    required String userName,
+    String? email,
+  }) async {
+    try {
+      final androidLocalPlugin = localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidLocalPlugin != null) {
+        await androidLocalPlugin.requestNotificationsPermission();
+      }
+
+      const channel = AndroidNotificationChannel(
+        'vexa_account_channel',
+        'Account & Security',
+        description: 'Real-time login and account security updates for VEXA.',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+      await androidLocalPlugin?.createNotificationChannel(channel);
+
+      final displayName = userName.trim().isNotEmpty ? userName.trim() : 'Valued Customer';
+      final title = '🎉 Login Successful!';
+      final body = 'Welcome back, $displayName! You are now logged in to VEXA Style Hub.';
+      final notifId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+      await localNotifications.show(
+        id: notifId,
+        title: title,
+        body: body,
+        payload: 'OPEN_NOTIFICATIONS',
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            channel.id,
+            channel.name,
+            channelDescription: channel.description,
+            icon: '@mipmap/ic_launcher',
+            importance: Importance.max,
+            priority: Priority.max,
+            playSound: true,
+            enableVibration: true,
+            ticker: 'Login Successful',
+            styleInformation: BigTextStyleInformation(
+              'Welcome back, <b>$displayName</b>!<br/>You have successfully logged in to VEXA Style Hub. Enjoy your personalized shopping experience.',
+              htmlFormatBigText: true,
+              contentTitle: '<b>🎉 Login Successful</b>',
+              htmlFormatContentTitle: true,
+              summaryText: 'Account Login',
+            ),
+          ),
+        ),
+      );
+
+      // Add to in-app notification list
+      final newNotif = {
+        'id': 'notif_login_${DateTime.now().millisecondsSinceEpoch}',
+        'title': title,
+        'body': body,
+        'time': 'Just now',
+        'isRead': false,
+        'icon': Icons.verified_user_rounded,
+        'color': const Color(0xFF10B981),
+        'type': 'LOGIN_SUCCESS',
+        'data': {'userName': displayName, 'email': email ?? ''},
+      };
+
+      notifications.insert(0, newNotif);
+      notifyListeners();
+      debugPrint('🔔 [NotificationService] Real-time system notification delivered for Login Success: $displayName');
+
+      // Sync FCM token and remote notifications with backend
+      if (email != null && email.isNotEmpty) {
+        registerFcmTokenWithBackend(email: email);
+        syncRemoteNotifications(email);
+      }
+    } catch (e) {
+      debugPrint('Error showing local login success notification: $e');
     }
   }
 }

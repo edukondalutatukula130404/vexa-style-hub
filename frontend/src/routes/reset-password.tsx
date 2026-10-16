@@ -127,8 +127,9 @@ export function ResetPassword() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="text-muted-foreground hover:text-gold transition-colors p-1"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                   </button>
                 </div>
               </div>

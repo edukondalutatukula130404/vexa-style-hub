@@ -144,6 +144,14 @@ export function Navbar() {
     <>
       <header
         className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 transform ${
+          location.pathname.startsWith("/product/") ||
+          location.pathname === "/products" ||
+          (location.pathname === "/dashboard" && location.search.includes("tab=cart")) ||
+          location.pathname === "/cart" ||
+          location.pathname === "/login"
+            ? "hidden md:block"
+            : ""
+        } ${
           visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
         } ${
           scrolled
@@ -360,7 +368,7 @@ export function Navbar() {
             ) : (
               <Link
                 to="/login"
-                className="inline-flex items-center gap-1.5 rounded bg-[#965B0A] hover:bg-[#834E06] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-white transition-all shadow-sm cursor-pointer active:scale-95 ml-1"
+                className="hidden md:inline-flex items-center gap-1.5 rounded bg-[#965B0A] hover:bg-[#834E06] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-white transition-all shadow-sm cursor-pointer active:scale-95 ml-1"
                 title="Login to Account"
               >
                 <User className="size-3.5" />

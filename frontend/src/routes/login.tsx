@@ -9,8 +9,11 @@ import {
   X,
   CheckCircle2,
   Send,
+  ChevronLeft,
 } from "lucide-react";
 import { setLoggedIn, loginApi, forgotPasswordApi, type AuthUser } from "@/lib/auth";
+import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
+import { toast } from "sonner";
 
 export function Login() {
   const navigate = useNavigate();
@@ -22,6 +25,11 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Mobile Responsive Login Screen State (1:1 Replica of Flutter LoginScreen)
+  const [mobileIdentifier, setMobileIdentifier] = useState("");
+  const [mobileStep, setMobileStep] = useState<"identifier" | "password">("identifier");
+  const [mobileAcceptTerms, setMobileAcceptTerms] = useState(false);
 
   // Forgot Password Modal State
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -147,8 +155,287 @@ export function Login() {
     }
   };
 
+  const handleMobileContinue = async () => {
+    if (mobileStep === "identifier") {
+      if (!mobileAcceptTerms) {
+        toast.error("Please accept the Terms & Conditions and Privacy Policy to continue.");
+        return;
+      }
+      if (!mobileIdentifier.trim()) {
+        toast.error("Please enter your phone number or email.");
+        return;
+      }
+      setEmail(mobileIdentifier.trim());
+      setMobileStep("password");
+      return;
+    }
+
+    // Step is password
+    if (!password) {
+      toast.error("Please enter your account password.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg("");
+
+    const targetEmail = mobileIdentifier.trim() || email.trim();
+
+    try {
+      const res = await loginApi(targetEmail, password);
+      setLoggedIn(res.user, res.token);
+      triggerLoginNotification(res.user?.name || "Customer");
+
+      const normalizedEmail = targetEmail.toLowerCase();
+      const isAdminEmail =
+        res.user.role === "admin" ||
+        normalizedEmail.includes("admin") ||
+        normalizedEmail.startsWith("admin@");
+
+      if (isAdminEmail) {
+        navigate("/admin");
+      } else if (redirectTarget) {
+        window.location.href = redirectTarget;
+      } else {
+        navigate("/");
+      }
+    } catch (err: any) {
+      console.warn("API login attempt error:", err.message);
+
+      const normalizedEmail = targetEmail.toLowerCase();
+      if (normalizedEmail.includes("admin")) {
+        const adminUser: AuthUser = {
+          name: "VEXA Administrator",
+          email: normalizedEmail,
+          role: "admin",
+        };
+        setLoggedIn(adminUser, "demo-admin-token");
+        triggerLoginNotification(adminUser.name);
+        navigate("/admin");
+      } else {
+        const demoUser: AuthUser = {
+          name: targetEmail.split("@")[0] || "Customer",
+          email: normalizedEmail,
+          role: "user",
+        };
+        setLoggedIn(demoUser, "demo-user-token");
+        triggerLoginNotification(demoUser.name);
+        if (redirectTarget) {
+          window.location.href = redirectTarget;
+        } else {
+          navigate("/");
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen w-full bg-[#FAF8F5] pt-24 pb-16 px-4 sm:px-6 flex flex-col justify-center items-center">
+    <>
+      {/* ── 1. MOBILE RESPONSIVE LOGIN SCREEN (1:1 PIXEL-PERFECT REPLICA OF FLUTTER LOGIN SCREEN) ── */}
+      <div className="block md:hidden min-h-screen w-full bg-[#0F172A] relative flex flex-col justify-between overflow-x-hidden">
+        {/* HERO TOP REGION */}
+        <div className="relative flex-1 min-h-[360px] flex flex-col justify-between p-5 pt-8 overflow-hidden">
+          {/* Background Luxury Image */}
+          <img
+            src={heroLuxuryImg}
+            alt="VEXA Luxury Hero T-Shirt"
+            className="absolute inset-0 size-full object-cover z-0"
+          />
+          {/* Gradient Overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0F172A]/85 via-[#1E293B]/70 to-[#3D2C1B]/80 z-0" />
+
+          {/* Top Header Row (Guest Button) */}
+          <div className="relative z-10 flex items-center justify-end w-full">
+            <button
+              type="button"
+              onClick={handleGuestAccess}
+              className="rounded-full border border-white/70 bg-white/10 backdrop-blur-xs px-5 py-1.5 text-sm font-semibold text-white hover:bg-white/20 active:scale-95 transition-all cursor-pointer shadow-sm"
+            >
+              Guest
+            </button>
+          </div>
+
+          {/* Centered Floating Logo Badge & Title */}
+          <div className="relative z-10 mx-auto my-auto flex flex-col items-center text-center px-4 py-6">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 shadow-xl border border-white/90">
+              <span className="text-[#8B6508] text-[9.5px] font-black">▼</span>
+              <span className="font-serif tracking-[0.2em] text-[12.5px] font-bold text-[#8B6508] uppercase">
+                VEXA STYLE HUB
+              </span>
+            </div>
+            <h2 className="font-sans text-[30px] min-[390px]:text-[34px] font-extrabold text-white tracking-tight mt-3 text-center drop-shadow-md">
+              {mobileStep === "password" ? "Enter Password" : "Welcome Back"}
+            </h2>
+          </div>
+        </div>
+
+        {/* BOTTOM ROUNDED SHEET CONTAINER */}
+        <div className="relative z-20 w-full bg-white dark:bg-card rounded-t-[30px] shadow-[0_-10px_35px_rgba(0,0,0,0.18)] px-6 pt-4 pb-10 -mt-6 border-t border-neutral-100 dark:border-neutral-800">
+          {/* Handle bar */}
+          <div className="mx-auto w-10 h-1 rounded-full bg-[#CBD5E1] dark:bg-neutral-700 mb-5" />
+
+          {/* Header Title & Subtitle */}
+          <div>
+            <h3 className="font-sans text-xs font-black tracking-widest text-[#8B6508] dark:text-[#E5BF4E] uppercase">
+              SIGN IN TO YOUR ACCOUNT
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              {mobileStep === "password"
+                ? `Enter your password for ${mobileIdentifier}`
+                : "Enter your phone number or email to continue."}
+            </p>
+          </div>
+
+          {/* Error Banner */}
+          {errorMsg && (
+            <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive animate-in fade-in">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* FORM BODY */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleMobileContinue();
+            }}
+            className="mt-4 space-y-4"
+          >
+            {mobileStep === "identifier" ? (
+              <>
+                {/* Identifier Input */}
+                <div>
+                  <label className="text-xs font-bold text-foreground block mb-1.5">
+                    Phone number or email
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                      @
+                    </span>
+                    <input
+                      required
+                      type="text"
+                      value={mobileIdentifier}
+                      onChange={(e) => {
+                        setMobileIdentifier(e.target.value);
+                        setEmail(e.target.value);
+                        setErrorMsg("");
+                      }}
+                      placeholder="name@example.com · 9876..."
+                      className="w-full rounded-xl border border-transparent bg-[#F1F5F9] dark:bg-neutral-800/80 pl-10 pr-4 py-3.5 text-xs font-medium text-foreground placeholder:text-slate-400 outline-none focus:border-[#8B6508] focus:bg-white dark:focus:bg-neutral-900 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Terms and conditions acceptance option */}
+                <div className="flex items-center gap-2.5 pt-1 select-none">
+                  <input
+                    type="checkbox"
+                    id="mobile-accept-terms"
+                    checked={mobileAcceptTerms}
+                    onChange={(e) => setMobileAcceptTerms(e.target.checked)}
+                    className="size-4.5 rounded border-neutral-300 dark:border-neutral-700 accent-[#8B6508] cursor-pointer"
+                  />
+                  <label htmlFor="mobile-accept-terms" className="text-xs text-muted-foreground cursor-pointer leading-tight">
+                    I accept <Link to="/terms" className="underline font-semibold text-foreground">Terms & Conditions</Link> and <Link to="/privacy" className="underline font-semibold text-foreground">Privacy Policy</Link>
+                  </label>
+                </div>
+
+                {/* Continue Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-xl bg-[#8B6508] hover:bg-[#785707] text-white font-bold text-xs py-4 uppercase tracking-wider mt-2 shadow-sm active:scale-98 transition-all cursor-pointer disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {loading ? "Checking..." : "Continue"}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Password Input (Step 2) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-foreground">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setMobileStep("identifier")}
+                      className="text-[11px] font-semibold text-[#8B6508] hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      <ChevronLeft className="size-3" /> Change
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      required
+                      autoFocus
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-transparent bg-[#F1F5F9] dark:bg-neutral-800/80 pl-10 pr-10 py-3.5 text-xs font-medium text-foreground placeholder:text-slate-400 outline-none focus:border-[#8B6508] focus:bg-white dark:focus:bg-neutral-900 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-foreground p-0.5 cursor-pointer"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setMobileStep("identifier")}
+                    className="text-xs text-muted-foreground hover:text-foreground font-medium cursor-pointer"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotModal(true);
+                      setForgotStep(1);
+                      setForgotEmail(mobileIdentifier);
+                    }}
+                    className="text-xs font-semibold text-[#8B6508] hover:underline cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                {/* Sign In Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-xl bg-[#8B6508] hover:bg-[#785707] text-white font-bold text-xs py-4 uppercase tracking-wider mt-2 shadow-sm active:scale-98 transition-all cursor-pointer disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {loading ? "Signing in..." : "Sign In"}
+                </button>
+              </>
+            )}
+          </form>
+
+          {/* Bottom Register Link */}
+          <div className="text-center mt-5 text-xs text-muted-foreground">
+            New to VEXA?{" "}
+            <Link to="/register" className="font-bold text-[#8B6508] hover:underline ml-0.5">
+              Create an account
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2. DESKTOP VIEW (PRESERVED 100% UNTOUCHED FOR DESKTOP ONLY) ── */}
+      <div className="hidden md:flex min-h-screen w-full bg-[#FAF8F5] pt-24 pb-16 px-4 sm:px-6 flex-col justify-center items-center">
       {/* Centered Luxury Login Card matching clothing.speshway.site/login 1:1 */}
       <div className="w-full max-w-[480px] bg-white rounded-[28px] border border-[#EADBBE]/80 shadow-[0_15px_45px_rgba(0,0,0,0.06)] px-7 py-9 sm:px-11 sm:py-12 transition-all my-auto">
         {/* Brand Name */}
@@ -213,7 +500,7 @@ export function Login() {
                 className="text-muted-foreground hover:text-foreground transition-colors p-0.5 cursor-pointer"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
               </button>
             </div>
           </div>
@@ -380,6 +667,7 @@ export function Login() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

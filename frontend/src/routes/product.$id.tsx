@@ -14,6 +14,10 @@ import {
   ThumbsUp,
   X,
   ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Edit3,
+  MapPin,
   Share2,
   Minus,
   Plus,
@@ -21,12 +25,16 @@ import {
   Check,
   AlertCircle,
   PackageX,
+  Heart,
+  Send,
 } from "lucide-react";
 import { useProducts, SIZES, getVariantStock, type Product } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 import { Reveal } from "@/components/Reveal";
 import { addToCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
+import { useWishlist, toggleWishlist } from "@/lib/wishlist";
+import { DeliveryLocationModal } from "@/components/DeliveryLocationModal";
 import { toast } from "sonner";
 
 import black from "@/assets/tee-black.jpg";
@@ -40,6 +48,8 @@ import heroLuxuryImg from "@/assets/hero_luxury_tshirt.png";
 import promoBanner1 from "@/assets/promo_banner_1.png";
 import promoBanner2 from "@/assets/promo_banner_2.png";
 import rust from "@/assets/tee-rust.png";
+import lavender from "@/assets/tee-lavender.png";
+import emerald from "@/assets/tee-emerald.png";
 
 export type ColorOption = {
   name: string;
@@ -49,13 +59,16 @@ export type ColorOption = {
 };
 
 export const COLOR_OPTIONS: ColorOption[] = [
-  { name: "Luxury Cream & Gold", hex: "#F5F0E6", image: luxuryGold, borderColor: "#D4AF37" },
+  { name: "Pastel Lavender", hex: "#B8A5D6", image: lavender, borderColor: "#9C87BD" },
+  { name: "Emerald Green", hex: "#1B4D3E", image: emerald, borderColor: "#13382D" },
   { name: "Jet Black", hex: "#18181B", image: black, borderColor: "#3F3F46" },
+  { name: "Vintage Rust", hex: "#8B3A2B", image: rust, borderColor: "#65281B" },
+  { name: "Desert Sand", hex: "#D4C3A3", image: beige, borderColor: "#A89878" },
+  { name: "Military Olive", hex: "#4B5320", image: olive, borderColor: "#3B4219" },
   { name: "Ivory White", hex: "#FDFDFD", image: white, borderColor: "#E4E4E7" },
   { name: "Midnight Navy", hex: "#1E293B", image: navy, borderColor: "#334155" },
-  { name: "Desert Sand", hex: "#D4C3A3", image: beige, borderColor: "#A89878" },
-  { name: "Vintage Rust", hex: "#8B3A2B", image: rust, borderColor: "#65281B" },
   { name: "Charcoal Gray", hex: "#3F3F46", image: charcoal, borderColor: "#52525B" },
+  { name: "Luxury Cream & Gold", hex: "#F5F0E6", image: luxuryGold, borderColor: "#D4AF37" },
 ];
 
 export type Review = {
@@ -74,42 +87,42 @@ const defaultReviewsMap: Record<string, Review[]> = {
   default: [
     {
       id: "rev-1",
-      name: "Rahul Verma",
+      name: "Rohan V.",
       rating: 5,
-      date: "August 1, 2026",
-      title: "Unbelievable quality and fit!",
+      date: "2 days ago",
+      title: "The 240 GSM heavy cotton feel is insane!",
       comment:
-        "The 240 GSM weight is incredible. Heavy yet breathable cotton, drape is top notch. Wore it all day in the heat and the collar hasn't lost shape at all.",
+        "The 240 GSM heavy cotton feel is insane! Fits perfectly oversized without looking boxy. Color fastness after washing is top notch.",
       verified: true,
       helpfulCount: 24,
     },
     {
       id: "rev-2",
-      name: "Ananya Sharma",
+      name: "Ananya I.",
       rating: 5,
-      date: "July 28, 2026",
-      title: "Fits like high-end luxury streetwear",
+      date: "5 days ago",
+      title: "Pure luxury aesthetic",
       comment:
-        "Ordered size M for an oversized look and it fits like a high-end designer brand. Stitching quality and bio-wash finish are super impressive.",
+        "Pure luxury aesthetic. Stitching detail and drop shoulder cut is premium quality.",
       verified: true,
       helpfulCount: 18,
     },
     {
       id: "rev-3",
-      name: "Karan Patel",
+      name: "Karan P.",
       rating: 4,
-      date: "July 20, 2026",
+      date: "1 week ago",
       title: "Great colorway & premium feel",
       comment:
-        "Great colorway and luxurious heavy feel. Delivery took 2 days to Mumbai. Definitely buying the obsidian color next.",
+        "Great colorway and luxurious heavy feel. Delivery took 2 days. Definitely buying the obsidian color next.",
       verified: true,
       helpfulCount: 9,
     },
     {
       id: "rev-4",
-      name: "Vikram Singh",
+      name: "Vikram S.",
       rating: 5,
-      date: "July 12, 2026",
+      date: "2 weeks ago",
       title: "Best heavy tee in India",
       comment:
         "Hands down the best heavyweight tee in India right now. Fits true to the oversized aesthetic. Premium gold-tier packaging too!",
@@ -148,10 +161,42 @@ export function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState<"specs" | "care" | "shipping">("specs");
   const [addedToast, setAddedToast] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const { isInWishlist } = useWishlist();
+  const isWishlisted = product ? isInWishlist(product.id) : false;
+
+  // Delivery details state
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(() => {
+    if (typeof window !== "undefined") {
+      return (
+        localStorage.getItem("vexa_delivery_location") ||
+        "Floor 5, Cyber Towers, HITEC City, Phase 2, Hyderabad 500081"
+      );
+    }
+    return "Floor 5, Cyber Towers, HITEC City, Phase 2, Hyderabad 500081";
+  });
+
+  const deliveryDateString = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+    const day = d.getDate();
+    const month = d.toLocaleDateString("en-US", { month: "short" });
+    return `${weekday}, ${day} ${month}`;
+  }, []);
+
+  const handleSelectLocation = (loc: string) => {
+    setSelectedLocation(loc);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vexa_delivery_location", loc);
+    }
+    setIsLocationModalOpen(false);
+  };
 
   // Review state
   const [reviews, setReviews] = useState<Review[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showAllMobileReviews, setShowAllMobileReviews] = useState(false);
   const [newRating, setNewRating] = useState(5);
   const [newName, setNewName] = useState("");
   const [newTitle, setNewTitle] = useState("");
@@ -432,7 +477,7 @@ export function ProductDetailPage() {
     const others = products.filter(
       (p) => p.id !== product.id && p.category !== product.category
     );
-    return [...sameCat, ...others].slice(0, 4);
+    return [...sameCat, ...others].slice(0, 10);
   }, [products, product]);
 
   const currentVariantStock = useMemo(() => {
@@ -607,10 +652,10 @@ export function ProductDetailPage() {
       : product.rating.toFixed(1);
 
   return (
-    <section className="mx-auto max-w-7xl px-5 pt-28 pb-12">
+    <>
       {/* Toast Notification */}
       {addedToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border border-gold/50 bg-card p-4 text-xs shadow-2xl animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-20 md:bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border border-gold/50 bg-card p-4 text-xs shadow-2xl animate-in slide-in-from-bottom duration-300">
           <CheckCircle2 className="size-5 text-gold shrink-0" />
           <div>
             <p className="font-bold text-foreground">Added to Bag</p>
@@ -626,6 +671,484 @@ export function ProductDetailPage() {
           </Link>
         </div>
       )}
+
+      {/* ============================================================== */}
+      {/* 1. MOBILE RESPONSIVE ONLY VIEW (< md)                          */}
+      {/* ============================================================== */}
+      <div className="block md:hidden min-h-screen bg-background pb-32">
+        {/* Edge-to-Edge Hero Image */}
+        <div className="relative w-full aspect-[4/5] sm:aspect-square overflow-hidden bg-neutral-900">
+          <img
+            key={selectedImage}
+            src={selectedImage}
+            alt={`${product.name} in ${selectedColor.name}`}
+            className="h-full w-full object-cover object-top"
+          />
+
+          {/* Floating Back Button (Top Left) */}
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="absolute top-4 left-4 z-20 flex size-10 items-center justify-center rounded-full bg-white text-black shadow-lg transition-transform active:scale-90 cursor-pointer"
+            aria-label="Go Back"
+          >
+            <ChevronLeft className="size-6 text-black -ml-0.5" strokeWidth={2.4} />
+          </button>
+
+          {/* Floating Action Buttons (Top Right) */}
+          <div className="absolute top-4 right-4 z-20 flex flex-col gap-2.5">
+            <button
+              type="button"
+              onClick={() => toggleWishlist(product)}
+              className="flex size-10 items-center justify-center rounded-full bg-white text-black shadow-lg transition-transform active:scale-90 cursor-pointer"
+              aria-label="Wishlist"
+            >
+              <Heart className={`size-5 transition-colors ${isWishlisted ? "fill-red-500 text-red-500" : "text-black"}`} />
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex size-10 items-center justify-center rounded-full bg-white text-black shadow-lg transition-transform active:scale-90 cursor-pointer"
+              aria-label="Share"
+            >
+              <Send className="size-4.5 text-black -ml-0.5" />
+            </button>
+          </div>
+
+          {/* Floating Rating Pill (Bottom Left) */}
+          <div className="absolute bottom-3.5 left-3.5 z-20 flex items-center gap-1.5 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-bold text-black shadow-md backdrop-blur-xs">
+            <span className="font-extrabold">{avgRating}</span>
+            <Star className="size-3.5 fill-emerald-600 text-emerald-600" />
+            <span className="text-neutral-300 font-light">|</span>
+            <span className="text-neutral-600 font-semibold">{reviews.length || 96}</span>
+          </div>
+        </div>
+
+        {/* Slide Progress Indicator Bar */}
+        <div className="w-full h-1 bg-neutral-200 dark:bg-neutral-800 relative">
+          <div className="h-full bg-[#D4AF37] w-1/3" />
+        </div>
+
+        {/* Main Details Body */}
+        <div className="px-4 pt-4 space-y-5">
+          {/* Brand Tag & Title */}
+          <div>
+            <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 tracking-wide">
+              {product.category ? `${product.category} Collection` : "VEXA Fashion"}
+            </p>
+            <h1 className="mt-1 font-display text-lg font-bold text-foreground leading-snug">
+              {product.name}
+            </h1>
+
+            {/* Price Row */}
+            <div className="mt-2 flex items-baseline gap-2.5">
+              <span className="text-2xl font-black text-foreground">
+                ₹{currentPrice.toLocaleString("en-IN")}
+              </span>
+              {currentOldPrice > currentPrice && (
+                <span className="text-sm text-neutral-400 line-through">
+                  ₹{currentOldPrice.toLocaleString("en-IN")}
+                </span>
+              )}
+              {discountOff > 0 && (
+                <span className="text-sm font-extrabold text-emerald-500">
+                  {discountOff}% OFF
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Selected Color Section with Image Thumbnails */}
+          <div>
+            <p className="text-xs font-bold text-foreground">
+              Selected Color:{" "}
+              <span className="font-normal text-neutral-500 dark:text-neutral-400">
+                {selectedColor.name}
+              </span>
+            </p>
+            <div className="mt-2.5 flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
+              {availableColorsForProduct.map((col) => {
+                const isSelected = selectedColor.name.toLowerCase().trim() === col.name.toLowerCase().trim();
+                return (
+                  <button
+                    key={col.name}
+                    type="button"
+                    onClick={() => handleSelectColor(col)}
+                    className={`relative shrink-0 w-14 h-18 rounded-xl overflow-hidden border-2 transition-all bg-card cursor-pointer ${
+                      isSelected
+                        ? "border-foreground dark:border-white ring-2 ring-[#D4AF37]/50 shadow-md scale-102"
+                        : "border-border/70 opacity-80 hover:opacity-100"
+                    }`}
+                    title={col.name}
+                  >
+                    <img
+                      src={col.image}
+                      alt={col.name}
+                      className="w-full h-full object-cover object-top"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Select Size Section */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-foreground">Select Size</span>
+                <button
+                  type="button"
+                  onClick={() => setShowSizeGuide(true)}
+                  className="text-xs font-semibold text-blue-500 hover:underline cursor-pointer"
+                >
+                  Size Chart
+                </button>
+              </div>
+              <span className={`text-xs font-semibold ${isVariantInStock ? "text-emerald-500" : "text-red-500"}`}>
+                {isVariantInStock ? `Size ${selectedSize} (In Stock)` : `Size ${selectedSize} (Out of Stock)`}
+              </span>
+            </div>
+
+            <div className="mt-3 flex gap-2.5">
+              {SIZES.filter((sz) => sz !== "XS" && sz !== "XXL").map((sz) => {
+                const szStock = product ? getVariantStock(product.id, selectedColor.name, sz, product.stock) : 0;
+                const isSzOut = szStock <= 0;
+                const isSelected = selectedSize === sz;
+
+                return (
+                  <button
+                    key={sz}
+                    type="button"
+                    disabled={isSzOut}
+                    onClick={() => !isSzOut && setSelectedSize(sz)}
+                    className={`relative flex size-11 items-center justify-center rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-[#D4AF37] text-white shadow-sm font-black border-none"
+                        : isSzOut
+                        ? "border border-neutral-200 dark:border-neutral-800 bg-muted/20 text-neutral-400 cursor-not-allowed opacity-50"
+                        : "border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-card text-foreground hover:border-[#D4AF37]"
+                    }`}
+                  >
+                    <span>{sz}</span>
+                    {isSzOut && (
+                      <span className="absolute -top-1.5 -right-1.5 rounded-full bg-red-500 px-1 py-0.2 text-[8px] font-black text-white shadow-xs">
+                        OOS
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quantity Selector */}
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-sm font-bold text-foreground">Quantity:</span>
+            <div className="flex items-center rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-card px-3 py-1.5 shadow-xs">
+              <button
+                type="button"
+                disabled={!isVariantInStock}
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                className="p-1 text-neutral-600 dark:text-neutral-300 hover:text-foreground cursor-pointer disabled:opacity-40"
+              >
+                <Minus className="size-4" />
+              </button>
+              <span className="w-8 text-center text-sm font-bold text-foreground">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                disabled={!isVariantInStock}
+                onClick={() => setQuantity((q) => q + 1)}
+                className="p-1 text-neutral-600 dark:text-neutral-300 hover:text-foreground cursor-pointer disabled:opacity-40"
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Delivery Details */}
+          <div className="space-y-2.5 pt-1">
+            <h2 className="text-base font-bold text-foreground">Delivery details</h2>
+
+            {/* Address Row */}
+            <div
+              onClick={() => setIsLocationModalOpen(true)}
+              className="flex items-center justify-between rounded-2xl bg-[#F0F6FF] dark:bg-blue-950/25 border border-blue-100 dark:border-blue-900/40 p-3.5 cursor-pointer active:scale-99 transition-all"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <MapPin className="size-4.5 text-blue-600 shrink-0" />
+                <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                  {selectedLocation}
+                </span>
+              </div>
+              <ChevronRight className="size-4 text-neutral-400 shrink-0" />
+            </div>
+
+            {/* Delivery Time Row */}
+            <div className="flex items-center justify-between rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-card p-3.5 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <Truck className="size-4.5 text-neutral-600 dark:text-neutral-300" />
+                <span className="text-xs text-neutral-600 dark:text-neutral-300">
+                  Delivery by <strong className="font-bold text-foreground">{deliveryDateString}</strong>
+                </span>
+              </div>
+              <span className="rounded-md bg-emerald-100 dark:bg-emerald-950/50 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                FASTEST
+              </span>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="pt-1">
+            <h2 className="text-sm font-bold text-foreground">Description:</h2>
+            <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              {product.description || "240 GSM combed cotton in pastel lilac tone with luxury heavy rib collar."}
+            </p>
+          </div>
+
+          {/* Similar Products */}
+          {relatedProducts.length > 0 && (
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-foreground">Similar Products</h2>
+                <Link
+                  to="/products"
+                  className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/50 bg-[#FFFDF5] dark:bg-card px-2.5 py-1 text-[11px] font-bold text-[#8B6508] dark:text-[#E5C158] hover:bg-[#D4AF37] hover:text-white transition-all shadow-xs shrink-0"
+                >
+                  <span>See All</span>
+                  <ArrowRight className="size-3" />
+                </Link>
+              </div>
+
+              <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                {relatedProducts.map((rel) => {
+                  const relOff = Math.round((1 - rel.price / rel.oldPrice) * 100);
+                  const isRelWish = isInWishlist(rel.id);
+                  return (
+                    <div
+                      key={rel.id}
+                      onClick={() => {
+                        navigate(`/product/${rel.id}`);
+                        window.scrollTo({ top: 0, behavior: "instant" });
+                      }}
+                      className="relative w-[180px] xs:w-[190px] shrink-0 overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-card shadow-xs cursor-pointer flex flex-col justify-between"
+                    >
+                      {/* Product Image */}
+                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-900">
+                        <img
+                          src={rel.image || luxuryGold}
+                          alt={rel.name}
+                          className="h-full w-full object-cover object-top"
+                        />
+                        {/* Discount Badge */}
+                        {relOff > 0 && (
+                          <span className="absolute left-2.5 top-2.5 rounded-md bg-[#E5C158] px-2 py-0.5 text-[9px] font-black uppercase text-black shadow-xs">
+                            {relOff}% OFF
+                          </span>
+                        )}
+                        {/* Heart */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleWishlist(rel);
+                          }}
+                          className="absolute right-2.5 top-2.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-xs transition-transform active:scale-90"
+                        >
+                          <Heart className={`size-3.5 ${isRelWish ? "fill-red-500 text-red-500" : "text-white"}`} />
+                        </button>
+                      </div>
+
+                      {/* Card Info */}
+                      <div className="p-3 flex-1 flex flex-col justify-between">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
+                            {rel.category || "OVERSIZED"}
+                          </p>
+                          <h3 className="mt-0.5 font-bold text-xs text-foreground line-clamp-1">
+                            {rel.name}
+                          </h3>
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between pt-1">
+                          <div>
+                            {rel.oldPrice > rel.price && (
+                              <p className="text-[10px] text-neutral-400 line-through">
+                                ₹{rel.oldPrice.toLocaleString("en-IN")}
+                              </p>
+                            )}
+                            <p className="text-sm font-extrabold text-foreground">
+                              ₹{rel.price.toLocaleString("en-IN")}
+                            </p>
+                          </div>
+
+                          <div className="flex size-7 items-center justify-center rounded-full bg-[#FFF4D1] dark:bg-neutral-800 text-[#8B6508] dark:text-[#E5C158]">
+                            <ArrowRight className="size-3.5" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* See All End Card */}
+                <Link
+                  to="/products"
+                  className="relative w-[140px] shrink-0 overflow-hidden rounded-2xl border-2 border-dashed border-[#D4AF37]/50 bg-[#FFFDF5] dark:bg-card/40 flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-all hover:border-[#D4AF37] active:scale-95 shadow-xs"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-full bg-[#D4AF37]/15 text-[#8B6508] dark:text-[#E5C158] mb-2 shadow-xs">
+                    <ArrowRight className="size-5" />
+                  </div>
+                  <span className="text-xs font-bold text-foreground">See All</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5 font-medium">
+                    View Catalog
+                  </span>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Customer Reviews on Mobile */}
+          <div className="pt-2 border-t border-border/40 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-foreground">Customer Reviews</h2>
+              <button
+                type="button"
+                onClick={handleOpenReviewModal}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#D4AF37] bg-white dark:bg-card px-3 py-1.5 text-xs font-bold text-[#8B6508] dark:text-[#E5C158] shadow-xs cursor-pointer active:scale-95"
+              >
+                <Edit3 className="size-3.5" />
+                <span>Write Review</span>
+              </button>
+            </div>
+
+            {/* Rating Breakdown Card */}
+            <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-card p-4 shadow-xs flex items-center gap-4">
+              {/* Left Column: Big score */}
+              <div className="text-center shrink-0 pr-2">
+                <div className="text-4xl font-black text-foreground tracking-tight">4.6</div>
+                <div className="flex justify-center text-amber-400 gap-0.5 mt-1">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className="size-3.5 fill-amber-400 text-amber-400" />
+                  ))}
+                </div>
+                <p className="text-[11px] text-neutral-400 mt-1">175 ratings</p>
+              </div>
+
+              {/* Vertical Divider */}
+              <div className="w-px h-18 bg-neutral-200 dark:bg-neutral-800 shrink-0" />
+
+              {/* Right Column: Rating progress bars */}
+              <div className="flex-1 space-y-1">
+                {[
+                  { star: 5, pct: 75, count: 3 },
+                  { star: 4, pct: 25, count: 1 },
+                  { star: 3, pct: 0, count: 0 },
+                  { star: 2, pct: 0, count: 0 },
+                  { star: 1, pct: 0, count: 0 },
+                ].map(({ star, pct, count }) => (
+                  <div key={star} className="flex items-center gap-1.5 text-[10px]">
+                    <span className="font-semibold text-neutral-500 w-2.5 text-right">{star}</span>
+                    <Star className="size-2.5 fill-amber-400 text-amber-400 shrink-0" />
+                    <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                      <div
+                        className="h-full bg-[#D4AF37] rounded-full"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="text-neutral-400 w-3 text-right">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Individual Review Cards */}
+            <div className="space-y-3 pt-1">
+              {(showAllMobileReviews ? reviews : reviews.slice(0, 2)).map((rev) => (
+                <div
+                  key={rev.id}
+                  className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-card p-4 shadow-xs space-y-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex size-9 items-center justify-center rounded-full bg-[#FFF4D1] dark:bg-neutral-800 font-bold text-xs text-[#8B6508] dark:text-[#E5C158] shrink-0">
+                        {rev.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs text-foreground">{rev.name}</span>
+                          {rev.verified && (
+                            <span className="flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.2 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <Check className="size-2.5 stroke-[3]" /> Verified Buyer
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-neutral-400">{rev.date}</p>
+                      </div>
+                    </div>
+
+                    {/* Star Rating */}
+                    <div className="flex text-amber-400 gap-0.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`size-3 ${i < rev.rating ? "fill-amber-400 text-amber-400" : "text-neutral-200 dark:text-neutral-700"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed font-normal">
+                    {rev.comment}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* View All Reviews Button */}
+            {reviews.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllMobileReviews((prev) => !prev)}
+                className="w-full rounded-xl border border-[#E5C158] bg-[#FFFDF5] dark:bg-neutral-900 py-3 flex items-center justify-center gap-1.5 text-xs font-bold text-[#8B6508] dark:text-[#E5C158] shadow-xs active:scale-98 transition-all cursor-pointer"
+              >
+                <ChevronDown className={`size-4 transition-transform duration-300 ${showAllMobileReviews ? "rotate-180" : ""}`} />
+                <span>
+                  {showAllMobileReviews ? "Hide Reviews" : `View All Reviews (${reviews.length})`}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sticky Mobile Bottom Bar (Fixed at bottom on Mobile) */}
+        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-border/60 bg-white dark:bg-[#14120E] p-3.5 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <button
+            type="button"
+            disabled={!isVariantInStock}
+            onClick={handleAddToCart}
+            className="flex-1 py-3 px-4 rounded-xl border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-foreground font-bold text-sm shadow-xs active:scale-95 transition-all text-center disabled:opacity-50 cursor-pointer"
+          >
+            Add to cart
+          </button>
+          <button
+            type="button"
+            disabled={!isVariantInStock}
+            onClick={handleBuyNow}
+            className="flex-1 py-3 px-4 rounded-xl bg-[#D4AF37] hover:bg-[#C29D2F] text-white font-extrabold text-sm shadow-md active:scale-95 transition-all text-center disabled:opacity-50 cursor-pointer"
+          >
+            Buy now
+          </button>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* 2. DESKTOP VIEW (>= md)                                        */}
+      {/* ============================================================== */}
+      <section className="hidden md:block mx-auto max-w-7xl px-5 pt-28 pb-12">
 
 
 
@@ -1219,11 +1742,12 @@ export function ProductDetailPage() {
           </div>
         </div>
       )}
+    </section>
 
-      {/* WRITE A REVIEW MODAL */}
+      {/* WRITE A REVIEW MODAL (Available on Mobile & Desktop) */}
       {showReviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-2xl border border-gold/50 bg-card p-6 sm:p-8 shadow-2xl space-y-5">
+          <div className="relative w-full max-w-lg rounded-2xl border border-gold/50 bg-card p-5 sm:p-8 shadow-2xl space-y-5 my-auto max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowReviewModal(false)}
               className="absolute right-5 top-5 rounded-full border border-border bg-background p-2 text-muted-foreground hover:border-gold hover:text-gold"
@@ -1358,47 +1882,13 @@ export function ProductDetailPage() {
         </div>
       )}
 
-      {/* Sticky Mobile Bottom Bar (Matches Flutter Product Detail Screen 1:1) */}
-      <div className="fixed inset-x-0 bottom-16 z-30 md:hidden border-t border-gold/30 bg-background/95 backdrop-blur-xl p-3 shadow-[0_-5px_20px_rgba(0,0,0,0.15)] flex items-center justify-between gap-3">
-        <div className="flex flex-col justify-center min-w-0">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Total Price</span>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-base font-bold text-gold">₹{currentPrice.toLocaleString("en-IN")}</span>
-            {currentOldPrice > currentPrice && (
-              <span className="text-[10px] text-muted-foreground line-through">₹{currentOldPrice.toLocaleString("en-IN")}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-1 justify-end">
-          <button
-            type="button"
-            disabled={!isVariantInStock}
-            onClick={handleAddToCart}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95 ${
-              isVariantInStock
-                ? "border border-gold text-gold hover:bg-gold hover:text-primary-foreground bg-card shadow-sm"
-                : "border border-border bg-muted/40 text-muted-foreground cursor-not-allowed opacity-60"
-            }`}
-          >
-            <ShoppingBag className="size-3.5" />
-            <span>Bag</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={!isVariantInStock}
-            onClick={handleBuyNow}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 px-3.5 text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer shadow-goldy active:scale-95 ${
-              isVariantInStock
-                ? "bg-gold text-primary-foreground hover:bg-gold/90"
-                : "border border-border bg-card/20 text-muted-foreground cursor-not-allowed opacity-60"
-            }`}
-          >
-            <span>{isVariantInStock ? "Buy Now" : "Out of Stock"}</span>
-          </button>
-        </div>
-      </div>
-    </section>
+      {/* DELIVERY LOCATION MODAL */}
+      <DeliveryLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        currentLocation={selectedLocation}
+        onSelectLocation={handleSelectLocation}
+      />
+    </>
   );
 }

@@ -336,6 +336,21 @@ exports.updateOrderStatus = async (req, res, next) => {
       });
     }
 
+    if (!order && cleanCode && cleanCode.length >= 4) {
+      const allOrders = await Order.find({});
+      order = allOrders.find(o => {
+        const oIdStr = String(o._id || '').toLowerCase();
+        const readableIdStr = String(o.id || '').toLowerCase();
+        const searchStr = cleanCode.toLowerCase();
+        return (
+          oIdStr.endsWith(searchStr) ||
+          oIdStr.includes(searchStr) ||
+          readableIdStr.includes(searchStr) ||
+          readableIdStr.replace(/^#+/, '').includes(searchStr)
+        );
+      });
+    }
+
     if (!order) {
       // In-memory or demo orders (e.g. #VX-1806): still notify admin & broadcast
       if (newStatus.toUpperCase() === 'CANCELLED') {

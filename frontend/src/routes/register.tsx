@@ -143,7 +143,7 @@ export function Register() {
                   className="text-muted-foreground hover:text-gold transition-colors p-1"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                 </button>
               </div>
             </div>
@@ -168,7 +168,7 @@ export function Register() {
                   className="text-muted-foreground hover:text-gold transition-colors p-1"
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
-                  {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showConfirmPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                 </button>
               </div>
             </div>

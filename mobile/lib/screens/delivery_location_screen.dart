@@ -321,22 +321,37 @@ class _DeliveryLocationScreenState extends State<DeliveryLocationScreen> {
       String? detectedRegion;
       String? detectedPin;
 
-      // 1. Try freeipapi (HTTPS)
+      // 1. Try ipapi.co (HTTPS, highly accurate city & postal code)
       try {
-        final res = await http.get(Uri.parse('https://freeipapi.com/api/json')).timeout(const Duration(seconds: 4));
-        if (res.statusCode == 200) {
-          final data = jsonDecode(res.body);
-          if (data['cityName'] != null && data['cityName'].toString().isNotEmpty) {
-            detectedCity = data['cityName'].toString();
-          }
-          if (data['regionName'] != null && data['regionName'].toString().isNotEmpty) {
-            detectedRegion = data['regionName'].toString();
-          }
-          if (data['zipCode'] != null && data['zipCode'].toString().isNotEmpty) {
-            detectedPin = data['zipCode'].toString();
+        final res0 = await http.get(Uri.parse('https://ipapi.co/json/')).timeout(const Duration(seconds: 4));
+        if (res0.statusCode == 200) {
+          final data0 = jsonDecode(res0.body);
+          if (data0['city'] != null && data0['city'].toString().isNotEmpty && data0['error'] != true) {
+            detectedCity = data0['city'].toString();
+            detectedRegion = (data0['region'] ?? 'Telangana').toString();
+            detectedPin = (data0['postal'] ?? '500081').toString();
           }
         }
       } catch (_) {}
+
+      // 2. Fallback to freeipapi (HTTPS)
+      if (detectedCity == null || detectedCity.isEmpty) {
+        try {
+          final res = await http.get(Uri.parse('https://freeipapi.com/api/json')).timeout(const Duration(seconds: 4));
+          if (res.statusCode == 200) {
+            final data = jsonDecode(res.body);
+            if (data['cityName'] != null && data['cityName'].toString().isNotEmpty) {
+              detectedCity = data['cityName'].toString();
+            }
+            if (data['regionName'] != null && data['regionName'].toString().isNotEmpty) {
+              detectedRegion = data['regionName'].toString();
+            }
+            if (data['zipCode'] != null && data['zipCode'].toString().isNotEmpty) {
+              detectedPin = data['zipCode'].toString();
+            }
+          }
+        } catch (_) {}
+      }
 
       // 2. Fallback to ip-api
       if (detectedCity == null || detectedCity.isEmpty) {

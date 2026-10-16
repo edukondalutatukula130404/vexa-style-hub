@@ -5,7 +5,7 @@ export function CartRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate("/dashboard?tab=cart");
+    navigate("/dashboard?tab=cart", { replace: true });
   }, [navigate]);
 
   return (

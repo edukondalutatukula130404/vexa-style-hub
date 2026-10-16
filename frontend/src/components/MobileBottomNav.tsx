@@ -5,7 +5,6 @@ import {
   Home as HomeIcon,
   Heart,
   User as UserIcon,
-  ShoppingBag,
 } from "lucide-react";
 import { useWishlist } from "@/lib/wishlist";
 import { useCart } from "@/lib/cart";
@@ -17,8 +16,15 @@ export function MobileBottomNav() {
   const { cartItems } = useCart();
   const { isLoggedIn } = useAuth();
 
-  // Hide on admin, login, and notifications routes
-  if (location.pathname.startsWith("/admin") || location.pathname === "/login" || location.pathname === "/notifications") {
+  // Hide on admin, login, notifications, product details, and cart routes
+  if (
+    location.pathname.startsWith("/admin") ||
+    location.pathname === "/login" ||
+    location.pathname === "/notifications" ||
+    location.pathname.startsWith("/product/") ||
+    (location.pathname === "/dashboard" && location.search.includes("tab=cart")) ||
+    location.pathname === "/cart"
+  ) {
     return null;
   }
 
@@ -35,8 +41,8 @@ export function MobileBottomNav() {
     (pathname === "/dashboard" && (search.includes("tab=profile") || (!search.includes("tab=orders") && !search.includes("tab=wishlist") && !search.includes("tab=cart"))));
 
   const wishlistCount = (wishlistItems || []).length;
-  const totalCartCount = (cartItems || []).reduce((acc, i) => acc + (i.quantity || 1), 0);
-  const showFloatingCart = !search.includes("tab=cart") && !pathname.startsWith("/product") && (isHome || isWishlist || totalCartCount > 0);
+  const totalCartCount = (cartItems || []).length;
+  const showFloatingCart = !search.includes("tab=cart") && !pathname.startsWith("/product/") && (isHome || isWishlist || pathname === "/products" || totalCartCount > 0);
 
   return (
     <>
@@ -48,7 +54,19 @@ export function MobileBottomNav() {
           aria-label="View Cart"
         >
           <div className="relative flex items-center justify-center">
-            <ShoppingBag className="size-5" />
+            {/* Exact Mobile App Shopping Bag Cart Icon (Matches Screenshot 1:1) */}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-5.5 text-[#0F172A]"
+            >
+              <rect x="5" y="8" width="14" height="13" rx="2" />
+              <path d="M9 10V6a3 3 0 0 1 6 0v4" />
+            </svg>
             {totalCartCount > 0 && (
               <span className="absolute -top-2.5 -right-2.5 flex size-4.5 items-center justify-center rounded-full bg-[#0C2340] text-[10px] font-bold text-white shadow">
                 {totalCartCount}

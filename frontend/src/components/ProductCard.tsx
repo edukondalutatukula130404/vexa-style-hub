@@ -142,7 +142,7 @@ export function ProductCard({ product }: { product: Product }) {
                 </span>
               )}
             </div>
-            <span className="flex items-center gap-0.5 text-[10px] text-gold font-bold">
+            <span className="hidden sm:flex items-center gap-0.5 text-[10px] text-gold font-bold">
               <Star className="size-3 fill-current text-gold" />
               {product.rating}
             </span>

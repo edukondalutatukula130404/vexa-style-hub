@@ -382,15 +382,6 @@ export function DeliveryLocationModal({
               </h1>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleOpenAddAddress}
-            className="flex items-center gap-1 text-xs font-bold text-[#8B6508] dark:text-[#E5BF4E] hover:opacity-80 active:scale-95 transition-all cursor-pointer -mr-1"
-          >
-            <Plus className="size-4" />
-            <span>Add New</span>
-          </button>
         </div>
 
         {/* Scrollable Content Body */}

@@ -33,6 +33,7 @@ interface SavedAddress {
   pincode: string;
   mobile?: string;
   phone?: string;
+  isDefault?: boolean;
 }
 
 const DEFAULT_SEED_ADDRESSES: SavedAddress[] = [
@@ -45,6 +46,7 @@ const DEFAULT_SEED_ADDRESSES: SavedAddress[] = [
     city: "Hyderabad",
     state: "Telangana",
     pincode: "500033",
+    isDefault: true,
   },
   {
     id: "addr_default_2",
@@ -55,6 +57,7 @@ const DEFAULT_SEED_ADDRESSES: SavedAddress[] = [
     city: "Hyderabad",
     state: "Telangana",
     pincode: "500081",
+    isDefault: false,
   },
 ];
 
